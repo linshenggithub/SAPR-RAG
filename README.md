@@ -1,4 +1,8 @@
-# Agentic RAG Process Optimization
+# SAPR-RAG
+
+Step-Aware Process-supervised Retrieval-Augmented Generation.
+
+This repository is also the broader research workspace for Agentic RAG process optimization.
 
 This repository is the research workspace for:
 
@@ -64,4 +68,3 @@ This repository does not vendor full external baseline code by default. Local wo
 3. Freeze ReasonRAG baseline configurations and trajectory format.
 4. Build HotpotQA step-level evidence preference data.
 5. Implement SAPR-RAG V0 on small samples.
-

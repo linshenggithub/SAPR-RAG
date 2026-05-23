@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Logs and runtime outputs
+*.log
+logs/
+output/
+outputs/
+runs/
+wandb/
+
+# Large data and model artifacts
+*.jsonl
+*.parquet
+*.arrow
+*.pkl
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.index
+*.faiss
+datasets/
+corpus/
+models/
+checkpoints/
+
+# Local environment
+.env
+.venv/
+venv/
+env/
+
+# Office temp files
+~$*
+
+# OS/editor
+.DS_Store
+.vscode/
+

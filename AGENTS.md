@@ -201,7 +201,7 @@ Use the fixed note structure:
 ## 10. 后续行动
 ```
 
-For each key claim, mark whether it is `[论文明确提出]`, `[基于方法/实验设置推断]`, or `[本课题 badcase 对齐]`. Store extracted paper figures under `01_literature/paper_notes/images/<note_stem>/` with an `index.md` file.
+For each key claim, mark whether it is `[论文明确提出]`, `[基于方法/实验设置推断]`, or `[本课题 badcase 对齐]`. Store key paper artifacts under `01_literature/paper_notes/images/<note_stem>/key_figures/` with an `index.md` file. Prefer original figures extracted from arXiv source packages by parsing `figure` / `includegraphics`; use PDF caption crops only when source figures are unavailable or when extracting LaTeX tables.
 
 When the user asks for latest or recent papers, browse and prefer primary sources such as ACL Anthology, OpenReview, arXiv, official proceedings, and official project pages.
 

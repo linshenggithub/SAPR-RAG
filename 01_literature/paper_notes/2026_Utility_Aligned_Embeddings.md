@@ -46,19 +46,19 @@
 
 ### Figure 1：Motivation / Problem Setting
 
-![Figure 1](images/2026_Utility_Aligned_Embeddings/key_figures/figure1_page01.png)
+![Figure 1](images/2026_Utility_Aligned_Embeddings/key_figures/figure1_source_efficiency_pareto.png)
 
 > 图 1 通常承担 motivation 或问题定义作用。阅读时要看作者如何把旧方法的问题可视化，例如 dead end、final-answer reward 过粗、检索噪声、faithfulness 缺失或 utility mismatch。对 SAPR-RAG 来说，这类图用于支撑“为什么需要 state-aware process reward”，而不是只作为装饰图。
 
 ### Figure 2：Method / Framework
 
-![Figure 2](images/2026_Utility_Aligned_Embeddings/key_figures/figure2_page01.png)
+![Figure 2](images/2026_Utility_Aligned_Embeddings/key_figures/figure2_source_component.png)
 
 > 图 2 通常对应方法框架或关键模块。阅读时要拆出输入、状态、动作、奖励/监督信号和输出，并判断它覆盖的是 Query Reward、Evidence Reward、Stop Reward、Repair Mechanism 还是 Failure Diagnosis。
 
 ### Table 1：Main Results / Dataset Statistics
 
-![Table 1](images/2026_Utility_Aligned_Embeddings/key_figures/table1_page04.png)
+![Table 1](images/2026_Utility_Aligned_Embeddings/key_figures/table1_pdfcrop_page04.png)
 
 > Table 1 往往是主结果表或数据统计表。阅读时不要只抄最高分，而要判断实验是否真的验证了过程质量：是否包含多跳数据集，是否报告 trajectory-level 指标，是否能定位 query/evidence/stop 的错误来源。
 

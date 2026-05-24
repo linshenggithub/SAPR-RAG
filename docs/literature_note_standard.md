@@ -8,7 +8,7 @@
 
 1. 确认一手来源：优先使用 ACL Anthology、OpenReview、arXiv、官方项目页和官方 GitHub。
 2. 提取论文元信息：标题、作者、年份、venue、paper/pdf/code/dataset 链接、任务、数据集、模型、检索器。
-3. 获取图表：优先按 caption 定位并裁剪关键图表，即 Figure 1 / Figure 2 / Table 1 / Table 2；普通 PDF 页面截图只能作为排查材料，不能作为笔记正文的默认图。
+3. 获取图表：优先从 arXiv 源码包解析 `figure` 环境和 `\includegraphics`，提取作者原始 Figure 1 / Figure 2；若源码不可用或未找到原图，再按 caption 从 PDF 裁剪。Table 1 / Table 2 通常是 LaTeX 表格，可使用 PDF caption 裁剪。
 4. 阅读正文结构：至少覆盖摘要、引言、方法、实验、消融、局限或附录。
 5. 写中文深度笔记：每个关键判断标注 `[论文明确提出]` 或 `[基于方法/实验设置推断]`。
 6. 映射到本课题：说明该论文支持哪个共性问题、暴露哪个逻辑缺口、可转化成 SAPR-RAG 的哪个模块。

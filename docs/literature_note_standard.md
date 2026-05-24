@@ -8,26 +8,33 @@
 
 1. 确认一手来源：优先使用 ACL Anthology、OpenReview、arXiv、官方项目页和官方 GitHub。
 2. 提取论文元信息：标题、作者、年份、venue、paper/pdf/code/dataset 链接、任务、数据集、模型、检索器。
-3. 获取图表：优先从 arXiv 源码包提取图片；若源码不可用，则从 PDF 提取图片；若仍无法抽取有效图片，则渲染论文关键页作为阅读图。
+3. 获取图表：优先按 caption 定位并裁剪关键图表，即 Figure 1 / Figure 2 / Table 1 / Table 2；普通 PDF 页面截图只能作为排查材料，不能作为笔记正文的默认图。
 4. 阅读正文结构：至少覆盖摘要、引言、方法、实验、消融、局限或附录。
 5. 写中文深度笔记：每个关键判断标注 `[论文明确提出]` 或 `[基于方法/实验设置推断]`。
 6. 映射到本课题：说明该论文支持哪个共性问题、暴露哪个逻辑缺口、可转化成 SAPR-RAG 的哪个模块。
 
 ## 2. 图表处理规范
 
-图片保存到：
+关键图表保存到：
 
 ```text
-01_literature/paper_notes/images/<note_stem>/
+01_literature/paper_notes/images/<note_stem>/key_figures/
 ```
 
-每个图片目录必须包含：
+每个关键图表目录必须包含：
 
 ```text
 index.md
 ```
 
-`index.md` 记录图片文件名、来源、大小、页面或抽取方式。笔记正文中至少引用 1 张图，优先引用方法架构图、数据构造图、主结果表或诊断图。若抽不到独立图片，可引用渲染的 PDF 页面，并在图注中注明“页面渲染图，仅用于定位原文图表”。
+`index.md` 记录图片文件名、匹配到的 caption、页面和大小。笔记正文中优先引用：
+
+1. Figure 1：motivation / problem setting；
+2. Figure 2：method / framework；
+3. Table 1：main results / dataset statistics；
+4. Table 2：ablation / diagnostic results。
+
+若自动裁剪失败，应人工检查 PDF 并补图；不要用无意义的首页截图、logo、箭头图标或随机页面图替代关键图表。
 
 图注必须说明：
 

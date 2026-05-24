@@ -170,14 +170,16 @@ def read_meta(path: Path) -> dict[str, str]:
     return meta
 
 
-def image_refs(stem: str) -> tuple[str, str]:
-    folder = IMAGES_DIR / stem
-    files = []
-    if folder.exists():
-        files = sorted(p.name for p in folder.iterdir() if p.is_file() and p.name != "index.md")
-    first_non_page = next((f for f in files if not f.startswith("page_")), files[0] if files else "")
-    page = next((f for f in files if f.startswith("page_01")), first_non_page)
-    return first_non_page, page
+def key_artifact_refs(stem: str) -> dict[str, str]:
+    folder = IMAGES_DIR / stem / "key_figures"
+    refs: dict[str, str] = {}
+    if not folder.exists():
+        return refs
+    for kind in ["figure1", "figure2", "table1", "table2"]:
+        match = next(iter(sorted(folder.glob(f"{kind}_*.png"))), None)
+        if match:
+            refs[kind] = f"images/{stem}/key_figures/{match.name}"
+    return refs
 
 
 def bullets(items: list[str]) -> str:
@@ -188,9 +190,10 @@ def render(path: Path) -> str:
     stem = path.stem
     meta = read_meta(path)
     profile = PROFILES[stem]
-    fig, page = image_refs(stem)
-    fig_md = f"![关键图](images/{stem}/{fig})" if fig else "（暂无可用图片）"
-    page_md = f"![论文首页](images/{stem}/{page})" if page else "（暂无页面图）"
+    refs = key_artifact_refs(stem)
+    fig1_md = f"![Figure 1](%s)" % refs["figure1"] if "figure1" in refs else "（未自动定位到 Figure 1）"
+    fig2_md = f"![Figure 2](%s)" % refs["figure2"] if "figure2" in refs else "（未自动定位到 Figure 2）"
+    table1_md = f"![Table 1](%s)" % refs["table1"] if "table1" in refs else "（未自动定位到 Table 1）"
 
     return f"""# {meta['title']}
 
@@ -238,15 +241,25 @@ def render(path: Path) -> str:
 
 ## 3. 图表速读
 
-{fig_md}
+### Figure 1：Motivation / Problem Setting
 
-> 图 1：来自原论文或 PDF 抽取图。阅读时重点看它如何组织 `{profile['module']}`：是把推理轨迹展开成树、把 reward 拆到步骤，还是把文档 utility 与 LLM 偏好对齐。对 SAPR-RAG 来说，图中最值得迁移的是状态、动作、奖励或数据构造方式，而不是照搬整套系统。
+{fig1_md}
 
-{page_md}
+> 图 1 通常承担 motivation 或问题定义作用。阅读时要看作者如何把旧方法的问题可视化，例如 dead end、final-answer reward 过粗、检索噪声、faithfulness 缺失或 utility mismatch。对 SAPR-RAG 来说，这类图用于支撑“为什么需要 state-aware process reward”，而不是只作为装饰图。
 
-> 图 2：论文首页或关键页面渲染图，用于快速定位题目、摘要、贡献和实验设置。若图 1 是抽取到的局部图片，图 2 可作为上下文补充。
+### Figure 2：Method / Framework
 
-图片索引：[`images/{stem}/index.md`](images/{stem}/index.md)
+{fig2_md}
+
+> 图 2 通常对应方法框架或关键模块。阅读时要拆出输入、状态、动作、奖励/监督信号和输出，并判断它覆盖的是 Query Reward、Evidence Reward、Stop Reward、Repair Mechanism 还是 Failure Diagnosis。
+
+### Table 1：Main Results / Dataset Statistics
+
+{table1_md}
+
+> Table 1 往往是主结果表或数据统计表。阅读时不要只抄最高分，而要判断实验是否真的验证了过程质量：是否包含多跳数据集，是否报告 trajectory-level 指标，是否能定位 query/evidence/stop 的错误来源。
+
+关键图表索引：[`images/{stem}/key_figures/index.md`](images/{stem}/key_figures/index.md)
 
 ## 4. 方法拆解
 

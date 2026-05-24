@@ -44,15 +44,25 @@
 
 ## 3. 图表速读
 
-![关键图](images/2025_ReasonRAG/pdf_p02_02.png)
+### Figure 1：Motivation / Problem Setting
 
-> 图 1：来自原论文或 PDF 抽取图。阅读时重点看它如何组织 `Baseline / SAPR-RAG integration`：是把推理轨迹展开成树、把 reward 拆到步骤，还是把文档 utility 与 LLM 偏好对齐。对 SAPR-RAG 来说，图中最值得迁移的是状态、动作、奖励或数据构造方式，而不是照搬整套系统。
+![Figure 1](images/2025_ReasonRAG/key_figures/figure1_page02.png)
 
-![论文首页](images/2025_ReasonRAG/page_01.png)
+> 图 1 通常承担 motivation 或问题定义作用。阅读时要看作者如何把旧方法的问题可视化，例如 dead end、final-answer reward 过粗、检索噪声、faithfulness 缺失或 utility mismatch。对 SAPR-RAG 来说，这类图用于支撑“为什么需要 state-aware process reward”，而不是只作为装饰图。
 
-> 图 2：论文首页或关键页面渲染图，用于快速定位题目、摘要、贡献和实验设置。若图 1 是抽取到的局部图片，图 2 可作为上下文补充。
+### Figure 2：Method / Framework
 
-图片索引：[`images/2025_ReasonRAG/index.md`](images/2025_ReasonRAG/index.md)
+![Figure 2](images/2025_ReasonRAG/key_figures/figure2_page03.png)
+
+> 图 2 通常对应方法框架或关键模块。阅读时要拆出输入、状态、动作、奖励/监督信号和输出，并判断它覆盖的是 Query Reward、Evidence Reward、Stop Reward、Repair Mechanism 还是 Failure Diagnosis。
+
+### Table 1：Main Results / Dataset Statistics
+
+![Table 1](images/2025_ReasonRAG/key_figures/table1_page05.png)
+
+> Table 1 往往是主结果表或数据统计表。阅读时不要只抄最高分，而要判断实验是否真的验证了过程质量：是否包含多跳数据集，是否报告 trajectory-level 指标，是否能定位 query/evidence/stop 的错误来源。
+
+关键图表索引：[`images/2025_ReasonRAG/key_figures/index.md`](images/2025_ReasonRAG/key_figures/index.md)
 
 ## 4. 方法拆解
 

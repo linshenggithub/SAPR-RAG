@@ -28,9 +28,23 @@
 
 ## 3. 图表速读
 
-![关键图](images/NOTE_STEM/IMAGE_NAME.png)
+### Figure 1：Motivation / Problem Setting
 
-> 图注：说明图表来自哪篇论文、表达什么方法或结果、如何支撑本课题判断。
+![Figure 1](images/NOTE_STEM/key_figures/figure1_pageXX.png)
+
+> 图注：说明 Figure 1 如何定义问题、展示旧方法缺陷或引出 motivation。
+
+### Figure 2：Method / Framework
+
+![Figure 2](images/NOTE_STEM/key_figures/figure2_pageXX.png)
+
+> 图注：说明 Figure 2 的输入、状态、动作、奖励/监督信号和输出。
+
+### Table 1：Main Results / Dataset Statistics
+
+![Table 1](images/NOTE_STEM/key_figures/table1_pageXX.png)
+
+> 图注：说明 Table 1 的主结果、数据统计或实验结论，以及它是否真的支撑过程优化。
 
 ## 4. 方法拆解
 

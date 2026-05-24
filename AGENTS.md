@@ -181,6 +181,8 @@ Paper notes go under:
 01_literature/paper_notes/YYYY_PaperName.md
 ```
 
+Paper reading notes must be written in Chinese by default, so they can be reused directly for weekly reports, the midterm report, the AAAI draft, and the master thesis. English technical terms may be kept when needed. Important figures or tables from the original paper may be included in the note, but the note should cite the source paper and avoid excessive verbatim copying.
+
 Use the fixed note structure:
 
 ```markdown
@@ -449,4 +451,3 @@ Follow this execution order unless the user explicitly changes priorities:
 ## 14. Core Project Statement
 
 本课题面向复杂问答中的 Agentic RAG 多步检索推理过程优化问题，系统调研任务性能改进类 Agentic RAG、生成质量与证据质量改进类 RAG、证据效用建模和过程监督奖励建模等方向，归纳出现有方法在状态感知证据效用建模和细粒度过程奖励修复方面的共性不足。课题以 ReasonRAG 作为代表性 baseline 进行复现和 badcase 诊断，提出状态感知证据效用建模与状态感知过程奖励轨迹修复两项工作。本课题使用 GitHub 作为统一知识库和项目管理平台，对文献、代码、实验、笔记、报告和论文进行全过程管理，保证研究过程可追踪、实验结果可复现、写作材料可复用。
-

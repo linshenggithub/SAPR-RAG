@@ -181,23 +181,27 @@ Paper notes go under:
 01_literature/paper_notes/YYYY_PaperName.md
 ```
 
-Paper reading notes must be written in Chinese by default, so they can be reused directly for weekly reports, the midterm report, the AAAI draft, and the master thesis. English technical terms may be kept when needed. Important figures or tables from the original paper may be included in the note, but the note should cite the source paper and avoid excessive verbatim copying.
+Paper reading notes must be written in Chinese by default, so they can be reused directly for weekly reports, the midterm report, the AAAI draft, and the master thesis. English technical terms may be kept when needed. Important figures or tables from the original paper should be included when available, but the note should cite the source paper and avoid excessive verbatim copying. Follow the detailed standard in `docs/literature_note_standard.md`.
 
 Use the fixed note structure:
 
 ```markdown
 # Paper Title
 
-## 1. Basic Information
-## 2. Motivation
-## 3. Method
-## 4. Experiments
-## 5. Main Results
-## 6. Limitations
-## 7. Relation to My Research
-## 8. Useful Sentences for Writing
-## 9. Follow-up Ideas
+## 0. 阅读结论
+## 1. 核心信息
+## 2. 摘要与问题定义
+## 3. 图表速读
+## 4. 方法拆解
+## 5. 实验设计与结果解读
+## 6. 论文贡献、局限与证据强度
+## 7. 与本课题的关系
+## 8. 可复现与代码阅读线索
+## 9. 可用于写作的中文表述
+## 10. 后续行动
 ```
+
+For each key claim, mark whether it is `[论文明确提出]`, `[基于方法/实验设置推断]`, or `[本课题 badcase 对齐]`. Store extracted paper figures under `01_literature/paper_notes/images/<note_stem>/` with an `index.md` file.
 
 When the user asks for latest or recent papers, browse and prefer primary sources such as ACL Anthology, OpenReview, arXiv, official proceedings, and official project pages.
 

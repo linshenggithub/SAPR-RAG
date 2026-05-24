@@ -1,28 +1,83 @@
 # Paper Title
 
-## 1. Basic Information
+## 0. 阅读结论
+
+- [论文定位]
+- [核心问题]
+- [对本课题价值]
+
+## 1. 核心信息
 
 - Year:
 - Venue:
+- Paper:
+- PDF:
 - Code:
 - Task:
 - Dataset:
 - Backbone:
 - Retriever:
 
-## 2. Motivation
+## 2. 摘要与问题定义
 
-## 3. Method
+### 摘要要点
 
-## 4. Experiments
+### 问题定义
 
-## 5. Main Results
+### 与 ReasonRAG Badcase 的对应
 
-## 6. Limitations
+## 3. 图表速读
 
-## 7. Relation to My Research
+![关键图](images/NOTE_STEM/IMAGE_NAME.png)
 
-## 8. Useful Sentences for Writing
+> 图注：说明图表来自哪篇论文、表达什么方法或结果、如何支撑本课题判断。
 
-## 9. Follow-up Ideas
+## 4. 方法拆解
 
+### 输入输出
+
+### 核心模块
+
+### 训练信号或奖励
+
+### 推理流程
+
+### 与 ReasonRAG 的接口差异
+
+## 5. 实验设计与结果解读
+
+### 数据集与设置
+
+### Baseline 与指标
+
+### 主结果
+
+### 消融与诊断
+
+### 实验严谨性评价
+
+## 6. 论文贡献、局限与证据强度
+
+### 贡献
+
+### 局限
+
+### 证据强度
+
+- [论文明确提出]
+- [基于方法/实验设置推断]
+- [本课题 badcase 对齐]
+
+## 7. 与本课题的关系
+
+### 对 SAPR-RAG 的启发
+
+### 可转化模块
+
+### 与其他论文的关系
+
+## 8. 可复现与代码阅读线索
+
+## 9. 可用于写作的中文表述
+
+## 10. 后续行动

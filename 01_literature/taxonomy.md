@@ -1,6 +1,6 @@
 # 面向 ReasonRAG 方向的 Agentic RAG 文献谱系
 
-本文件基于 `deep-research-report.md` 与 Franklin A 档调研结果重建，目标是服务“面向复杂问答的 Agentic RAG 多步检索推理过程优化研究”。本轮只做论文层面的 A 档调研，不做代码深读。
+本文件基于 `deep-research-report.md`、Franklin A 档调研结果与网页端 Deep Research 证据核查补充重建，目标是服务“面向复杂问答的 Agentic RAG 多步检索推理过程优化研究”。本轮只做论文层面的 A 档调研，不做代码深读。
 
 ## 1. 方向基线：从 Outcome Reward 到 Process Reward
 
@@ -118,13 +118,37 @@
 - 可作为 Evidence Reward 的局部证据集合评估器。
 - 但 SAPR-RAG 需要进一步把证据评估嵌入 query、evidence、stop 三类动作的过程控制中。
 
-## 6. 本课题的逻辑缺口
+## 6. 诊断与 Hop-Level Benchmark 类
+
+代表论文：
+
+- AgenticRAGTracer
+
+共同趋势：
+
+1. 从只看 final QA 的整体评测，转向对每个 hop 的中间问题、推理链长度和失败位置做细粒度诊断。
+2. 将 Agentic RAG 的失败从“答错了”拆成“在哪一步塌缩、在哪一步过度延伸、在哪一步没有按逻辑结构推进”。
+3. 为 failure-labeled dev set、hop-level evaluation 和 trajectory diagnosis 提供数据侧支撑。
+
+共同不足：
+
+1. 这类工作主要回答“如何诊断失败”，不直接回答“如何训练模型避免失败”。
+2. Benchmark 的 hop-level label 需要映射到具体系统 trace，才能成为 reward model 或 reranker 的训练数据。
+3. 它能指出 premature collapse / over-extension，但 state-aware evidence utility 仍需要在方法层面另行定义。
+
+对 SAPR-RAG 的启发：
+
+- ReasonRAG badcase 不应只记录 final prediction，应记录每个 step 的 subquery、retrieved docs、evidence、intermediate answer、stop decision 与 failure type。
+- SAPR-RAG 的实验应报告 hop-level 指标，例如 collapse rate、over-extension rate、step sufficiency 和 trajectory faithfulness。
+- AgenticRAGTracer 适合放在“评测与诊断相关工作”，而不是“优化方法相关工作”。
+
+## 7. 本课题的逻辑缺口
 
 现有研究已经分别证明：
 
 1. Agentic RAG 需要 process reward，而不能只依赖 final answer reward。
 2. 检索文档的 relevance 不等于 LLM 真正需要的 utility。
-3. 多步推理轨迹中的 dead end、noise、unfaithfulness、over-search / under-search 都是真实问题。
+3. 多步推理轨迹中的 dead end、noise、unfaithfulness、over-search / under-search、premature collapse / over-extension 都是真实问题。
 
 但仍缺少统一回答：
 

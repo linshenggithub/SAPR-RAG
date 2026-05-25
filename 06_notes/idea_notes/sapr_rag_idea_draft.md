@@ -1,4 +1,6 @@
-# SAPR-RAG 详细实现方案
+# SAPR-RAG Idea Draft
+
+> 本文档是待审核和多轮打磨的 idea 草案，不代表最终方法设计。
 
 ## 1. 方法定位
 

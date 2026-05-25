@@ -8,7 +8,8 @@
 - [ ] Summarize ReasonRAG local changes.
 - [x] Narrow the core literature set to ReasonRAG-line Agentic RAG methods.
 - [ ] Define the standard trajectory schema.
-- [x] Write the first SAPR-RAG implementation plan.
+- [x] Write the first SAPR-RAG idea draft.
+- [ ] Review and refine the SAPR-RAG idea draft.
 
 ## Baseline
 

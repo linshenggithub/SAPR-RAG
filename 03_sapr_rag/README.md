@@ -6,7 +6,7 @@ SAPR-RAG stands for:
 
 The goal is to repair multi-step retrieval reasoning trajectories by scoring intermediate actions conditioned on the current reasoning state.
 
-See the detailed design and experiment roadmap in [implementation_plan.md](implementation_plan.md).
+Current SAPR-RAG ideas are still under review and iteration. Draft notes live in `06_notes/idea_notes/`.
 
 ## Core Modules
 

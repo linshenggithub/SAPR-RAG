@@ -2,9 +2,11 @@
 
 SAPR-RAG stands for:
 
-> State-Aware Process Reward for Agentic RAG
+> State-Aware Process Repair for Agentic RAG
 
 The goal is to repair multi-step retrieval reasoning trajectories by scoring intermediate actions conditioned on the current reasoning state.
+
+See the detailed design and experiment roadmap in [implementation_plan.md](implementation_plan.md).
 
 ## Core Modules
 
@@ -27,4 +29,3 @@ Question
   -> State-aware Stop Reward
   -> Continue or answer
 ```
-

@@ -2,12 +2,13 @@
 
 ## Immediate
 
-- [ ] Create the first literature survey table.
-- [ ] Write `01_literature/taxonomy.md`.
+- [x] Create the first literature survey table.
+- [x] Write `01_literature/taxonomy.md`.
 - [ ] Write `02_baseline_reasonrag/baseline_results.md`.
 - [ ] Summarize ReasonRAG local changes.
-- [ ] Decide the first 30 papers for literature review.
+- [x] Narrow the core literature set to ReasonRAG-line Agentic RAG methods.
 - [ ] Define the standard trajectory schema.
+- [x] Write the first SAPR-RAG implementation plan.
 
 ## Baseline
 
@@ -18,9 +19,13 @@
 
 ## SAPR-RAG
 
-- [ ] Define Query Reward.
-- [ ] Define Evidence Reward.
-- [ ] Define Stop Reward.
+- [x] Define Query Reward.
+- [x] Define Evidence Reward.
+- [x] Define Stop Reward.
+- [ ] Build HotpotQA Failure Bank V0.
+- [ ] Implement prompt-based Query Repair V0.
+- [ ] Implement prompt-based State-Aware Evidence Reranker V0.
+- [ ] Implement prompt-based Stop Verifier V0.
 - [ ] Implement a small-sample SAPR-RAG V0.
 - [ ] Run ablation on HotpotQA.
 
@@ -29,4 +34,3 @@
 - [ ] Draft research direction statement.
 - [ ] Draft related work outline.
 - [ ] Draft midterm report structure.
-

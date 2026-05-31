@@ -11,6 +11,16 @@ outputs/
 runs/
 wandb/
 
+# Local ARIS / Claude Code installation state
+.claude/skills/
+.claude/settings.local.json
+.aris/tools
+.aris/installed-skills*.txt*
+.aris/traces/
+
+# Accidental nested experiment output paths
+04_experiments/04_experiments/
+
 # Large data and model artifacts
 *.jsonl
 *.parquet
@@ -39,4 +49,3 @@ env/
 # OS/editor
 .DS_Store
 .vscode/
-

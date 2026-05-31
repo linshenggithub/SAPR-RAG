@@ -1,0 +1,143 @@
+{
+  "label": "debug_result",
+  "aggregate": {
+    "retriever_top3": {
+      "selector": "retriever_top3",
+      "n_steps": 113,
+      "hit@3_mean": 0.469,
+      "recall@3_mean": 0.2389,
+      "noise_rate_mean": 0.8407,
+      "item_hit_pct": 56.7,
+      "n_items": 30
+    },
+    "static_qd": {
+      "selector": "static_qd",
+      "n_steps": 113,
+      "hit@3_mean": 0.5221,
+      "recall@3_mean": 0.2832,
+      "noise_rate_mean": 0.8112,
+      "item_hit_pct": 56.7,
+      "n_items": 30
+    },
+    "sapr_e_v0": {
+      "selector": "sapr_e_v0",
+      "n_steps": 113,
+      "hit@3_mean": 0.5398,
+      "recall@3_mean": 0.2699,
+      "noise_rate_mean": 0.8201,
+      "item_hit_pct": 63.3,
+      "n_items": 30
+    },
+    "sapr_e_no_hist": {
+      "selector": "sapr_e_no_hist",
+      "n_steps": 113,
+      "hit@3_mean": 0.5133,
+      "recall@3_mean": 0.2566,
+      "noise_rate_mean": 0.8289,
+      "item_hit_pct": 60.0,
+      "n_items": 30
+    },
+    "sapr_e_no_title": {
+      "selector": "sapr_e_no_title",
+      "n_steps": 113,
+      "hit@3_mean": 0.4602,
+      "recall@3_mean": 0.2301,
+      "noise_rate_mean": 0.8466,
+      "item_hit_pct": 53.3,
+      "n_items": 30
+    },
+    "sapr_e_no_subquery": {
+      "selector": "sapr_e_no_subquery",
+      "n_steps": 113,
+      "hit@3_mean": 0.5133,
+      "recall@3_mean": 0.2566,
+      "noise_rate_mean": 0.8289,
+      "item_hit_pct": 60.0,
+      "n_items": 30
+    }
+  },
+  "badcases": [
+    {
+      "item_id": "dev_1",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+      "gold_titles": [
+        "kiss and tell 1945 film",
+        "shirley temple"
+      ]
+    },
+    {
+      "item_id": "dev_11",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and Téa Leoni?",
+      "gold_titles": [
+        "david weissman",
+        "the family man"
+      ]
+    },
+    {
+      "item_id": "dev_11",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and Téa Leoni?",
+      "gold_titles": [
+        "david weissman",
+        "the family man"
+      ]
+    },
+    {
+      "item_id": "dev_26",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "The 2011–12 VCU Rams men's basketball team, led by third year head coach Shaka Smart, represented Virginia Commonwealth University which was founded in what year?",
+      "gold_titles": [
+        "201112 vcu rams mens basketball team",
+        "virginia commonwealth university"
+      ]
+    },
+    {
+      "item_id": "dev_27",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Are both Dictyosperma, and Huernia described as a genus?",
+      "gold_titles": [
+        "dictyosperma",
+        "huernia"
+      ]
+    },
+    {
+      "item_id": "dev_28",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+      "gold_titles": [
+        "henry j kaiser",
+        "kaiser ventures"
+      ]
+    },
+    {
+      "item_id": "dev_28",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+      "gold_titles": [
+        "henry j kaiser",
+        "kaiser ventures"
+      ]
+    },
+    {
+      "item_id": "dev_7",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "The arena where the Lewiston Maineiacs played their home games can seat how many people?",
+      "gold_titles": [
+        "androscoggin bank colise",
+        "lewiston maineiacs"
+      ]
+    }
+  ],
+  "n_items": 30,
+  "n_retrieval_steps": 113
+}

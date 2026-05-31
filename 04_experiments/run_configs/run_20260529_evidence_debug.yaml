@@ -1,0 +1,25 @@
+run_name: 20260529_evidence_debug_30samples_v2
+date: 2026-05-29
+server: rag-5090
+gpu: "0"
+model: qwen2.5-instruct-ReasonRAG-lora
+adapter: ReasonRAG-LoRA (merged, frozen)
+dataset: hotpotqa_dev_30slice
+retriever: bge-base-en-v1.5
+corpus: wiki18_extended.jsonl
+top_k: 3
+max_steps: 8
+temperature: 0.0
+num_candidates: 2
+method: ReasonRAG baseline (trajectory sanity check)
+baseline: self
+output_path: /home/mayi/RAG/agentic-rag-process-optimization/04_experiments/logs/20260529_evidence_debug_30samples_v2/
+log_path: /home/mayi/RAG/agentic-rag-process-optimization/04_experiments/logs/20260529_evidence_debug_30samples_v2/run.log
+metric_path: /home/mayi/RAG/agentic-rag-process-optimization/04_experiments/metrics/20260529_evidence_debug_30samples_v2/
+note: >
+  ReasonRAG-LoRA baseline trajectory sanity check on 30 HotpotQA dev examples.
+  max_iter=8 (ReasonRAG standard), retrieval_topk=3, max_children=2.
+  This is debug_result, baseline trajectory sanity, NOT SAPR-E evidence comparison.
+  v1 had max_iter=3 which was too low (60% max-out rate, EM=0.033).
+  v2 corrected to max_iter=8: 97% answer rate, EM=0.233, F1=0.328.
+  Output saved outside ReasonRAG/output/ to protect previous reproduction results.

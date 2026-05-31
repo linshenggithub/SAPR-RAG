@@ -1,0 +1,71 @@
+{
+  "run_id": "20260529_evidence_debug_30samples_v2",
+  "label": "debug_result",
+  "purpose": "ReasonRAG-LoRA baseline trajectory sanity check (NOT SAPR-E evidence comparison)",
+  "timestamp": "2026-05-29T23:09:00",
+  "server": "rag-5090",
+  "gpu": "0",
+  "gpu_info": "RTX 5090, 32 GiB VRAM, single GPU",
+  "dataset": "hotpotqa_dev",
+  "num_examples": 30,
+  "slice_rule": "first 30 examples from HotpotQA dev (dev_0 .. dev_29)",
+  "method": "ReasonRAG-LoRA baseline",
+  "model": "qwen2.5-instruct-ReasonRAG-lora",
+  "model_path": "/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+  "retriever": "bge-base-en-v1.5",
+  "retriever_path": "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
+  "corpus": "/nas/mayi/RAG/corpus/wiki18_extended.jsonl",
+  "index": "/home/mayi/ReasonRAG/indexes/bge_extended/bge_Flat.index",
+  "retrieval_topk": 3,
+  "max_iter": 8,
+  "max_children": 2,
+  "max_rollouts": 64,
+  "framework": "vllm 0.12.0",
+  "gpu_memory_utilization": 0.8,
+  "generator_max_input_len": 8192,
+  "seed": 2024,
+  "metrics": {
+    "em": 0.2333,
+    "f1": 0.3283,
+    "acc": 0.2333,
+    "recall": 0.3133,
+    "precision": 0.3556
+  },
+  "trajectory_stats": {
+    "answer_rate": "29/30 (96.7%)",
+    "maxout_rate": "1/30 (3.3%)",
+    "non_empty_pred": 29,
+    "maxed_out_pred": 1,
+    "em_hits": 7,
+    "flag_distribution": {"answer": 29, "None": 1},
+    "iteration_distribution": {"1": 2, "2": 4, "3": 6, "4": 9, "5": 7, "6": 1, "8": 1}
+  },
+  "timing": {
+    "init_time_s": 495.6,
+    "run_time_s": 872.9,
+    "run_time_min": 14.5,
+    "avg_time_per_example_s": 29.1
+  },
+  "comparison": {
+    "full_dev_baseline_em": 0.3495,
+    "full_dev_baseline_f1": 0.4560,
+    "full_dev_baseline_acc": 0.4038,
+    "full_dev_baseline_config": "hotpotqa_2026_03_13_15_10_qwen2.5-instruct-ReasonRAG_lora_iter8_baseline",
+    "note": "30-sample debug EM is lower than full dev baseline due to small sample variance; trajectory behavior is consistent"
+  },
+  "remote_paths": {
+    "intermediate_data": "/home/mayi/RAG/agentic-rag-process-optimization/04_experiments/logs/20260529_evidence_debug_30samples_v2/hotpotqa_2026_05_29_23_09_20260529_evidence_debug_30samples_v2/intermediate_data.json",
+    "metric_score_txt": "/home/mayi/RAG/agentic-rag-process-optimization/04_experiments/logs/20260529_evidence_debug_30samples_v2/hotpotqa_2026_05_29_23_09_20260529_evidence_debug_30samples_v2/metric_score.txt",
+    "run_log": "/home/mayi/RAG/agentic-rag-process-optimization/04_experiments/logs/20260529_evidence_debug_30samples_v2/run.log"
+  },
+  "v1_comparison": {
+    "v1_run_id": "20260529_evidence_debug_30samples",
+    "v1_max_iter": 3,
+    "v1_topk": 10,
+    "v1_em": 0.0333,
+    "v1_f1": 0.0429,
+    "v1_answer_rate": "12/30 (40%)",
+    "v1_maxout_rate": "18/30 (60%)",
+    "v1_note": "max_iter=3 too low for ReasonRAG MCTS; 60% samples maxed out without answer"
+  }
+}

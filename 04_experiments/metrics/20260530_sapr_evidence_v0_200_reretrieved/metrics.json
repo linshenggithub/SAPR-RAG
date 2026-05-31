@@ -1,0 +1,553 @@
+{
+  "label": "debug_result",
+  "aggregate": {
+    "retriever_top3": {
+      "selector": "retriever_top3",
+      "n_steps": 734,
+      "hit@3_mean": 0.3256,
+      "recall@3_mean": 0.1744,
+      "noise_rate_mean": 0.8837,
+      "item_hit_pct": 47.7,
+      "n_items": 199
+    },
+    "static_qd": {
+      "selector": "static_qd",
+      "n_steps": 734,
+      "hit@3_mean": 0.3311,
+      "recall@3_mean": 0.1853,
+      "noise_rate_mean": 0.8765,
+      "item_hit_pct": 49.2,
+      "n_items": 199
+    },
+    "sapr_e_v0": {
+      "selector": "sapr_e_v0",
+      "n_steps": 734,
+      "hit@3_mean": 0.342,
+      "recall@3_mean": 0.1792,
+      "noise_rate_mean": 0.8806,
+      "item_hit_pct": 51.8,
+      "n_items": 199
+    },
+    "sapr_e_no_hist": {
+      "selector": "sapr_e_no_hist",
+      "n_steps": 734,
+      "hit@3_mean": 0.3501,
+      "recall@3_mean": 0.1832,
+      "noise_rate_mean": 0.8778,
+      "item_hit_pct": 51.8,
+      "n_items": 199
+    },
+    "sapr_e_no_title": {
+      "selector": "sapr_e_no_title",
+      "n_steps": 734,
+      "hit@3_mean": 0.2943,
+      "recall@3_mean": 0.158,
+      "noise_rate_mean": 0.8946,
+      "item_hit_pct": 46.2,
+      "n_items": 199
+    },
+    "sapr_e_no_subquery": {
+      "selector": "sapr_e_no_subquery",
+      "n_steps": 734,
+      "hit@3_mean": 0.3283,
+      "recall@3_mean": 0.1717,
+      "noise_rate_mean": 0.8856,
+      "item_hit_pct": 50.3,
+      "n_items": 199
+    }
+  },
+  "badcases": [
+    {
+      "item_id": "dev_1",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+      "gold_titles": [
+        "kiss and tell 1945 film",
+        "shirley temple"
+      ]
+    },
+    {
+      "item_id": "dev_101",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "David Huntsinger has worked with this gospel singer born in the month of July?",
+      "gold_titles": [
+        "david huntsinger",
+        "larnelle harris"
+      ]
+    },
+    {
+      "item_id": "dev_104",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Since 2 June 2017, The Leader of Fine Gael had been held by which Irish Fine Gael politician who has served as Taoiseach and Minister for Defence?",
+      "gold_titles": [
+        "leader of fine gael",
+        "leo varadkar"
+      ]
+    },
+    {
+      "item_id": "dev_107",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What type of activity does Owner earnings and Warren Buffett have in common?",
+      "gold_titles": [
+        "owner earnings",
+        "warren buffett"
+      ]
+    },
+    {
+      "item_id": "dev_107",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "What type of activity does Owner earnings and Warren Buffett have in common?",
+      "gold_titles": [
+        "owner earnings",
+        "warren buffett"
+      ]
+    },
+    {
+      "item_id": "dev_11",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and Téa Leoni?",
+      "gold_titles": [
+        "david weissman",
+        "the family man"
+      ]
+    },
+    {
+      "item_id": "dev_11",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and Téa Leoni?",
+      "gold_titles": [
+        "david weissman",
+        "the family man"
+      ]
+    },
+    {
+      "item_id": "dev_114",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "Which component of shellite has the formula (ON)CHOH?",
+      "gold_titles": [
+        "picric acid",
+        "shellite explosive"
+      ]
+    },
+    {
+      "item_id": "dev_119",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Are Daryl Hall and Gerry Marsden both musicians?",
+      "gold_titles": [
+        "daryl hall",
+        "gerry marsden"
+      ]
+    },
+    {
+      "item_id": "dev_119",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Are Daryl Hall and Gerry Marsden both musicians?",
+      "gold_titles": [
+        "daryl hall",
+        "gerry marsden"
+      ]
+    },
+    {
+      "item_id": "dev_122",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "What's the name of the fantasy film starring Sarah Bolger, featuring a New England family who discover magical creatures around their estate?",
+      "gold_titles": [
+        "sarah bolger",
+        "the spiderwick chronicles film"
+      ]
+    },
+    {
+      "item_id": "dev_128",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Where is the Bubblegum Alley, that is similar to Gum Wall, located in California?",
+      "gold_titles": [
+        "gum wall",
+        "san luis obispo california"
+      ]
+    },
+    {
+      "item_id": "dev_128",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Where is the Bubblegum Alley, that is similar to Gum Wall, located in California?",
+      "gold_titles": [
+        "gum wall",
+        "san luis obispo california"
+      ]
+    },
+    {
+      "item_id": "dev_133",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Which Eminem album included vocals from a singer who had an album titled \"Unapologetic\"?",
+      "gold_titles": [
+        "numb rihanna song",
+        "the monster song"
+      ]
+    },
+    {
+      "item_id": "dev_138",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "For what type of work is the production company for The Year Without a Santa Claus best known?",
+      "gold_titles": [
+        "rankinbass productions",
+        "the year without a santa claus"
+      ]
+    },
+    {
+      "item_id": "dev_145",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Who was born first, Erika Jayne or Marco Da Silva",
+      "gold_titles": [
+        "erika jayne",
+        "marco da silva dancer"
+      ]
+    },
+    {
+      "item_id": "dev_149",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "Which song was behind the third single on the album  \"A Lot About Livin' (And a Little 'bout Love)\" for two weeks on the country charts?",
+      "gold_titles": [
+        "chattahoochee song",
+        "well burn that bridge"
+      ]
+    },
+    {
+      "item_id": "dev_155",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Where was the world cup hosted that Algeria qualified for the first time into the round of 16?",
+      "gold_titles": [
+        "2014 fifa world cup",
+        "algeria at the fifa world cup"
+      ]
+    },
+    {
+      "item_id": "dev_159",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "The song \"Chim Chim Cher-ee\" can be heard  in the \"Mary Poppins\" scene of a Disney ride that debuted in what year?",
+      "gold_titles": [
+        "chim chim cheree",
+        "the great movie ride"
+      ]
+    },
+    {
+      "item_id": "dev_159",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "The song \"Chim Chim Cher-ee\" can be heard  in the \"Mary Poppins\" scene of a Disney ride that debuted in what year?",
+      "gold_titles": [
+        "chim chim cheree",
+        "the great movie ride"
+      ]
+    },
+    {
+      "item_id": "dev_168",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "What was the 58th quadrennial American presidential election held after the 2016 Michigan Democratic primary?",
+      "gold_titles": [
+        "michigan democratic primary 2016",
+        "united states presidential election 2016"
+      ]
+    },
+    {
+      "item_id": "dev_168",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "What was the 58th quadrennial American presidential election held after the 2016 Michigan Democratic primary?",
+      "gold_titles": [
+        "michigan democratic primary 2016",
+        "united states presidential election 2016"
+      ]
+    },
+    {
+      "item_id": "dev_170",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What is the name of the detective novelist parent of the author of '\"Q\" Is for Quarry'?",
+      "gold_titles": [
+        "quotqquot is for quarry",
+        "sue grafton"
+      ]
+    },
+    {
+      "item_id": "dev_173",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Which songwriting duo composed music for \"La La Land\", and created lyrics for \"A Christmas Story: The Musical\"? ",
+      "gold_titles": [
+        "a christmas story the musical",
+        "pasek and paul"
+      ]
+    },
+    {
+      "item_id": "dev_173",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Which songwriting duo composed music for \"La La Land\", and created lyrics for \"A Christmas Story: The Musical\"? ",
+      "gold_titles": [
+        "a christmas story the musical",
+        "pasek and paul"
+      ]
+    },
+    {
+      "item_id": "dev_184",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "What year did the series on CBS, starring the actor who known for his role in \"Rebel Without a Cause,\" air?",
+      "gold_titles": [
+        "cbs television workshop",
+        "james dean"
+      ]
+    },
+    {
+      "item_id": "dev_186",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "Who were the directors of the 2009 American science fiction film starring the actor who played Dexter Morgan in the Showtime TV Network series \"Dexter\"?",
+      "gold_titles": [
+        "gamer film",
+        "michael c hall"
+      ]
+    },
+    {
+      "item_id": "dev_187",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Which travel parody series featured American actor, comedian, and radio host best known as the host of \"The Joe Schmo Show\"?",
+      "gold_titles": [
+        "hidden america with jonah ray",
+        "ralph garman"
+      ]
+    },
+    {
+      "item_id": "dev_26",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "The 2011–12 VCU Rams men's basketball team, led by third year head coach Shaka Smart, represented Virginia Commonwealth University which was founded in what year?",
+      "gold_titles": [
+        "201112 vcu rams mens basketball team",
+        "virginia commonwealth university"
+      ]
+    },
+    {
+      "item_id": "dev_27",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Are both Dictyosperma, and Huernia described as a genus?",
+      "gold_titles": [
+        "dictyosperma",
+        "huernia"
+      ]
+    },
+    {
+      "item_id": "dev_28",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+      "gold_titles": [
+        "henry j kaiser",
+        "kaiser ventures"
+      ]
+    },
+    {
+      "item_id": "dev_28",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+      "gold_titles": [
+        "henry j kaiser",
+        "kaiser ventures"
+      ]
+    },
+    {
+      "item_id": "dev_33",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "Are Freakonomics and In the Realm of the Hackers both American documentaries?",
+      "gold_titles": [
+        "freakonomics film",
+        "in the realm of the hackers"
+      ]
+    },
+    {
+      "item_id": "dev_33",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Are Freakonomics and In the Realm of the Hackers both American documentaries?",
+      "gold_titles": [
+        "freakonomics film",
+        "in the realm of the hackers"
+      ]
+    },
+    {
+      "item_id": "dev_51",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "In 1991 Euromarché was bought by a chain that operated how any hypermarkets at the end of 2016?",
+      "gold_titles": [
+        "carrefour",
+        "euromarch"
+      ]
+    },
+    {
+      "item_id": "dev_51",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "In 1991 Euromarché was bought by a chain that operated how any hypermarkets at the end of 2016?",
+      "gold_titles": [
+        "carrefour",
+        "euromarch"
+      ]
+    },
+    {
+      "item_id": "dev_56",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "D1NZ is a series based on what oversteering technique?",
+      "gold_titles": [
+        "d1nz",
+        "drifting motorsport"
+      ]
+    },
+    {
+      "item_id": "dev_61",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "What is the name of the executive producer of the film that has a score composed by Jerry Goldsmith?",
+      "gold_titles": [
+        "alien film",
+        "alien soundtrack"
+      ]
+    },
+    {
+      "item_id": "dev_61",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "What is the name of the executive producer of the film that has a score composed by Jerry Goldsmith?",
+      "gold_titles": [
+        "alien film",
+        "alien soundtrack"
+      ]
+    },
+    {
+      "item_id": "dev_65",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "What WB supernatrual drama series was Jawbreaker star Rose Mcgowan best known for being in?",
+      "gold_titles": [
+        "jawbreaker film",
+        "rose mcgowan"
+      ]
+    },
+    {
+      "item_id": "dev_65",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "What WB supernatrual drama series was Jawbreaker star Rose Mcgowan best known for being in?",
+      "gold_titles": [
+        "jawbreaker film",
+        "rose mcgowan"
+      ]
+    },
+    {
+      "item_id": "dev_7",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "The arena where the Lewiston Maineiacs played their home games can seat how many people?",
+      "gold_titles": [
+        "androscoggin bank colise",
+        "lewiston maineiacs"
+      ]
+    },
+    {
+      "item_id": "dev_81",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "The Album Against the Wind was the 11th Album of a Rock singer Robert C Seger born may 6 1945. What was the Rock singers stage name ?",
+      "gold_titles": [
+        "against the wind album",
+        "bob seger"
+      ]
+    },
+    {
+      "item_id": "dev_83",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "Handi-Snacks are a snack food product line sold by what American multinational confectionery, food, and beverage company that is based in Illinois?",
+      "gold_titles": [
+        "handisnacks",
+        "mondelez international"
+      ]
+    },
+    {
+      "item_id": "dev_83",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "Handi-Snacks are a snack food product line sold by what American multinational confectionery, food, and beverage company that is based in Illinois?",
+      "gold_titles": [
+        "handisnacks",
+        "mondelez international"
+      ]
+    },
+    {
+      "item_id": "dev_85",
+      "sapr_e_v0": 0,
+      "retriever_top3": 1.0,
+      "question": "When was the American lawyer, lobbyist and political consultant who was a senior member of the presidential campaign of Donald Trump born?",
+      "gold_titles": [
+        "paul manafort",
+        "trump campaignrussian meeting"
+      ]
+    },
+    {
+      "item_id": "dev_85",
+      "sapr_e_v0": 0,
+      "static_qd": 1.0,
+      "question": "When was the American lawyer, lobbyist and political consultant who was a senior member of the presidential campaign of Donald Trump born?",
+      "gold_titles": [
+        "paul manafort",
+        "trump campaignrussian meeting"
+      ]
+    },
+    {
+      "item_id": "dev_91",
+      "sapr_e_v0": 1.0,
+      "static_qd": 0,
+      "question": "Which American film director hosted the 18th Independent Spirit Awards in 2002?",
+      "gold_titles": [
+        "18th independent spirit awards",
+        "john waters"
+      ]
+    },
+    {
+      "item_id": "dev_94",
+      "sapr_e_v0": 1.0,
+      "retriever_top3": 0,
+      "question": "In what month is the annual documentary film festival, that is presented by the fortnightly published British journal of literary essays, held? ",
+      "gold_titles": [
+        "london international documentary festival",
+        "london review of books"
+      ]
+    }
+  ],
+  "n_items": 199,
+  "n_retrieval_steps": 734
+}

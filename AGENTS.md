@@ -6,6 +6,12 @@ This repository is the long-term research workspace for:
 
 Use this file as the project operating guide. When continuing work in this repository, read this file first, then inspect `README.md`, `ROADMAP.md`, and the task-relevant directory.
 
+## 0. Language and Communication Rules
+
+Default interaction language: Chinese (`language: zh`).
+
+When working in this repository, Copilot CLI, Codex, and ARIS skills should reply to the user in Chinese by default. Keep technical terms, paper titles, dataset names, model names, file paths, shell commands, code identifiers, and API names in English when that is clearer. Generated code, configs, command lines, YAML/JSON keys, and exact logs should remain in their original language. Paper notes and reusable writing material should be written in Chinese unless the user explicitly requests English.
+
 ## 1. Research Positioning
 
 This project is not a single-method modification of ReasonRAG. ReasonRAG has three roles:
@@ -51,7 +57,7 @@ Fix research direction
   -> Expand both directions into the master thesis
 ```
 
-Do not jump directly into large-scale GRPO unless the data pipeline, reward design, and small-scale verification are stable.
+Do not jump directly into large-scale GRPO/online RL before the data pipeline, reward design, and small-scale verification are stable. This is a staged-risk rule, not a ban on SFT/RL. SFT, DPO, PRM training, GRPO/online RL, and larger compute are all valid candidate routes when the idea is sufficiently novel, falsifiable, and early evidence justifies the cost.
 
 ## 4. Two Optimization Directions
 
@@ -124,7 +130,8 @@ docs/                    Setup, experiment protocol, coding standard, writing st
 
 External codebases should normally stay outside this repository:
 
-- ReasonRAG: `/home/mayi/RAG/ReasonRAG`
+- ReasonRAG on local 4 x RTX 3090 server: `/home/mayi/RAG/ReasonRAG`
+- ReasonRAG on remote `rag-5090`: `/home/mayi/ReasonRAG`
 - DPA-RAG: `/home/mayi/RAG/DPA-RAG`
 - DecEx-RAG: `/home/mayi/RAG/DecEx-RAG`
 - RoleRAG: `/home/mayi/RAG/RoleRAG`
@@ -367,12 +374,27 @@ Examples:
 
 Known resources:
 
-- Server A: RTX 5090 machines, used for main experiments, SAPR-RAG main method, candidate trajectory generation, LLM-as-Judge scoring, and later reward model training.
-- Server B: 4 x RTX 3090, used for baseline reruns, retrieval preprocessing, badcase classification, ablations, and metric recomputation.
+- Server A: 3 x RTX 5090, SSH alias `rag-5090`, IP `10.249.150.133`, hostname `expm11`, user `mayi`. Use it for main experiments, SAPR-RAG main method, candidate trajectory generation, LLM-as-Judge scoring, and later reward model training. Connect with key-based auth:
+
+```bash
+ssh rag-5090
+```
+
+- Server B: current 4 x RTX 3090 machine, user `mayi`. Use it as the default Copilot CLI / ARIS control node, and for baseline reruns, retrieval preprocessing, badcase classification, ablations, and metric recomputation.
 - No cross-server distributed training by default.
 - Use task-level parallelism across machines.
 
 Every experiment should record server, GPU, model, retriever, corpus, output path, and log path.
+
+Remote `rag-5090` already has a ReasonRAG reproduction workspace at `/home/mayi/ReasonRAG`, including previous reproduction outputs. Do not overwrite, delete, or rsync over its `output/`, `corpus/`, `indexes/`, `dataset/`, `training_dataset/`, or other local result/data directories unless the user explicitly requests it. For SAPR-RAG debug experiments on `rag-5090`, use `/home/mayi/ReasonRAG` as the baseline repo path and write new outputs to a clearly named new run directory.
+
+When asking Copilot CLI / ARIS to run experiment workflows, prefer explicit server names, for example:
+
+```text
+/experiment-bridge "Connect SAPR-RAG experiments to ReasonRAG baseline" — server: rag-5090, gpu: 0, base repo: /home/mayi/ReasonRAG
+```
+
+Additional non-sensitive server notes are stored in `docs/server_env.md`. Never store private keys, passwords, API tokens, or credentials in this repository.
 
 ## 11. File and Git Hygiene
 

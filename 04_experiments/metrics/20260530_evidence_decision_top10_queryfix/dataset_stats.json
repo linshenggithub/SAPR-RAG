@@ -1,0 +1,19 @@
+{
+  "label": "debug_result",
+  "source": "export_evidence_decisions_v2.py",
+  "n_items": 30,
+  "n_retrieval_steps": 113,
+  "n_summaries": 30,
+  "n_total_decision_points": 143,
+  "inferred_subquery_nonempty_rate": 1.0,
+  "pipeline_query_empty_rate": 1.0,
+  "docs_total": 1130,
+  "docs_with_title": 1130,
+  "docs_with_text": 1130,
+  "docs_with_score": 1130,
+  "supporting_facts_preserved": 113,
+  "baseline_em": 0.2333,
+  "baseline_f1": null,
+  "inference_time_s": 1126.5,
+  "validation": "PASSED"
+}

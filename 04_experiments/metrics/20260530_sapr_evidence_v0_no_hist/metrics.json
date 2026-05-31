@@ -1,0 +1,45 @@
+{
+  "label": "debug_result",
+  "aggregate": {
+    "retriever_top3": {
+      "selector": "retriever_top3",
+      "n_steps": 113,
+      "hit@3_mean": 0.0,
+      "recall@3_mean": 0.0,
+      "noise_rate_mean": 1.0,
+      "item_hit_pct": 0.0,
+      "n_items": 30
+    },
+    "static_qd": {
+      "selector": "static_qd",
+      "n_steps": 113,
+      "hit@3_mean": 0.0,
+      "recall@3_mean": 0.0,
+      "noise_rate_mean": 1.0,
+      "item_hit_pct": 0.0,
+      "n_items": 30
+    },
+    "sapr_e_v0": {
+      "selector": "sapr_e_v0",
+      "n_steps": 113,
+      "hit@3_mean": 0.0,
+      "recall@3_mean": 0.0,
+      "noise_rate_mean": 1.0,
+      "item_hit_pct": 0.0,
+      "n_items": 30
+    },
+    "sapr_e_no_hist": {
+      "selector": "sapr_e_no_hist",
+      "n_steps": 113,
+      "hit@3_mean": 0.0,
+      "recall@3_mean": 0.0,
+      "noise_rate_mean": 1.0,
+      "item_hit_pct": 0.0,
+      "n_items": 30
+    }
+  },
+  "n_items": 30,
+  "n_retrieval_steps": 113,
+  "ablation": "sapr_e_no_hist = SAPR-E with empty history_thoughts",
+  "data_quality_note": "ALL retrieval_top10 are from empty-query retrieval (identical docs) — results are NOT meaningful"
+}

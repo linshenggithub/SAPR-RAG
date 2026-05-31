@@ -1,0 +1,6342 @@
+[
+  {
+    "item_id": "dev_0",
+    "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+    "gold_titles": [
+      "ed wood",
+      "scott derrickson"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "Ed Wood's nationality",
+      "Ed Wood's nationality",
+      "Ed Wood's nationality",
+      "Ed Wood's nationality"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Ed Wood",
+            "Woodson, Arkansas",
+            "Wayne Bastrup"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ed Wood",
+            "Woodson, Arkansas",
+            "Wayne Bastrup"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ed Wood",
+            "Woodson, Arkansas",
+            "Wayne Bastrup"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Ed Wood",
+            "Woodson, Arkansas",
+            "Wayne Bastrup"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Woodson, Arkansas",
+            "Ed Wood (film)",
+            "Ed Wood"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Woodson, Arkansas",
+            "Ed Wood (film)",
+            "Ed Wood"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Woodson, Arkansas",
+            "Ed Wood (film)",
+            "Ed Wood"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Woodson, Arkansas",
+            "Ed Wood (film)",
+            "Ed Wood"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Ed Wood (film)",
+            "Ed Wood",
+            "Woodson, Arkansas"
+          ],
+          "gold_found": [
+            "ed wood"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_1",
+    "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+    "gold_titles": [
+      "kiss and tell 1945 film",
+      "shirley temple"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "the woman who portrayed Corliss Archer in the film \"Kiss and",
+      "what government position she might have held",
+      "what government position she might have held"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "A Kiss for Corliss",
+            "A Kiss for Corliss",
+            "A Kiss for Corliss"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Maria Minna",
+            "Governess",
+            "Lucy Lameck"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Maria Minna",
+            "Governess",
+            "Lucy Lameck"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kathryn Card",
+            "Kiss and Tell (1945 film)",
+            "A Kiss for Corliss"
+          ],
+          "gold_found": [
+            "kiss and tell 1945 film"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Maria Minna",
+            "Lucy Lameck",
+            "Margaret Bondfield"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Maria Minna",
+            "Lucy Lameck",
+            "Margaret Bondfield"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kiss and Tell (1945 film)",
+            "Kiss and Tell (1945 film)",
+            "A Kiss for Corliss"
+          ],
+          "gold_found": [
+            "kiss and tell 1945 film",
+            "kiss and tell 1945 film"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Maria Minna",
+            "Margaret Bondfield",
+            "Security of tenure"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Maria Minna",
+            "Margaret Bondfield",
+            "Security of tenure"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kiss and Tell (1945 film)",
+            "A Kiss for Corliss",
+            "Kiss and Tell (1945 film)"
+          ],
+          "gold_found": [
+            "kiss and tell 1945 film",
+            "kiss and tell 1945 film"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Maria Minna",
+            "Margaret Bondfield",
+            "Security of tenure"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Maria Minna",
+            "Margaret Bondfield",
+            "Security of tenure"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_10",
+    "question": "What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?",
+    "gold_titles": [
+      "kansas song",
+      "university of kansas"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "the",
+      "the  fight song of that university that also operates branch",
+      "the  fight song of that university that also operates branch"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "The",
+            "Thesaurus (information retrieval)",
+            "Thesaurus (information retrieval)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Just Like You (Louis Tomlinson song)",
+            "Michelangelo Faggioli",
+            "Steven Ronald Jensen"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Just Like You (Louis Tomlinson song)",
+            "Michelangelo Faggioli",
+            "Steven Ronald Jensen"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "Thesaurus (information retrieval)",
+            "Thesaurus"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "Thesaurus (information retrieval)",
+            "Thesaurus"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "Thesaurus (information retrieval)",
+            "Thesaurus"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "History of the Kansas City metropolitan area",
+            "Michigan–Michigan State men's basketball rivalry",
+            "Kansas State University Marching Band"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_11",
+    "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and Téa Leoni?",
+    "gold_titles": [
+      "david weissman",
+      "the family man"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "if",
+      "if  this screenwriter also co-wrote a film starring Nicolas ",
+      "if  this screenwriter also co-wrote a film starring Nicolas ",
+      "if  this screenwriter also co-wrote a film starring Nicolas "
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "If (band)",
+            "If—",
+            "If (Pink Floyd song)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Nicolas Cage",
+            "Drive Angry",
+            "David Diamond (screenwriter)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Nicolas Cage",
+            "Drive Angry",
+            "David Diamond (screenwriter)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Nicolas Cage",
+            "Drive Angry",
+            "David Diamond (screenwriter)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "If and only if",
+            "If (band)",
+            "If (Pink Floyd song)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "David Diamond (screenwriter)",
+            "Drive Angry",
+            "Gundala (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "David Diamond (screenwriter)",
+            "Drive Angry",
+            "Gundala (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "David Diamond (screenwriter)",
+            "Drive Angry",
+            "Gundala (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "If and only if",
+            "If (band)",
+            "If and only if"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "The Family Man"
+          ],
+          "gold_found": [
+            "the family man"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "The Family Man"
+          ],
+          "gold_found": [
+            "the family man"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "The Family Man"
+          ],
+          "gold_found": [
+            "the family man"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "If and only if",
+            "If (band)",
+            "If (Pink Floyd song)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "Drive Angry"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "Drive Angry"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Téa Leoni",
+            "David Diamond (screenwriter)",
+            "Drive Angry"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_12",
+    "question": "What year did Guns N Roses perform a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective?",
+    "gold_titles": [
+      "end of days film",
+      "oh my god guns n roses song"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "the movie in question",
+      "the movie in question",
+      "they appeared in a 1993 O'Hara Figgis commercial, which prom",
+      "they appeared in a 1993 O'Hara Figgis commercial, which prom",
+      "they appeared in a 1993 O'Hara Figgis commercial, which prom"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Mise en abyme",
+            "I Lost It at the Movies",
+            "Cinéma vérité"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Mise en abyme",
+            "I Lost It at the Movies",
+            "Cinéma vérité"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Council on American–Islamic Relations",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Council on American–Islamic Relations",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Council on American–Islamic Relations",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Mise en abyme",
+            "1998 in film",
+            "Janie Geiser"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Mise en abyme",
+            "1998 in film",
+            "Janie Geiser"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "True Lies",
+            "Guns N' Roses discography",
+            "Council on American–Islamic Relations"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "True Lies",
+            "Guns N' Roses discography",
+            "Council on American–Islamic Relations"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "True Lies",
+            "Guns N' Roses discography",
+            "Council on American–Islamic Relations"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Janie Geiser",
+            "Story within a story",
+            "Roman Polanski"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Janie Geiser",
+            "Story within a story",
+            "Film (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Janie Geiser",
+            "Story within a story",
+            "Film (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Janie Geiser",
+            "Story within a story",
+            "Film (film)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Guns N' Roses discography",
+            "True Lies",
+            "True Lies"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_13",
+    "question": "Are Random House Tower and 888 7th Avenue both used for real estate?",
+    "gold_titles": [
+      "888 7th avenue",
+      "random house tower"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "Is the Random House Tower used for real estate?",
+      "Is 8 88 7th Avenue used for real estate?",
+      "Is 8 88 7th Avenue used for real estate?",
+      "Is 8 88 7th Avenue used for real estate?",
+      "Is 8 88 7th Avenue used for real estate?"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Pershing Square Capital Management",
+            "Random House Tower",
+            "Random House Studio"
+          ],
+          "gold_found": [
+            "random house tower"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Random House",
+            "Random House Tower",
+            "Pershing Square Capital Management"
+          ],
+          "gold_found": [
+            "random house tower"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Economy of New York City",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Economy of New York City",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Economy of New York City",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Economy of New York City",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Random House Tower",
+            "Random House Tower",
+            "List of tallest buildings in Cleveland"
+          ],
+          "gold_found": [
+            "random house tower",
+            "random house tower"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Economy of New York City",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Random House Tower",
+            "Random House Tower",
+            "George Batten (advertiser)"
+          ],
+          "gold_found": [
+            "random house tower",
+            "random house tower"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "888 7th Avenue",
+            "888 7th Avenue",
+            "888 7th Avenue"
+          ],
+          "gold_found": [
+            "888 7th avenue",
+            "888 7th avenue",
+            "888 7th avenue"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_14",
+    "question": "The football manager who recruited David Beckham managed Manchester United during what timeframe?",
+    "gold_titles": [
+      "199596 manchester united fc season",
+      "alex ferguson"
+    ],
+    "n_steps": 2,
+    "subqueries": [
+      "the timeframe during which",
+      "the timeframe during which  he managed Manchester United"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Present",
+            "Temporal parts",
+            "Critical period"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Matt Busby",
+            "History of Manchester United F.C. (1986–2013)",
+            "Matt Busby"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Critical period",
+            "Priority right",
+            "Limitation periods in the United Kingdom"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Matt Busby",
+            "Matt Busby",
+            "History of football in England"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Chronology of the Bible",
+            "Limitation periods in the United Kingdom",
+            "Tempore"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "2013–14 Manchester United F.C. season",
+            "1991–92 Manchester United F.C. season",
+            "History of Manchester United F.C. (1986–2013)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Chronology of the Bible",
+            "Priority right",
+            "Limitation periods in the United Kingdom"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "2013–14 Manchester United F.C. season",
+            "History of Manchester United F.C. (1986–2013)",
+            "1991–92 Manchester United F.C. season"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_15",
+    "question": "Brown State Fishing Lake is in a country that has a population of how many inhabitants ?",
+    "gold_titles": [
+      "brown county kansas",
+      "brown state fishing lake"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "the specific country**: The question starts with \"Brown Stat",
+      "the specific country**: The question starts with \"Brown Stat",
+      "the specific country**: The question starts with \"Brown Stat",
+      "the specific country**: The question starts with \"Brown Stat",
+      "the specific country**: The question starts with \"Brown Stat"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Fishing Lake",
+            "Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Fishing Lake",
+            "Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Fishing Lake",
+            "Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Fishing Lake",
+            "Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake",
+            "Brown State Fishing Lake"
+          ],
+          "gold_found": [
+            "brown state fishing lake",
+            "brown state fishing lake",
+            "brown state fishing lake"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_16",
+    "question": "The Vermont Catamounts men's soccer team currently competes in a conference that was formerly known as what from 1988 to 1996?",
+    "gold_titles": [
+      "america east conference",
+      "vermont catamounts mens soccer"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "the current conference of the Vermont Catamounts men's socce",
+      "the current conference of the Vermont Catamounts men's socce",
+      "the current conference of the Vermont Catamounts men's socce",
+      "the current conference of the Vermont Catamounts men's socce"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer",
+            "Vermont Catamounts men's soccer"
+          ],
+          "gold_found": [
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer",
+            "vermont catamounts mens soccer"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_17",
+    "question": "Are Giuseppe Verdi and Ambroise Thomas both Opera composers ?",
+    "gold_titles": [
+      "ambroise thomas",
+      "giuseppe verdi"
+    ],
+    "n_steps": 6,
+    "subqueries": [
+      "if Giuseppe Verdi is",
+      "if Giuseppe Verdi is  known for composing operas",
+      "if Giuseppe Verdi is  known for composing operas",
+      "if Giuseppe Verdi is  known for composing operas",
+      "if Giuseppe Verdi is  known for composing operas",
+      "if Giuseppe Verdi is  known for composing operas"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Teatro Verdi (Florence)",
+            "Giuseppe Verdi (film)"
+          ],
+          "gold_found": [
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Teatro Verdi (Florence)",
+            "Giuseppe Verdi (film)"
+          ],
+          "gold_found": [
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Teatro Verdi (Florence)",
+            "Giuseppe Verdi (film)"
+          ],
+          "gold_found": [
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Teatro Verdi (Florence)",
+            "Giuseppe Verdi (film)"
+          ],
+          "gold_found": [
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Teatro Verdi (Florence)",
+            "Giuseppe Verdi (film)"
+          ],
+          "gold_found": [
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Giuseppe Verdi",
+            "Giuseppe Verdi (film)",
+            "Giuseppe Verdi"
+          ],
+          "gold_found": [
+            "giuseppe verdi",
+            "giuseppe verdi"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_18",
+    "question": "Roger O. Egeberg was Assistant Secretary for Health and Scientific Affairs during the administration of a president that served during what years?",
+    "gold_titles": [
+      "richard nixon",
+      "roger o egeberg"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "the president that Roger O",
+      "the years of service of that president",
+      "the years of service of that president"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Raúl Osella",
+            "1960 United States presidential election in Oklahoma",
+            "Gerald Ford"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "President of the United States",
+            "Presidency of George H. W. Bush",
+            "White House Chief Usher"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "President of the United States",
+            "Presidency of George H. W. Bush",
+            "White House Chief Usher"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Raúl Osella",
+            "1960 United States presidential election in Oklahoma",
+            "Hail to the Chief"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Marcus A. Smith",
+            "Presidency of George H. W. Bush",
+            "White House Chief Usher"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Marcus A. Smith",
+            "Presidency of George H. W. Bush",
+            "White House Chief Usher"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "1960 United States presidential election in Oklahoma",
+            "Donald Rice",
+            "Gerald Ford"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "White House Chief Usher",
+            "Hermann Göring",
+            "Marcus A. Smith"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "White House Chief Usher",
+            "Hermann Göring",
+            "Marcus A. Smith"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Raúl Osella",
+            "1960 United States presidential election in Oklahoma",
+            "Hail to the Chief"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "White House Chief Usher",
+            "Marcus A. Smith",
+            "President of the United States"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "White House Chief Usher",
+            "Marcus A. Smith",
+            "President of the United States"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_19",
+    "question": "Which writer was from England, Henry Roth or Robert Erskine Childers?",
+    "gold_titles": [
+      "henry roth",
+      "robert erskine childers"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "if Robert Erskine",
+      "if Robert Erskine  Childers was from England",
+      "if Robert Erskine  Childers was from England",
+      "if Robert Erskine  Childers was from England"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Lisa Zbitnew",
+            "Robert Erskine (doctor)",
+            "Robert Erskine"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "John Childs (historian)",
+            "Erskine Hamilton Childers",
+            "Robert Caesar Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "John Childs (historian)",
+            "Erskine Hamilton Childers",
+            "Robert Caesar Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "John Childs (historian)",
+            "Erskine Hamilton Childers",
+            "Robert Caesar Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Ralph Erskine (minister)",
+            "Ralph Erskine (minister)",
+            "Lisa Zbitnew"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Barton Childers",
+            "Erskine Childers (author)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Barton Childers",
+            "Erskine Childers (author)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Barton Childers",
+            "Erskine Childers (author)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Robert Erskine",
+            "Robert Erskine (doctor)",
+            "Robert Erskine (doctor)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Robert Erskine (doctor)",
+            "Robert Erskine",
+            "Robert Erskine (doctor)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Erskine Hamilton Childers",
+            "Erskine Childers (author)",
+            "Erskine Barton Childers"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_2",
+    "question": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+    "gold_titles": [
+      "animorphs",
+      "the horkbajir chronicles"
+    ],
+    "n_steps": 1,
+    "subqueries": [
+      "if it is told in first"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "First-person narrative",
+            "who tells the first story in canterbury tales",
+            "TPR Storytelling"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "First-person narrative",
+            "who tells the first story in canterbury tales",
+            "First-person narrative"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "First-person narrative",
+            "who tells the first story in canterbury tales",
+            "Law of primacy in persuasion"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "First-person narrative",
+            "who tells the first story in canterbury tales",
+            "Law of primacy in persuasion"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_20",
+    "question": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+    "gold_titles": [
+      "formula one drivers from mexico",
+      "sergio prez"
+    ],
+    "n_steps": 1,
+    "subqueries": [
+      "the Force India driver born in 1990"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Jorge Arteaga",
+            "Force India",
+            "Ricardo Rodríguez (racing driver)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Force India",
+            "Ricardo Rodríguez (racing driver)",
+            "Jorge Arteaga"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Force India",
+            "Force India",
+            "Force India VJM09"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Force India",
+            "Force India",
+            "Force India VJM09"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_21",
+    "question": "This singer of A Rather Blustery Day also voiced what hedgehog?",
+    "gold_titles": [
+      "a rather blustery day",
+      "jim cummings"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "which",
+      "which  hedgehog character they voiced",
+      "which  hedgehog character they voiced",
+      "which  hedgehog character they voiced"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Which (Unix)",
+            "Pronoun",
+            "Which (Unix)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Sonic the Hedgehog (1991 video game)",
+            "Sonic the Hedgehog (1991 video game)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Sonic the Hedgehog (1991 video game)",
+            "Sonic the Hedgehog (1991 video game)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Sonic the Hedgehog (1991 video game)",
+            "Sonic the Hedgehog (1991 video game)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Which (Unix)",
+            "Who (pronoun)",
+            "Demonstrative"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog",
+            "David Humphrey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog",
+            "David Humphrey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog",
+            "David Humphrey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Which (Unix)",
+            "Comparison of American and British English",
+            "Relative pronoun"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "who plays the voice of sonic the hedgehog",
+            "Winnie the Pooh and a Day for Eeyore"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "who plays the voice of sonic the hedgehog",
+            "Winnie the Pooh and a Day for Eeyore"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "who plays the voice of sonic the hedgehog",
+            "Winnie the Pooh and a Day for Eeyore"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Which (Unix)",
+            "Relative pronoun",
+            "Comparison of American and British English"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Sonic the Hedgehog (character)",
+            "Winnie the Pooh and a Day for Eeyore",
+            "who plays the voice of sonic the hedgehog"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_22",
+    "question": "Aside from the Apple Remote, what other device can control the program Apple Remote was originally designed to interact with?",
+    "gold_titles": [
+      "apple remote",
+      "front row software"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "the program that the Apple Remote was originally designed to",
+      "if there are other devices that can control this program",
+      "if there are other devices that can control this program",
+      "if there are other devices that can control this program",
+      "if there are other devices that can control this program"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.1,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Siri Remote",
+            "Apple Remote",
+            "ITunes Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Internet of things",
+            "Siri Remote",
+            "X10 (industry standard)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Internet of things",
+            "Siri Remote",
+            "X10 (industry standard)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Internet of things",
+            "Siri Remote",
+            "X10 (industry standard)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Internet of things",
+            "Siri Remote",
+            "X10 (industry standard)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Siri Remote",
+            "Apple Remote",
+            "Siri Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Lagotek"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Lagotek"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Lagotek"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Lagotek"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Apple Remote",
+            "Apple Remote",
+            "Siri Remote"
+          ],
+          "gold_found": [
+            "apple remote",
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Apple Remote",
+            "Apple Remote",
+            "Siri Remote"
+          ],
+          "gold_found": [
+            "apple remote",
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Apple Remote",
+            "Siri Remote",
+            "Unified Remote"
+          ],
+          "gold_found": [
+            "apple remote"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_23",
+    "question": "Which performance act has a higher instrument to person ratio, Badly Drawn Boy or Wolf Alice? ",
+    "gold_titles": [
+      "badly drawn boy",
+      "wolf alice"
+    ],
+    "n_steps": 8,
+    "subqueries": [
+      "Which performance act has a higher instrument to person rati",
+      "Which performance act has a higher instrument to person rati",
+      "Which performance act has a higher instrument to person rati",
+      "Which performance act has a higher instrument to person rati",
+      "Which performance act has a higher instrument to person rati",
+      "3.",
+      "3.",
+      "3."
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.3125,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Badly Drawn Boy",
+            "Ponderosa Twins Plus One",
+            "Kiss Their Sons"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Badly Drawn Boy",
+            "Ponderosa Twins Plus One",
+            "Kiss Their Sons"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Badly Drawn Boy",
+            "Ponderosa Twins Plus One",
+            "Kiss Their Sons"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Badly Drawn Boy",
+            "Ponderosa Twins Plus One",
+            "Kiss Their Sons"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Badly Drawn Boy",
+            "Ponderosa Twins Plus One",
+            "Kiss Their Sons"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Rule of three (writing)",
+            "3"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 7,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Rule of three (writing)",
+            "3"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 8,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Rule of three (writing)",
+            "3"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.3125,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "About a Boy (film)",
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "About a Boy (film)",
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "About a Boy (film)",
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "About a Boy (film)",
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "About a Boy (film)",
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 7,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 8,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.3125,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Third Amendment of the Constitution of India",
+            "Clavier-Übung III",
+            "Third jersey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 7,
+          "selected_titles": [
+            "Third Amendment of the Constitution of India",
+            "Clavier-Übung III",
+            "Third jersey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 8,
+          "selected_titles": [
+            "Third Amendment of the Constitution of India",
+            "Clavier-Übung III",
+            "Third jersey"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.3125,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Badly Drawn Boy discography",
+            "Badly Drawn Boy",
+            "Badly Drawn Boy"
+          ],
+          "gold_found": [
+            "badly drawn boy",
+            "badly drawn boy"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 6,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 7,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 8,
+          "selected_titles": [
+            "Clavier-Übung III",
+            "Third Amendment of the Constitution of India",
+            "Rule of three (writing)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_24",
+    "question": "What was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?",
+    "gold_titles": [
+      "kasper schmeichel",
+      "peter schmeichel"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "if Kasper Sch",
+      "if Kasper Sch meichel's father played for any national team",
+      "if Kasper Sch meichel's father played for any national team",
+      "if Kasper Sch meichel's father played for any national team",
+      "if Kasper Sch meichel's father played for any national team"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.4,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kasper Lorentzen",
+            "Kasper Lorentzen",
+            "Walter Kasper"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Lorentzen",
+            "Kasper Lorentzen"
+          ],
+          "gold_found": [
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Lorentzen",
+            "Kasper Lorentzen"
+          ],
+          "gold_found": [
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Lorentzen",
+            "Kasper Lorentzen"
+          ],
+          "gold_found": [
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Lorentzen",
+            "Kasper Lorentzen"
+          ],
+          "gold_found": [
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.8,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kasper Lorentzen",
+            "Kasper Lorentzen",
+            "Sommeren '92"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Peter Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "peter schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Peter Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "peter schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Peter Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "peter schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Peter Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "peter schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.4,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kasper Lorentzen",
+            "Kasper Lorentzen",
+            "Sommeren '92"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.4,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Kasper Lorentzen",
+            "Kasper Lorentzen",
+            "Sommeren '92"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Kasper Schmeichel",
+            "Kasper Schmeichel",
+            "Kasper Schmeichel"
+          ],
+          "gold_found": [
+            "kasper schmeichel",
+            "kasper schmeichel",
+            "kasper schmeichel"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_25",
+    "question": "Who was the writer of These Boots Are Made for Walkin' and who died in 2007?",
+    "gold_titles": [
+      "lee hazlewood",
+      "these boots are made for walkin"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "Who was the writer of \"These Boots Are Made for Walkin'\"?",
+      "Who was the writer of \"These Boots Are Made for Walkin'\"?",
+      "Who was the writer of \"These Boots Are Made for Walkin'\"?",
+      "The  question asks about the writer who died in 2007, which ",
+      "The  question asks about the writer who died in 2007, which "
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking",
+            "who wrote these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking",
+            "who wrote these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking",
+            "who wrote these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Burt Bacharach",
+            "David Alan Miller"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Burt Bacharach",
+            "David Alan Miller"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Who Will Answer? (song)",
+            "Burt Bacharach",
+            "Etan Boritzer"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Who Will Answer? (song)",
+            "Burt Bacharach",
+            "Etan Boritzer"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who sang these boots were made for walking first",
+            "who wrote the song these boots were made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote and sang these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote and sang these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Who Will Answer? (song)",
+            "Burt Bacharach"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Who Will Answer? (song)",
+            "Burt Bacharach"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "who was the original singer of these boots are made for walking",
+            "who wrote the song these boots were made for walking",
+            "who wrote the song these boots are made for walking"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Who Will Answer? (song)",
+            "Burt Bacharach"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Burt Bacharach",
+            "Who Will Answer? (song)",
+            "Burt Bacharach"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_26",
+    "question": "The 2011–12 VCU Rams men's basketball team, led by third year head coach Shaka Smart, represented Virginia Commonwealth University which was founded in what year?",
+    "gold_titles": [
+      "201112 vcu rams mens basketball team",
+      "virginia commonwealth university"
+    ],
+    "n_steps": 2,
+    "subqueries": [
+      "the founding year of Virginia Commonwealth University",
+      "the founding year of Virginia Commonwealth University"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "History of Virginia Commonwealth University",
+            "Virginia Commonwealth University",
+            "Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "History of Virginia Commonwealth University",
+            "Virginia Commonwealth University",
+            "Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Richmond Professional Institute",
+            "George Mason–VCU rivalry",
+            "History of Virginia Commonwealth University"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Richmond Professional Institute",
+            "George Mason–VCU rivalry",
+            "History of Virginia Commonwealth University"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Virginia Commonwealth University",
+            "History of Virginia Commonwealth University",
+            "Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Virginia Commonwealth University",
+            "History of Virginia Commonwealth University",
+            "Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Virginia Commonwealth University",
+            "Virginia Commonwealth University",
+            "History of Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Virginia Commonwealth University",
+            "Virginia Commonwealth University",
+            "History of Virginia Commonwealth University"
+          ],
+          "gold_found": [
+            "virginia commonwealth university",
+            "virginia commonwealth university"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_27",
+    "question": "Are both Dictyosperma, and Huernia described as a genus?",
+    "gold_titles": [
+      "dictyosperma",
+      "huernia"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "Are Dictyosperma described as a genus?",
+      "Both results will confirm if the statement is true or false.",
+      "that both are indeed described as genera in botanical taxono"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Nuclear Management Company",
+            "Dictyosperma",
+            "Phallus (fungus)"
+          ],
+          "gold_found": [
+            "dictyosperma"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "False positives and false negatives",
+            "Modal fallacy",
+            "?:"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Nepenthes fusca",
+            "Botanical name",
+            "Homonym (biology)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Phallus (fungus)",
+            "Stegnosperma",
+            "Cucumispora dikerogammari"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "False (logic)",
+            "False positives and false negatives",
+            "?:"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Homonym (biology)",
+            "Nomen illegitimum",
+            "Nepenthes fusca"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Dictyosperma",
+            "Nuclear Management Company",
+            "Stegnosperma"
+          ],
+          "gold_found": [
+            "dictyosperma"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "False (logic)",
+            "Liar paradox",
+            "?:"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Nomen illegitimum",
+            "Homonym (biology)",
+            "Nepenthes fusca"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Dictyosperma",
+            "Nuclear Management Company",
+            "Phallus (fungus)"
+          ],
+          "gold_found": [
+            "dictyosperma"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "False (logic)",
+            "?:",
+            "Liar paradox"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Homonym (biology)",
+            "Nomen illegitimum",
+            "Nepenthes fusca"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_28",
+    "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+    "gold_titles": [
+      "henry j kaiser",
+      "kaiser ventures"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "the American industrial",
+      "if this figure is associated with Kaiser Ventures",
+      "if this figure is associated with Kaiser Ventures",
+      "if this figure is associated with Kaiser Ventures"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Industrial Revolution in the United States",
+            "where was the industrial revolution centered on in the united states",
+            "Technological and industrial history of the United States"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Corporate venture capital",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Corporate venture capital",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Corporate venture capital",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "The American Manufacturer",
+            "Industrial Revolution in the United States",
+            "American (1911 automobile)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Henry J. Kaiser"
+          ],
+          "gold_found": [
+            "henry j kaiser"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "American Plan (union negotiations)",
+            "The American Manufacturer",
+            "American (1911 automobile)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Associates"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Associates"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Associates"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "American Plan (union negotiations)",
+            "The American Manufacturer",
+            "American (1911 automobile)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Permanente"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Permanente"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Kaiser Permanente",
+            "Kaiser Permanente",
+            "Kaiser Permanente"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_29",
+    "question": "What is the name for the adventure in \"Tunnels and Trolls\", a game designed by Ken St. Andre?",
+    "gold_titles": [
+      "arena of khazan",
+      "tunnels amp trolls"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "What is the name for the adventure in \"Tunnels and Trolls\", ",
+      "the designer: Ken St",
+      "the designer: Ken St"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Tunnels &amp; Trolls",
+            "Tunnels &amp; Trolls",
+            "Steve Crompton"
+          ],
+          "gold_found": [
+            "tunnels amp trolls",
+            "tunnels amp trolls"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ken Garland",
+            "Ken Adam",
+            "Ken Done"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ken Garland",
+            "Ken Adam",
+            "Ken Done"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Tunnels &amp; Trolls",
+            "Steve Crompton",
+            "Ken St. Andre"
+          ],
+          "gold_found": [
+            "tunnels amp trolls"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Ken Adam",
+            "Ken Done"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Ken Adam",
+            "Ken Done"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Tunnels & Trolls",
+            "Tunnels &amp; Trolls"
+          ],
+          "gold_found": [
+            "tunnels amp trolls"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Daniel Andreas San Diego",
+            "Ken Adam"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Daniel Andreas San Diego",
+            "Ken Adam"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.1667,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Tunnels &amp; Trolls",
+            "Ken St. Andre",
+            "Tunnels & Trolls"
+          ],
+          "gold_found": [
+            "tunnels amp trolls"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Daniel Andreas San Diego",
+            "Ken Adam"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ken St. Andre",
+            "Daniel Andreas San Diego",
+            "Ken Adam"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_3",
+    "question": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+    "gold_titles": [
+      "esma sultan mansion",
+      "laleli mosque"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "the location of",
+      "the location of  the Esma Sultan Mansion",
+      "the location of  the Esma Sultan Mansion",
+      "the location of  the Esma Sultan Mansion"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Location",
+            "Location",
+            "Place of origin"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan",
+            "Esma Sultan Mansion"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan",
+            "Esma Sultan Mansion"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan",
+            "Esma Sultan Mansion"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Location",
+            "Location",
+            "Place of origin"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)",
+            "Esma Sultan"
+          ],
+          "gold_found": [
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Location",
+            "Location",
+            "Place of origin"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Location",
+            "Location",
+            "Place of origin"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Esma Sultan Mansion",
+            "Esma Sultan Mansion",
+            "Esma Sultan (daughter of Abdul Hamid I)"
+          ],
+          "gold_found": [
+            "esma sultan mansion",
+            "esma sultan mansion"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_4",
+    "question": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+    "gold_titles": [
+      "adriana trigiani",
+      "big stone gap film"
+    ],
+    "n_steps": 5,
+    "subqueries": [
+      "the",
+      "out, I can focus on the location clue",
+      "out, I can focus on the location clue",
+      "out, I can focus on the location clue",
+      "out, I can focus on the location clue"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "The",
+            "Thesaurus (information retrieval)",
+            "Thesaurus (information retrieval)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Like This",
+            "Ilocano verb",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Like This",
+            "Ilocano verb",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Like This",
+            "Ilocano verb",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Like This",
+            "Ilocano verb",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "The",
+            "Thesaurus (information retrieval)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Ilocano verb",
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Ilocano verb",
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Ilocano verb",
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Ilocano verb",
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "Thesaurus",
+            "The"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Contrastive focus reduplication",
+            "The Trail to Yesterday",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Contrastive focus reduplication",
+            "The Trail to Yesterday",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Contrastive focus reduplication",
+            "The Trail to Yesterday",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "Contrastive focus reduplication",
+            "The Trail to Yesterday",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Thetical grammar",
+            "The",
+            "Thesaurus (information retrieval)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 5,
+          "selected_titles": [
+            "The Trail to Yesterday",
+            "Contrastive focus reduplication",
+            "They Can't Take That Away"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_5",
+    "question": "2014 S/S is the debut album of a South Korean boy group that was formed by who?",
+    "gold_titles": [
+      "2014 ss",
+      "winner band"
+    ],
+    "n_steps": 2,
+    "subqueries": [
+      "the South Korean boy group that released the album \"2014",
+      "the entity that formed the group: Sh"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "2014 S/S",
+            "Winner (band)",
+            "BTS (band)"
+          ],
+          "gold_found": [
+            "2014 ss",
+            "winner band"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "AKB48 Team SH",
+            "Stonehouse, South Lanarkshire",
+            ".sh"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Winner (band)",
+            "2014 S/S",
+            "Winner (band)"
+          ],
+          "gold_found": [
+            "winner band",
+            "2014 ss",
+            "winner band"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Stonehouse, South Lanarkshire",
+            "AKB48 Team SH",
+            "Thule Society"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.25,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "JJ Project",
+            "2014 S/S",
+            "2014 S/S"
+          ],
+          "gold_found": [
+            "2014 ss",
+            "2014 ss"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Stonehouse, South Lanarkshire",
+            "AKB48 Team SH",
+            "Shlomo Group"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.25,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "2014 S/S",
+            "2014 S/S",
+            "JJ Project"
+          ],
+          "gold_found": [
+            "2014 ss",
+            "2014 ss"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Stonehouse, South Lanarkshire",
+            "AKB48 Team SH",
+            "Shlomo Group"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_6",
+    "question": "Who was known by his stage name Aladin and helped organizations improve their performance as a consultant?",
+    "gold_titles": [
+      "eenasul fateh",
+      "management consulting"
+    ],
+    "n_steps": 3,
+    "subqueries": [
+      "if this stage name",
+      "Who was known by his stage name Aladin and helped organizati",
+      "Who was known by his stage name Aladin and helped organizati"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.3333,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Stage name",
+            "Stage name",
+            "If/Then"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Lil Ru",
+            "Eenasul Fateh",
+            "Eenasul Fateh"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Lil Ru",
+            "Eenasul Fateh",
+            "Eenasul Fateh"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.3333,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Stage name",
+            "Stage name",
+            "Stage name"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Lil Ru"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Lil Ru"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.3333,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Agranov",
+            "Stage name",
+            "Stage name"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Aladin (film)"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Aladin (film)"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.3333,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Agranov",
+            "Stage name",
+            "Stage name"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Aladin (film)"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Eenasul Fateh",
+            "Eenasul Fateh",
+            "Aladin (film)"
+          ],
+          "gold_found": [
+            "eenasul fateh",
+            "eenasul fateh"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_7",
+    "question": "The arena where the Lewiston Maineiacs played their home games can seat how many people?",
+    "gold_titles": [
+      "androscoggin bank colise",
+      "lewiston maineiacs"
+    ],
+    "n_steps": 2,
+    "subqueries": [
+      "the arena where the Lewiston Maineiacs played their home gam",
+      "the arena where the Lewiston Maineiacs played their home gam"
+    ],
+    "retriever_top3": {
+      "any_hit": 0,
+      "avg_recall": 0.0,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Dwyer Arena",
+            "Lewiston, Maine",
+            "Lewiston, Maine"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Dwyer Arena",
+            "Lewiston, Maine",
+            "Lewiston, Maine"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Dwyer Arena",
+            "Lewiston, Maine",
+            "Lewiston Maineiacs"
+          ],
+          "gold_found": [
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Dwyer Arena",
+            "Lewiston, Maine",
+            "Lewiston Maineiacs"
+          ],
+          "gold_found": [
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Lewiston Maineiacs",
+            "Lewiston Maineiacs",
+            "Lewiston, Maine"
+          ],
+          "gold_found": [
+            "lewiston maineiacs",
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Lewiston Maineiacs",
+            "Lewiston Maineiacs",
+            "Lewiston, Maine"
+          ],
+          "gold_found": [
+            "lewiston maineiacs",
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Lewiston Maineiacs",
+            "Lewiston Maineiacs",
+            "Dwyer Arena"
+          ],
+          "gold_found": [
+            "lewiston maineiacs",
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Lewiston Maineiacs",
+            "Lewiston Maineiacs",
+            "Dwyer Arena"
+          ],
+          "gold_found": [
+            "lewiston maineiacs",
+            "lewiston maineiacs"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_8",
+    "question": "Who is older, Annie Morton or Terry Richardson?",
+    "gold_titles": [
+      "annie morton",
+      "terry richardson"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "Terry Richardson's age",
+      "Terry Richardson's age",
+      "Annie Morton's exact date of birth",
+      "Annie Morton's exact date of birth"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.25,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Terry Richardson (ice hockey)",
+            "Terry Richardson",
+            "Terry Richardson (rugby league)"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Terry Richardson (ice hockey)",
+            "Terry Richardson",
+            "Terry Richardson (rugby league)"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "The Mummy: The Animated Series",
+            "Alicia Morton",
+            "Alicia Morton"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "The Mummy: The Animated Series",
+            "Alicia Morton",
+            "Alicia Morton"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Terry Richardson (rugby league)",
+            "Richardson, Texas",
+            "Terry Richardson"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Terry Richardson (rugby league)",
+            "Richardson, Texas",
+            "Terry Richardson"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Terry Richardson",
+            "Terry Richardson (rugby league)",
+            "Terry Richardson"
+          ],
+          "gold_found": [
+            "terry richardson",
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Terry Richardson (rugby league)",
+            "Terry Richardson",
+            "Terry Richardson"
+          ],
+          "gold_found": [
+            "terry richardson",
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Terry Richardson (rugby league)",
+            "Terry Richardson",
+            "Terry Richardson (ice hockey)"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Terry Richardson (rugby league)",
+            "Terry Richardson",
+            "Terry Richardson (ice hockey)"
+          ],
+          "gold_found": [
+            "terry richardson"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Annie Morton",
+            "Annie Morton",
+            "Annie Morton"
+          ],
+          "gold_found": [
+            "annie morton",
+            "annie morton",
+            "annie morton"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "item_id": "dev_9",
+    "question": "Are Local H and For Against both from the United States?",
+    "gold_titles": [
+      "for against",
+      "local h"
+    ],
+    "n_steps": 4,
+    "subqueries": [
+      "Are Local H from the United States?",
+      "Are For Against from the United  States?",
+      "Are For Against from the United  States?",
+      "Are For Against from the United  States?"
+    ],
+    "retriever_top3": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Bodyjar",
+            "Watch the Flowers Grow",
+            "Local H"
+          ],
+          "gold_found": [
+            "local h"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "static_qd": {
+      "any_hit": 1,
+      "avg_recall": 0.5,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "Joe Daniels (drummer)",
+            "Local H",
+            "Local H"
+          ],
+          "gold_found": [
+            "local h",
+            "local h"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "Victors Avenue",
+            "The Vermin",
+            "For Against"
+          ],
+          "gold_found": [
+            "for against"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_v0": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "E.R. Hays House",
+            "Bodyjar",
+            "Joe Daniels (drummer)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        }
+      ]
+    },
+    "sapr_e_no_hist": {
+      "any_hit": 1,
+      "avg_recall": 0.375,
+      "per_step": [
+        {
+          "step": 1,
+          "selected_titles": [
+            "E.R. Hays House",
+            "Bodyjar",
+            "Joe Daniels (drummer)"
+          ],
+          "gold_found": [],
+          "hit": 0.0
+        },
+        {
+          "step": 2,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 3,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        },
+        {
+          "step": 4,
+          "selected_titles": [
+            "For Against",
+            "For Against",
+            "Victors Avenue"
+          ],
+          "gold_found": [
+            "for against",
+            "for against"
+          ],
+          "hit": 1.0
+        }
+      ]
+    }
+  }
+]

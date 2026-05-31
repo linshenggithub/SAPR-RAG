@@ -6,7 +6,8 @@ This repository stores research management files, notes, configs, and method cod
 
 ```text
 /home/mayi/RAG/agentic-rag-process-optimization
-/home/mayi/RAG/ReasonRAG
+/home/mayi/RAG/ReasonRAG              # local 4 x RTX 3090 server
+/home/mayi/ReasonRAG                  # remote rag-5090 server
 /home/mayi/RAG/DPA-RAG
 /home/mayi/RAG/DecEx-RAG
 /home/mayi/RAG/RoleRAG
@@ -42,4 +43,3 @@ Allowed types:
 - `[writing]`
 - `[docs]`
 - `[config]`
-

@@ -16,8 +16,11 @@ SAMPLE_SIZE = 50  # number of trajectories to analyze
 MIN_BRANCH_CHILDREN = 2  # minimum children to be a branch point
 
 # Paths
+# 仓库外路径：保留绝对路径（数据来自外部 ReasonRAG 仓库），后续会迁移到 config/paths.py
+# TODO: 迁移到 config/paths.py 集中管理
 REWARD_DATA_DIR = Path("/home/mayi/RAG/ReasonRAG/output/hotpotqa")
-OUTPUT_DIR = Path("/home/mayi/RAG/agentic-rag-process-optimization/gate0/data")
+# 仓库内路径：相对于本脚本所在 gate0/ 目录，跨机器自动适配
+OUTPUT_DIR = Path(__file__).resolve().parent / "data"
 
 
 def load_reward_data():

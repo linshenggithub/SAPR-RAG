@@ -13,7 +13,8 @@ from pathlib import Path
 from typed_eval import evaluate_transition, extract_evidence, state_from_question
 
 
-DATA_DIR = Path("/home/mayi/RAG/agentic-rag-process-optimization/gate0/data")
+# 仓库内路径：相对于本脚本所在 gate0/ 目录，跨机器自动适配
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def has_non_empty_evidence(text: str) -> bool:

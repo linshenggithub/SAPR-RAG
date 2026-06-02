@@ -21,6 +21,19 @@ import json
 import time
 import numpy as np
 
+# 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
+from pathlib import Path as _Path
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import (  # noqa: E402
+    REASONRAG_ROOT,
+    WIKI_CORPUS_PATH,
+    BGE_INDEX_PATH,
+    BGE_MODEL_PATH,
+)
+
 # ── Paths ────────────────────────────────────────────────────────
 INPUT_FILE = os.path.join(
     os.path.dirname(__file__),
@@ -33,13 +46,13 @@ OUTPUT_DIR = os.path.join(
 )
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "evidence_decision_points.jsonl")
 
-BGE_PATH = "/nas/mayi/RAG/retrievers/bge-base-en-v1.5"
+BGE_PATH = str(BGE_MODEL_PATH)
 _INDEX_CANDIDATES = [
-    "/home/mayi/ReasonRAG/indexes/bge_extended/bge_Flat.index",
-    "/home/mayi/RAG/retriever/bgeindex/bge_Flat.index",
+    str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index"),
+    str(BGE_INDEX_PATH),
 ]
 INDEX_PATH = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[0])
-CORPUS_PATH = "/nas/mayi/RAG/corpus/wiki18_extended.jsonl"
+CORPUS_PATH = str(WIKI_CORPUS_PATH)
 TOP_K = 10
 
 # Resolve relative paths

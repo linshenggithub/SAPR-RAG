@@ -3,11 +3,19 @@
 
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
+# 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-ROOT = Path("/home/mayi/RAG/agentic-rag-process-optimization")
+from config.paths import REPO_ROOT  # noqa: E402
+
+
+ROOT = REPO_ROOT
 BASELINE_PATH = ROOT / (
     "04_experiments/logs/20260531_sapr_e_e2e_200_maxtok256_seq_gpu0/"
     "baseline/hotpotqa_2026_05_31_23_13_sapr_e_e2e_baseline/intermediate_data.json"

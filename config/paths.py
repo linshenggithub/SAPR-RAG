@@ -63,10 +63,38 @@ BGE_INDEX_PATH: Path = _path_from_env(
     "/home/mayi/RAG/retriever/bgeindex/bge_Flat.index",
 )
 
+# ReasonRAG 仓库根目录（用于把它加入 sys.path 以 import flashrag 配置等）
+REASONRAG_ROOT: Path = _path_from_env(
+    "SAPR_REASONRAG_ROOT",
+    "/home/mayi/ReasonRAG",
+)
+
+# BGE 检索 encoder 模型目录（bge-base-en-v1.5）
+BGE_MODEL_PATH: Path = _path_from_env(
+    "SAPR_BGE_MODEL_PATH",
+    "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
+)
+
+# qwen2.5-7B-lora-dpo-RAG-ProGuide （ReasonRAG DPO 后的合并模型）
+LORA_MODEL_PATH: Path = _path_from_env(
+    "SAPR_LORA_MODEL_PATH",
+    "/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+)
+
+# Conda 可执行文件（仅 launch_*.sh 需要；其他 Python 脚本不依赖）
+CONDA_BIN: Path = _path_from_env(
+    "SAPR_CONDA_BIN",
+    "/home/mayi/miniconda3/bin/conda",
+)
+
 
 __all__ = [
     "REPO_ROOT",
     "REASONRAG_OUTPUT_DIR",
     "WIKI_CORPUS_PATH",
     "BGE_INDEX_PATH",
+    "REASONRAG_ROOT",
+    "BGE_MODEL_PATH",
+    "LORA_MODEL_PATH",
+    "CONDA_BIN",
 ]

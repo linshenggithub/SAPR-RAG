@@ -17,9 +17,21 @@ Usage:
 import os, sys, json, re, time, argparse, datetime
 import numpy as np
 
-REASONRAG_ROOT = os.environ.get("REASONRAG_ROOT", "/home/mayi/ReasonRAG")
-RESEARCH_ROOT = os.environ.get("RESEARCH_ROOT", "/home/mayi/RAG/agentic-rag-process-optimization")
-sys.path.insert(0, REASONRAG_ROOT)
+# 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
+from pathlib import Path as _Path
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import (  # noqa: E402
+    REPO_ROOT,
+    REASONRAG_ROOT,
+    WIKI_CORPUS_PATH,
+    BGE_MODEL_PATH,
+    LORA_MODEL_PATH,
+)
+
+sys.path.insert(0, str(REASONRAG_ROOT))
 
 from flashrag.config import Config
 from flashrag.utils import get_dataset
@@ -34,11 +46,11 @@ parser.add_argument("--run_id", default=None)
 parser.add_argument("--max_tokens", type=int, default=256)
 parser.add_argument("--gpu_id", default="0")
 parser.add_argument("--index_path", default=None)
-parser.add_argument("--corpus_path", default="/nas/mayi/RAG/corpus/wiki18_extended.jsonl")
-parser.add_argument("--bge_path", default="/nas/mayi/RAG/retrievers/bge-base-en-v1.5")
+parser.add_argument("--corpus_path", default=str(WIKI_CORPUS_PATH))
+parser.add_argument("--bge_path", default=str(BGE_MODEL_PATH))
 parser.add_argument(
     "--generator_path",
-    default="/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+    default=str(LORA_MODEL_PATH),
 )
 parser.add_argument("--gpu_memory_utilization", type=float, default=0.8)
 args = parser.parse_args()
@@ -48,7 +60,7 @@ MODE = args.mode
 RUN_ID = args.run_id or "{}_sapr_e_e2e_{}samples_maxtok{}".format(
     datetime.datetime.now().strftime("%Y%m%d"), SLICE_SIZE, args.max_tokens
 )
-OUTPUT_DIR = os.path.join(RESEARCH_ROOT, "04_experiments/logs",
+OUTPUT_DIR = os.path.join(str(REPO_ROOT), "04_experiments/logs",
     RUN_ID, MODE)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -117,9 +129,9 @@ def select_sapr_e_top3(question, history_thoughts, subquery, docs_raw):
 
 # ── Config ───────────────────────────────────────────────────────
 topk = 10 if MODE == "sapr_e" else 3
-index_path = args.index_path or os.path.join(REASONRAG_ROOT, "indexes/bge_extended/bge_Flat.index")
+index_path = args.index_path or str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index")
 config_dict = {
-    "data_dir": os.path.join(REASONRAG_ROOT, "dataset/"),
+    "data_dir": str(REASONRAG_ROOT / "dataset/"),
     "dataset_name": "hotpotqa", "split": ["dev", "test"],
     "index_path": index_path,
     "retrieval_method": "bge",
@@ -147,12 +159,12 @@ config_dict = {
     "disable_save": False, "test_sample_num": None, "random_sample": False,
 }
 
-FORBIDDEN_DIR = os.path.join(REASONRAG_ROOT, "output")
+FORBIDDEN_DIR = str(REASONRAG_ROOT / "output")
 assert not os.path.abspath(OUTPUT_DIR).startswith(os.path.abspath(FORBIDDEN_DIR)), \
     "SAFETY: save_dir must not be inside {}".format(FORBIDDEN_DIR)
 assert args.max_tokens >= 128, \
     "max_tokens={} is too small for ReasonRAG routing markers; use 256.".format(args.max_tokens)
-assert os.path.exists(REASONRAG_ROOT), "Missing REASONRAG_ROOT={}".format(REASONRAG_ROOT)
+assert os.path.exists(str(REASONRAG_ROOT)), "Missing REASONRAG_ROOT={}".format(REASONRAG_ROOT)
 assert os.path.exists(index_path), "Missing index_path={}".format(index_path)
 assert os.path.exists(args.corpus_path), "Missing corpus_path={}".format(args.corpus_path)
 assert os.path.exists(args.bge_path), "Missing bge_path={}".format(args.bge_path)

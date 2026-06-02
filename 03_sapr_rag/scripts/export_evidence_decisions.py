@@ -21,9 +21,21 @@ import datetime
 import argparse
 from copy import deepcopy
 
-REASONRAG_ROOT = "/home/mayi/ReasonRAG"
-RESEARCH_ROOT = "/home/mayi/RAG/agentic-rag-process-optimization"
-sys.path.insert(0, REASONRAG_ROOT)
+# 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
+from pathlib import Path as _Path
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import (  # noqa: E402
+    REPO_ROOT,
+    REASONRAG_ROOT,
+    WIKI_CORPUS_PATH,
+    BGE_MODEL_PATH,
+    LORA_MODEL_PATH,
+)
+
+sys.path.insert(0, str(REASONRAG_ROOT))
 
 from flashrag.config import Config
 from flashrag.utils import get_dataset
@@ -36,24 +48,24 @@ parser.add_argument("--num_examples", type=int, default=3, help="Number of examp
 args = parser.parse_args()
 
 SLICE_SIZE = args.num_examples
-OUTPUT_DIR = os.path.join(RESEARCH_ROOT, "04_experiments", "logs", "20260529_evidence_decision_top10")
+OUTPUT_DIR = os.path.join(str(REPO_ROOT), "04_experiments", "logs", "20260529_evidence_decision_top10")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "evidence_decision_points.jsonl")
-FORBIDDEN_DIR = os.path.join(REASONRAG_ROOT, "output")
+FORBIDDEN_DIR = str(REASONRAG_ROOT / "output")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── Config ─────────────────────────────────────────────────────
 config_dict = {
-    "data_dir": os.path.join(REASONRAG_ROOT, "dataset/"),
+    "data_dir": str(REASONRAG_ROOT / "dataset/"),
     "dataset_name": "hotpotqa",
     "split": ["dev", "test"],
-    "index_path": os.path.join(REASONRAG_ROOT, "indexes/bge_extended/bge_Flat.index"),
+    "index_path": str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index"),
     "retrieval_method": "bge",
-    "corpus_path": "/nas/mayi/RAG/corpus/wiki18_extended.jsonl",
+    "corpus_path": str(WIKI_CORPUS_PATH),
     "faiss_gpu": False,
     "model2path": {
-        "bge": "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
-        "qwen2.5-instruct-ReasonRAG-lora": "/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+        "bge": str(BGE_MODEL_PATH),
+        "qwen2.5-instruct-ReasonRAG-lora": str(LORA_MODEL_PATH),
     },
     "model2pooling": {"bge": "cls"},
     "method2index": {"bge": None},

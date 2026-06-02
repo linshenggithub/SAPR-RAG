@@ -17,10 +17,22 @@ import json
 import time
 import datetime
 
+# 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
+from pathlib import Path as _Path
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import (  # noqa: E402
+    REPO_ROOT,
+    REASONRAG_ROOT,
+    WIKI_CORPUS_PATH,
+    BGE_MODEL_PATH,
+    LORA_MODEL_PATH,
+)
+
 # ── Add ReasonRAG to path ──────────────────────────────────────
-REASONRAG_ROOT = "/home/mayi/ReasonRAG"
-RESEARCH_ROOT = "/home/mayi/RAG/agentic-rag-process-optimization"
-sys.path.insert(0, REASONRAG_ROOT)
+sys.path.insert(0, str(REASONRAG_ROOT))
 
 from flashrag.config import Config
 from flashrag.utils import get_dataset
@@ -32,9 +44,9 @@ RUN_ID = "20260529_evidence_debug_30samples_v2"
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # ── Output directories ─────────────────────────────────────────
-SAVE_DIR = os.path.join(RESEARCH_ROOT, "04_experiments", "logs", RUN_ID)
-METRICS_DIR = os.path.join(RESEARCH_ROOT, "04_experiments", "metrics", RUN_ID)
-FORBIDDEN_DIR = os.path.join(REASONRAG_ROOT, "output")
+SAVE_DIR = os.path.join(str(REPO_ROOT), "04_experiments", "logs", RUN_ID)
+METRICS_DIR = os.path.join(str(REPO_ROOT), "04_experiments", "metrics", RUN_ID)
+FORBIDDEN_DIR = str(REASONRAG_ROOT / "output")
 
 # Safety check
 assert not os.path.abspath(SAVE_DIR).startswith(
@@ -49,20 +61,20 @@ SLICE_SIZE = 30
 
 config_dict = {
     # Data
-    "data_dir": os.path.join(REASONRAG_ROOT, "dataset/"),
+    "data_dir": str(REASONRAG_ROOT / "dataset/"),
     "dataset_name": "hotpotqa",
     "split": ["dev", "test"],
 
     # Retrieval
-    "index_path": os.path.join(REASONRAG_ROOT, "indexes/bge_extended/bge_Flat.index"),
+    "index_path": str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index"),
     "retrieval_method": "bge",
-    "corpus_path": "/nas/mayi/RAG/corpus/wiki18_extended.jsonl",
+    "corpus_path": str(WIKI_CORPUS_PATH),
     "faiss_gpu": False,
 
     # Model paths
     "model2path": {
-        "bge": "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
-        "qwen2.5-instruct-ReasonRAG-lora": "/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+        "bge": str(BGE_MODEL_PATH),
+        "qwen2.5-instruct-ReasonRAG-lora": str(LORA_MODEL_PATH),
     },
     "model2pooling": {
         "bge": "cls",

@@ -5,14 +5,22 @@
 
 from .paths import (
     BGE_INDEX_PATH,
+    BGE_MODEL_PATH,
+    CONDA_BIN,
+    LORA_MODEL_PATH,
     REASONRAG_OUTPUT_DIR,
+    REASONRAG_ROOT,
     REPO_ROOT,
     WIKI_CORPUS_PATH,
 )
 
 __all__ = [
     "BGE_INDEX_PATH",
+    "BGE_MODEL_PATH",
+    "CONDA_BIN",
+    "LORA_MODEL_PATH",
     "REASONRAG_OUTPUT_DIR",
+    "REASONRAG_ROOT",
     "REPO_ROOT",
     "WIKI_CORPUS_PATH",
 ]

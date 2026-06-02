@@ -12,11 +12,11 @@
     # 在 5090 上跑实验
     export SAPR_REASONRAG_OUTPUT_DIR=/home/mayi/ReasonRAG/output/hotpotqa
     export SAPR_WIKI_CORPUS_PATH=/nas/mayi/RAG/corpus/wiki18_extended.jsonl
-    python gate0/parse_trees.py
+    python gate0/sample_branch_points.py
 
     # 在本地 mlx_devbox 上跑（如果有数据软链）
     export SAPR_REASONRAG_OUTPUT_DIR=/path/to/local/reward_data_dir
-    python gate0/parse_trees.py
+    python gate0/sample_branch_points.py
 """
 
 from __future__ import annotations
@@ -87,6 +87,12 @@ CONDA_BIN: Path = _path_from_env(
     "/home/mayi/miniconda3/bin/conda",
 )
 
+# HotpotQA dev jsonl（gate0 GPT-4o pilot 用作输入 query 来源）
+HOTPOTQA_DEV_PATH: Path = _path_from_env(
+    "SAPR_HOTPOTQA_DEV_PATH",
+    "/home/mayi/RAG/ReasonRAG/dataset/hotpotqa/dev.jsonl",
+)
+
 
 __all__ = [
     "REPO_ROOT",
@@ -97,4 +103,5 @@ __all__ = [
     "BGE_MODEL_PATH",
     "LORA_MODEL_PATH",
     "CONDA_BIN",
+    "HOTPOTQA_DEV_PATH",
 ]

@@ -13,8 +13,8 @@
 - Total: ~6500+ trajectories with ~10000+ branch points
 
 ## Steps
-1. `parse_trees.py` - 解析 MCTS 树，提取分支点
-2. `compute_phi_q.py` - 计算 φ_q（NER-based，不需要 LLM）
+1. `sample_branch_points.py` - 解析 MCTS 树，提取分支点
+2. `compute_phi_q_typed.py` - 计算 φ_q（NER-based，不需要 LLM）
 3. `analyze_results.py` - 对比 typed vs scalar 的区分能力
 
 ## Metrics

@@ -12,10 +12,10 @@ Rules:
   - treatment: typed transition eval (φ_q, φ_c, φ_s computed from NER + set ops)
 
 Usage:
-  python mcts_pilot.py --mode sanity          # 1 sample, verify format & no-leak
-  python mcts_pilot.py --mode baseline        # run baseline on N samples
-  python mcts_pilot.py --mode treatment       # run treatment on N samples
-  python mcts_pilot.py --mode eval            # compute EM/F1 from saved results
+  python gate0/run_mcts_typed_vs_scalar_pilot.py --mode sanity     # 1 sample, verify format & no-leak
+  python gate0/run_mcts_typed_vs_scalar_pilot.py --mode baseline   # run baseline on N samples
+  python gate0/run_mcts_typed_vs_scalar_pilot.py --mode treatment  # run treatment on N samples
+  python gate0/run_mcts_typed_vs_scalar_pilot.py --mode eval       # compute EM/F1 from saved results
 """
 
 import os
@@ -36,12 +36,24 @@ import yaml
 from openai import OpenAI
 
 # ── Paths ──────────────────────────────────────────────────────────
-PROJECT_DIR = Path("/home/mayi/RAG/agentic-rag-process-optimization")
-GATE0_DIR = PROJECT_DIR / "gate0" / "gpt4o_experiment"
+# 让脚本能直接 `python gate0/run_mcts_typed_vs_scalar_pilot.py` 运行
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import (  # noqa: E402
+    BGE_INDEX_PATH as _BGE_INDEX_PATH,
+    BGE_MODEL_PATH as _BGE_MODEL_PATH,
+    HOTPOTQA_DEV_PATH as _HOTPOTQA_DEV_PATH,
+    WIKI_CORPUS_PATH as _WIKI_CORPUS_PATH,
+)
+
+# 仓库内路径：相对于本脚本所在 gate0/ 目录派生
+PROJECT_DIR = _REPO_ROOT
+GATE0_DIR = _REPO_ROOT / "gate0"
 DATA_DIR = GATE0_DIR / "data"
 RESULTS_DIR = GATE0_DIR / "results"
 
-sys.path.insert(0, str(PROJECT_DIR / "gate0"))
 from typed_eval import (  # noqa: E402
     evaluate_transition as rule_evaluate_transition,
     extract_evidence as rule_extract_evidence,
@@ -50,11 +62,11 @@ from typed_eval import (  # noqa: E402
     token_set as rule_token_set,
 )
 
-# External resources
-BGE_INDEX_PATH = "/home/mayi/RAG/reasonrag_indexes/bge_Flat.index"
-WIKI_CORPUS_PATH = "/home/mayi/RAG/reasonrag_corpus/wiki_20250901.jsonl"
-BGE_MODEL_PATH = "/home/mayi/RAG/retriever/bge-base-en-v1.5"
-HOTPOTQA_DEV_PATH = "/home/mayi/RAG/ReasonRAG/dataset/hotpotqa/dev.jsonl"
+# External resources（仓外路径：从 config/paths.py 读取，可被 SAPR_* 环境变量覆盖）
+BGE_INDEX_PATH = str(_BGE_INDEX_PATH)
+WIKI_CORPUS_PATH = str(_WIKI_CORPUS_PATH)
+BGE_MODEL_PATH = str(_BGE_MODEL_PATH)
+HOTPOTQA_DEV_PATH = str(_HOTPOTQA_DEV_PATH)
 
 # API config (loaded from .env, NOT hardcoded)
 DMXAPI_BASE_URL = "https://www.dmxapi.cn/v1"

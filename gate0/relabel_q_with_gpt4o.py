@@ -8,11 +8,11 @@ Gate 0 L1: Re-label Q values with GPT-4o on an UNBIASED random sample.
 - 与 Llama-70B-int4 的 Q 值做无偏对比,验证 "标量 PRM 在 67.5% 分支点撞车"
   到底是 judge 模型缺陷,还是 scalar PRM 的固有局限.
 
-与 parse_trees.py 的关键区别:
+与 sample_branch_points.py 的关键区别:
 - 这里的 trajectory 采样是 **完全随机** (默认 seed=2026),不再做 top-30 + random-20
   的有偏混合,以避免 q_same_rate 被高估.
 - 直接从 reward_data{0..3}.json 解析,不依赖 sampled_trajectories.json,
-  使用 **完整未截断** 的 response 文本 (parse_trees.py 截断到 1000 字符,
+  使用 **完整未截断** 的 response 文本 (sample_branch_points.py 截断到 1000 字符,
   会让 GPT-4o 评估失真).
 
 输出:
@@ -22,15 +22,15 @@ Gate 0 L1: Re-label Q values with GPT-4o on an UNBIASED random sample.
 
 使用:
     # 干跑,只统计采样规模和成本估算,不调用 API
-    python relabel_q_gpt4o.py --dry-run
+    python relabel_q_with_gpt4o.py --dry-run
 
     # 正式跑 (需要 OPENAI_API_KEY 或 DMXAPI key)
     export OPENAI_API_KEY=sk-xxx
     export OPENAI_BASE_URL=https://www.dmxapi.cn/v1
-    python relabel_q_gpt4o.py --n-traj 50 --concurrency 8
+    python relabel_q_with_gpt4o.py --n-traj 50 --concurrency 8
 
     # 断点续跑 (自动跳过 progress 文件里已完成的 child_id)
-    python relabel_q_gpt4o.py --n-traj 50 --resume
+    python relabel_q_with_gpt4o.py --n-traj 50 --resume
 
 环境依赖:
     pip install openai tqdm
@@ -48,7 +48,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# 让脚本能直接 `python gate0/relabel_q_gpt4o.py` 运行：把仓库根加进 sys.path
+# 让脚本能直接 `python gate0/relabel_q_with_gpt4o.py` 运行：把仓库根加进 sys.path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -76,7 +76,7 @@ EVALUATION_PROMPT = (
 
 
 # ----------------------------------------------------------------------------
-# 2) 解析 reward_data 树(直接复用 parse_trees.py 的核心逻辑,但读完整字段)
+# 2) 解析 reward_data 树(直接复用 sample_branch_points.py 的核心逻辑,但读完整字段)
 # ----------------------------------------------------------------------------
 def load_reward_data(reward_dir: Path) -> List[dict]:
     all_data = []
@@ -372,7 +372,7 @@ def main():
         "--seed",
         type=int,
         default=2026,
-        help="与 parse_trees.py(seed=42) 区分,做独立无偏采样",
+        help="与 sample_branch_points.py(seed=42) 区分,做独立无偏采样",
     )
     ap.add_argument("--model", type=str, default="gpt-4o")
     ap.add_argument("--concurrency", type=int, default=8)

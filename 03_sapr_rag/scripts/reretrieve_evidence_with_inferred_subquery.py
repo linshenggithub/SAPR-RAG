@@ -12,7 +12,7 @@ all 21M documents.
 
 Usage:
   conda activate reasonrag
-  CUDA_VISIBLE_DEVICES=1 python reretrieve_with_subquery.py
+  CUDA_VISIBLE_DEVICES=1 python reretrieve_evidence_with_inferred_subquery.py
 """
 
 import os

@@ -128,7 +128,7 @@ v4 当前版（见 docs/proposal.md）
 ## 关键经验教训（写给以后的我和 AI）
 
 1. **不要在没有 Gate 0 数据支持前迭代 idea 命名**。前 3 版主要是 AI 主导的语言重构，没有产生新的实证差异；产生的 ~20 份带时间戳的 EXPERIMENT_PLAN / TRACKER / FINAL_PROPOSAL 反向掩埋了真正的 idea。
-2. **数据来源的诚实性比方法学的精致更重要**。本仓库 `reward_data` 是用 Llama-70B-int4 复现的，**不是论文配置的 GPT-4o**。所有基于 reward_data 的统计（如"分支 Q 值高度同质化"）都必须先用 `gate0/relabel_q_gpt4o.py` 做 GPT-4o 无偏对照，再下结论。
+2. **数据来源的诚实性比方法学的精致更重要**。本仓库 `reward_data` 是用 Llama-70B-int4 复现的，**不是论文配置的 GPT-4o**。所有基于 reward_data 的统计（如"分支 Q 值高度同质化"）都必须先用 `gate0/relabel_q_with_gpt4o.py` 做 GPT-4o 无偏对照，再下结论。
 3. **命名规范**：
    - 不要用 `_v1 / _v2 / _v3` 文件后缀。最新版直接覆盖；演化记录写到 `docs/history.md`。
    - 不要给同一份文档加时间戳副本。git 已经记录历史，时间戳副本只制造噪声。

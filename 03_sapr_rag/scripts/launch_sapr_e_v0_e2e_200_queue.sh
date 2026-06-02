@@ -52,7 +52,7 @@ run_mode() {
   conda activate reasonrag
   # 透传给 Python 脚本，让 config/paths.py 也读取到这些值
   export SAPR_REASONRAG_ROOT="${REASONRAG_ROOT}"
-  python "${SCRIPT_DIR}/run_sapr_e_e2e.py" \
+  python "${SCRIPT_DIR}/run_sapr_e_v0_e2e_eval.py" \
     --num_examples 200 \
     --mode "${mode}" \
     --run_id "${RUN_ID}" \

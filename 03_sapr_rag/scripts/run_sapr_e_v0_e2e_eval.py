@@ -10,8 +10,8 @@ Modifies ReasonRAG pipeline to:
 
 Usage:
   conda activate reasonrag
-  CUDA_VISIBLE_DEVICES=0 python run_sapr_e_e2e.py --num_examples 30 --mode sapr_e
-  CUDA_VISIBLE_DEVICES=0 python run_sapr_e_e2e.py --num_examples 30 --mode baseline
+  CUDA_VISIBLE_DEVICES=0 python run_sapr_e_v0_e2e_eval.py --num_examples 30 --mode sapr_e
+  CUDA_VISIBLE_DEVICES=0 python run_sapr_e_v0_e2e_eval.py --num_examples 30 --mode baseline
 """
 
 import os, sys, json, re, time, argparse, datetime

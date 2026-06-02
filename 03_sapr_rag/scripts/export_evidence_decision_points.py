@@ -15,7 +15,7 @@ Do NOT change model behavior.
 Usage (on rag-5090):
   conda activate reasonrag
   cd /home/mayi/ReasonRAG
-  CUDA_VISIBLE_DEVICES=0 python export_evidence_decisions_v2.py --num_examples 3
+  CUDA_VISIBLE_DEVICES=0 python export_evidence_decision_points.py --num_examples 3
 """
 
 import os

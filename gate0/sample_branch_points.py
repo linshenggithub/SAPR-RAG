@@ -10,7 +10,7 @@ import random
 from pathlib import Path
 from collections import defaultdict
 
-# 让脚本能直接 `python gate0/parse_trees.py` 运行：把仓库根加进 sys.path
+# 让脚本能直接 `python gate0/sample_branch_points.py` 运行：把仓库根加进 sys.path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))

@@ -36,7 +36,7 @@
 | 2026-05-30 13:50 | /experiment-bridge | 04_experiments/metrics/20260530_sapr_evidence_v0_reretrieved/metrics.json | experiment | 6-way ablation on 30-sample reretrieved, directional signal ✅ |
 | 2026-05-30 13:50 | /experiment-bridge | 04_experiments/metrics/20260530_sapr_evidence_v0_reretrieved/per_item_table.md | experiment | per-item breakdown table |
 | 2026-05-30 13:50 | /experiment-bridge | 04_experiments/metrics/20260530_sapr_evidence_v0_reretrieved/per_item_breakdown.json | experiment | per-item per-step detailed results |
-| 2026-05-30 13:50 | /experiment-bridge | 03_sapr_rag/scripts/ablation_6way.py | code | 6-way ablation comparison script |
-| 2026-05-30 13:50 | /experiment-bridge | 03_sapr_rag/scripts/reretrieve_with_subquery.py | code | inferred_subquery reretrieval script |
+| 2026-05-30 13:50 | /experiment-bridge | 03_sapr_rag/scripts/compare_6way_selector_ablation.py | code | 6-way ablation comparison script |
+| 2026-05-30 13:50 | /experiment-bridge | 03_sapr_rag/scripts/reretrieve_evidence_with_inferred_subquery.py | code | inferred_subquery reretrieval script |
 | 2026-05-30 16:12 | /experiment-bridge | 04_experiments/logs/20260530_evidence_decision_top10_queryfix_200/evidence_decision_points.jsonl | experiment | 200-sample decision points |
 | 2026-05-30 16:30 | /experiment-bridge | 04_experiments/overnight_summary.md | experiment | overnight pipeline summary (updated) |

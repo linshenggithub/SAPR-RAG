@@ -600,7 +600,7 @@ Index setting B: bge_extended + wiki18_extended
 
 ### 7.2 代码位置
 
-`gate0/gpt4o_experiment/mcts_pilot.py`
+`gate0/run_mcts_typed_vs_scalar_pilot.py`
 
 ### 7.3 设计要点
 
@@ -635,16 +635,16 @@ Index setting B: bge_extended + wiki18_extended
 
 ```bash
 # Step 1: Sanity check（1 条，验证格式+无泄漏+指标计算）
-python mcts_pilot.py --mode sanity
+python gate0/run_mcts_typed_vs_scalar_pilot.py --mode sanity
 
 # Step 2: Baseline（确认 sanity 通过后）
-python mcts_pilot.py --mode baseline --n_samples 50
+python gate0/run_mcts_typed_vs_scalar_pilot.py --mode baseline --n_samples 50
 
 # Step 3: Treatment
-python mcts_pilot.py --mode treatment --n_samples 50
+python gate0/run_mcts_typed_vs_scalar_pilot.py --mode treatment --n_samples 50
 
 # Step 4: 对比
-python mcts_pilot.py --mode eval
+python gate0/run_mcts_typed_vs_scalar_pilot.py --mode eval
 ```
 
 ### 7.5 成本控制

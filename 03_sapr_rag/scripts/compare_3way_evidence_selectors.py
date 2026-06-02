@@ -18,7 +18,7 @@ Metrics:
 - per-question badcases
 
 Usage:
-  python compare_evidence_selectors.py --input <evidence_decision_points.jsonl> --output_dir <dir>
+  python compare_3way_evidence_selectors.py --input <evidence_decision_points.jsonl> --output_dir <dir>
 """
 
 import json

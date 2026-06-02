@@ -37,7 +37,7 @@
 ## 3. Evidence Decision Point Export (Stage 2)
 
 **Run**: `20260530_evidence_decision_top10_queryfix`
-**Script**: `03_sapr_rag/scripts/export_evidence_decisions_v2.py`
+**Script**: `03_sapr_rag/scripts/export_evidence_decision_points.py`
 
 | Check | Value |
 |-------|------:|
@@ -144,7 +144,7 @@ Same as above. All selectors 0% due to identical placeholder retrieval docs.
 
 ## 7. Reretrieval Script
 
-**Script**: `03_sapr_rag/scripts/reretrieve_with_subquery.py`
+**Script**: `03_sapr_rag/scripts/reretrieve_evidence_with_inferred_subquery.py`
 **Server**: rag-5090 GPU 1 (RTX 5090)
 **Key details**:
 - BGE query prefix: `"Represent this sentence for searching relevant passages: "` (matches FlashRAG)
@@ -232,12 +232,12 @@ Same as above. All selectors 0% due to identical placeholder retrieval docs.
 | **200-sample 6-way metrics** | `04_experiments/metrics/20260530_sapr_evidence_v0_200_reretrieved/metrics.json` |
 | 200-sample decision points | `04_experiments/logs/20260530_evidence_decision_top10_queryfix_200/evidence_decision_points.jsonl` |
 | 200-sample reretrieved | `04_experiments/logs/20260530_evidence_decision_top10_queryfix_200_reretrieved/evidence_decision_points.jsonl` |
-| SAPR-E e2e script | `03_sapr_rag/scripts/run_sapr_e_e2e.py` |
-| 6-way ablation script | `03_sapr_rag/scripts/ablation_6way.py` |
+| SAPR-E e2e script | `03_sapr_rag/scripts/run_sapr_e_v0_e2e_eval.py` |
+| 6-way ablation script | `03_sapr_rag/scripts/compare_6way_selector_ablation.py` |
 | Old 3-way metrics (invalid) | `04_experiments/metrics/20260530_sapr_evidence_v0/metrics.json` |
 | Old 4-way ablation (invalid) | `04_experiments/metrics/20260530_sapr_evidence_v0_no_hist/metrics.json` |
-| Comparison script | `03_sapr_rag/scripts/compare_evidence_selectors.py` |
-| Reretrieval script | `03_sapr_rag/scripts/reretrieve_with_subquery.py` |
-| Exporter script (v2) | `03_sapr_rag/scripts/export_evidence_decisions_v2.py` |
+| Comparison script | `03_sapr_rag/scripts/compare_3way_evidence_selectors.py` |
+| Reretrieval script | `03_sapr_rag/scripts/reretrieve_evidence_with_inferred_subquery.py` |
+| Exporter script | `03_sapr_rag/scripts/export_evidence_decision_points.py` |
 | **E2E 诊断报告** | `04_experiments/logs/20260531_sapr_e_e2e_diagnosis.md` |
 | **This summary** | `04_experiments/overnight_summary.md` |

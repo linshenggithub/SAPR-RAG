@@ -11,7 +11,7 @@ Selectors:
   6. sapr_e_no_subquery — ablation: remove Dim1 (subquery relevance)
 
 Usage:
-  python ablation_6way.py --input <reretrieved.jsonl> --output_dir <dir>
+  python compare_6way_selector_ablation.py --input <reretrieved.jsonl> --output_dir <dir>
 """
 
 import json

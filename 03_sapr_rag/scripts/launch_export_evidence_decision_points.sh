@@ -19,4 +19,4 @@ conda activate reasonrag
 LOG_DIR="${REPO_ROOT}/04_experiments/logs/20260529_evidence_decision_top10"
 mkdir -p "$LOG_DIR"
 
-python "${SCRIPT_DIR}/export_evidence_decisions.py" --num_examples 30 2>&1 | tee "$LOG_DIR/run.log"
+python "${SCRIPT_DIR}/export_evidence_decision_points.py" --num_examples 30 2>&1 | tee "$LOG_DIR/run.log"

@@ -6,10 +6,10 @@
 **Date**: 2026-05-28
 
 ## Final Deliverables
-- Proposal: `refine-logs/FINAL_PROPOSAL.md`
-- Review summary: `refine-logs/REVIEW_SUMMARY.md`
-- Experiment plan: `refine-logs/EXPERIMENT_PLAN.md`
-- Experiment tracker: `refine-logs/EXPERIMENT_TRACKER.md`
+- Proposal: `docs/proposal.md` (latest, was `refine-logs/FINAL_PROPOSAL.md`，已并入 docs/)
+- History 演化记录: `docs/history.md`
+- Experiment plan: `docs/experiment_plan.md`
+- Experiment tracker: `docs/experiment_tracker.md`
 
 ## Contribution Snapshot
 - Dominant contribution: state-conditioned action-value modeling for query/evidence/stop actions (compute-matched trajectory repair).

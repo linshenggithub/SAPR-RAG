@@ -6,7 +6,9 @@ This project is the long-term research workspace for:
 
 > 面向复杂问答的 Agentic RAG 多步检索推理过程优化研究
 
-When continuing work in this repository, first read `AGENTS.md`, then inspect `README.md`, `ROADMAP.md`, `MANIFEST.md`, `docs/history.md`, `gate0/GATE0_STATUS.md`, and the task-relevant directory. Treat `AGENTS.md` as the full project operating guide and single source of truth for research positioning, paths, server rules, experiment hygiene, and writing standards.
+When continuing work in this repository, first read `AGENTS.md`, then inspect `README.md`, `ROADMAP.md`, `MANIFEST.md`, `docs/repo_overview.md`, `docs/history.md`, `gate0/GATE0_STATUS.md`, and the task-relevant directory. Treat `AGENTS.md` as the full project operating guide and single source of truth for research positioning, paths, server rules, experiment hygiene, and writing standards.
+
+**新机器 / 新会话拉下仓库后的第一步**：先 `source config/env_3090.sh` 或 `source config/env_5090.sh`（或复制 `config/env_<host>.sh`），否则脚本会在用到外部路径时主动 `RuntimeError`。换机器流程详见 `docs/repo_overview.md` §5。
 
 Code-level规则（命名 / 路径 / debug / AI 执行行为约束）的详细版在 `docs/coding_standard.md`，AGENTS.md §11.5 有摘要。**跑实验遇到慢/卡/报错时必须先停下来报告，不允许默默降级**——这条规则违反过会让全部 debug 产物作废，详见 commit `cb867d1`。
 

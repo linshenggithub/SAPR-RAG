@@ -439,6 +439,7 @@ launcher 脚本必须能直接对应它启动的 Python 脚本。
 - 仓内路径用 `Path(__file__).resolve().parents[N]` 派生。
 - 仓外路径（数据集、索引、模型）写到 `config/paths.py`，通过 `SAPR_*` 环境变量覆盖。
 - 不在脚本里写绝对路径。
+- **新机器拉下来第一件事**：`source config/env_3090.sh` 或 `env_5090.sh`（或自己复制一份 `env_<host>.sh`）。`config/paths.py` 不再内置机器默认值，未 export 时会在使用时报 `RuntimeError`。详见 `docs/repo_overview.md` §5。
 
 ### Bug fix
 

@@ -19,14 +19,20 @@
 ## 2. 路径管理
 
 - **仓内路径**：用 `Path(__file__).resolve().parents[N]` 派生，不要写绝对路径。
-- **仓外路径**（数据集、索引、模型等）：集中在 `config/paths.py`，用 `SAPR_*` 环境变量覆盖。
+- **仓外路径**（数据集、索引、模型等）：集中在 `config/paths.py`，通过 `SAPR_*` 环境变量提供。**`config/paths.py` 不内置任何机器特定默认值**——未设置的变量会在被使用时抛 `RuntimeError`，避免误用其他机器的路径。
   ```python
   # bad
   WIKI_PATH = "/home/mayi/RAG/corpus/wiki18.jsonl"
   # good
   from config.paths import WIKI_CORPUS_PATH
   ```
-- 跨机器跑实验只改环境变量，不改代码。
+- **每台机器一份 env 脚本**：仓库自带 `config/env_3090.sh` 和 `config/env_5090.sh`。新机器复制一份 `config/env_<host>.sh`，按字段填路径。
+- **跑实验前 source**：
+  ```bash
+  source config/env_3090.sh
+  python gate0/run_mcts_typed_vs_scalar_pilot.py
+  ```
+- 跨机器跑实验只改 env 脚本，不改代码。详见 `docs/repo_overview.md` §5。
 
 ## 3. 脚本命名规范
 

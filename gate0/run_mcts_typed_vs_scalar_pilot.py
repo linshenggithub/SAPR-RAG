@@ -44,6 +44,7 @@ if str(_REPO_ROOT) not in sys.path:
 from config.paths import (  # noqa: E402
     BGE_INDEX_PATH as _BGE_INDEX_PATH,
     BGE_MODEL_PATH as _BGE_MODEL_PATH,
+    FLASHRAG_ROOT as _FLASHRAG_ROOT,
     HOTPOTQA_DEV_PATH as _HOTPOTQA_DEV_PATH,
     WIKI_CORPUS_PATH as _WIKI_CORPUS_PATH,
 )
@@ -252,7 +253,8 @@ class Retriever:
         """Load retriever on first use (saves startup time during testing)."""
         if self._retriever is not None:
             return
-        sys.path.insert(0, "/home/mayi/RAG/FlashRAG")
+        # FlashRAG 仓库根从 config.paths 读取（SAPR_FLASHRAG_ROOT 环境变量覆盖）
+        sys.path.insert(0, str(_FLASHRAG_ROOT))
         from flashrag.config import Config
         from flashrag.retriever import DenseRetriever
 

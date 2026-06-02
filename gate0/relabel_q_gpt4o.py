@@ -48,10 +48,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# 让脚本能直接 `python gate0/relabel_q_gpt4o.py` 运行：把仓库根加进 sys.path
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import REASONRAG_OUTPUT_DIR  # noqa: E402
+
 # ----------------------------------------------------------------------------
 # 1) 路径与超参
 # ----------------------------------------------------------------------------
-DEFAULT_REWARD_DIR = Path("/home/mayi/RAG/ReasonRAG/output/hotpotqa")
+# 仓库外路径：从 config/paths.py 读取（可被 SAPR_REASONRAG_OUTPUT_DIR 环境变量覆盖）
+DEFAULT_REWARD_DIR = REASONRAG_OUTPUT_DIR
 DEFAULT_OUT_DIR = Path(__file__).parent / "data"
 
 EVALUATION_PROMPT = (

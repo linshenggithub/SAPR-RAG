@@ -10,15 +10,21 @@ import random
 from pathlib import Path
 from collections import defaultdict
 
+# 让脚本能直接 `python gate0/parse_trees.py` 运行：把仓库根加进 sys.path
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from config.paths import REASONRAG_OUTPUT_DIR  # noqa: E402
+
 # ---- Config ----
 RANDOM_SEED = 42
 SAMPLE_SIZE = 50  # number of trajectories to analyze
 MIN_BRANCH_CHILDREN = 2  # minimum children to be a branch point
 
 # Paths
-# 仓库外路径：保留绝对路径（数据来自外部 ReasonRAG 仓库），后续会迁移到 config/paths.py
-# TODO: 迁移到 config/paths.py 集中管理
-REWARD_DATA_DIR = Path("/home/mayi/RAG/ReasonRAG/output/hotpotqa")
+# 仓库外路径：从 config/paths.py 读取（可被 SAPR_REASONRAG_OUTPUT_DIR 环境变量覆盖）
+REWARD_DATA_DIR = REASONRAG_OUTPUT_DIR
 # 仓库内路径：相对于本脚本所在 gate0/ 目录，跨机器自动适配
 OUTPUT_DIR = Path(__file__).resolve().parent / "data"
 

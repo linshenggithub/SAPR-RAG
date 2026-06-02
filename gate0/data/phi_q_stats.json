@@ -1,0 +1,29 @@
+{
+  "total_branch_points": 308,
+  "total_children": 616,
+  "q_same_total": 261,
+  "q_same_content_diff": 30,
+  "q_same_duplicate_content": 231,
+  "q_same_failure_diff": 1,
+  "q_same_score_diff": 1,
+  "q_diff_total": 47,
+  "q_diff_typed_agree": 21,
+  "q_diff_typed_disagree": 26,
+  "empty_query_children": 19,
+  "none_evidence_children": 44,
+  "failure_counts": {
+    "success": 478,
+    "query_fail": 99,
+    "mixed": 10,
+    "stop_fail": 29
+  },
+  "action_counts": {
+    "begin_reasoning": 100,
+    "document_analysis": 216,
+    "reasoning": 284,
+    "answer_generation": 16
+  },
+  "q_same_failure_diff_rate": 0.0038,
+  "q_same_score_diff_rate": 0.0038,
+  "q_same_content_diff_rate": 0.1149
+}

@@ -49,3 +49,4 @@ env/
 # OS/editor
 .DS_Store
 .vscode/
+gate0/.env

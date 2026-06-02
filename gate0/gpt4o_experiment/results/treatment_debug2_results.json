@@ -1,0 +1,80 @@
+[
+  {
+    "question": "In what year was the university where Sergei Aleksandrovich Tokarev was a professor founded?",
+    "prediction": "",
+    "tree": {
+      "node_0": {
+        "id": 0,
+        "step": 0,
+        "N": 2,
+        "Q": 0.5458,
+        "next_state": "begin_reasoning",
+        "parent_id": -1,
+        "children_ids": [
+          1
+        ],
+        "action_name": "",
+        "query": "",
+        "answer": "",
+        "response": "",
+        "expansion_method": "",
+        "typed_score": null,
+        "failure_type": null,
+        "stop_overridden": false
+      },
+      "node_1": {
+        "id": 1,
+        "step": 1,
+        "N": 2,
+        "Q": 0.5458,
+        "next_state": "document_analysis",
+        "parent_id": 0,
+        "children_ids": [
+          2
+        ],
+        "action_name": "begin_reasoning",
+        "query": "\"In what year was Moscow State University founded?\"",
+        "answer": "",
+        "response": "Sergei Aleksandrovich Tokarev was a professor at Moscow State University. \n\nSo the next query is <query>\"In what year was Moscow State University founded?\"</query>",
+        "expansion_method": "normal",
+        "typed_score": 0.5917,
+        "failure_type": "query_fail",
+        "stop_overridden": false,
+        "phi_q": 0.275,
+        "phi_c": 1.0,
+        "phi_s": 0.0
+      },
+      "node_2": {
+        "id": 2,
+        "step": 2,
+        "N": 1,
+        "Q": 0.5,
+        "next_state": "document_analysis",
+        "parent_id": 1,
+        "children_ids": [],
+        "action_name": "document_analysis",
+        "query": "\"What year was Moscow State University established, the institution where Sergei Aleksandrovich Tokarev was a professor?\"",
+        "answer": "",
+        "response": "So the next query is <query>\"What year was Moscow State University established, the institution where Sergei Aleksandrovich Tokarev was a professor?\"</query>",
+        "expansion_method": "query_rewrite",
+        "typed_score": 0.5,
+        "failure_type": "claim_fail",
+        "stop_overridden": false,
+        "phi_q": 1.0,
+        "phi_c": 0.0,
+        "phi_s": 0.0
+      }
+    },
+    "n_rollouts": 2,
+    "total_llm_calls": 2,
+    "total_tokens": 518,
+    "golden_answers": [
+      "1755"
+    ],
+    "type": "bridge",
+    "em": 0.0,
+    "f1": 0.0,
+    "llm_calls_this_sample": 2,
+    "tokens_this_sample": 518
+  }
+]

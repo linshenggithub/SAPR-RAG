@@ -1,0 +1,129 @@
+[
+  {
+    "question": "In what year was the university where Sergei Aleksandrovich Tokarev was a professor founded?",
+    "prediction": "",
+    "tree": {
+      "node_0": {
+        "id": 0,
+        "step": 0,
+        "N": 4,
+        "Q": 0.7368,
+        "next_state": "begin_reasoning",
+        "parent_id": -1,
+        "children_ids": [
+          1
+        ],
+        "action_name": "",
+        "base_action_name": "",
+        "query": "",
+        "answer": "",
+        "response": "",
+        "expansion_method": "",
+        "typed_score": null,
+        "failure_type": null,
+        "stop_overridden": false
+      },
+      "node_1": {
+        "id": 1,
+        "step": 1,
+        "N": 4,
+        "Q": 0.7368,
+        "next_state": "document_analysis",
+        "parent_id": 0,
+        "children_ids": [
+          2
+        ],
+        "action_name": "begin_reasoning",
+        "base_action_name": "begin_reasoning",
+        "query": "university where Sergei Aleksandrovich Tokarev was a professor",
+        "answer": "",
+        "response": "To answer this question, I need to determine the university where Sergei Aleksandrovich Tokarev was a professor and then identify the year it was founded. While I know that Tokarev was associated with Russian/Soviet academia, I need to confirm the specific university name. \n\nSo the next query is <qu",
+        "expansion_method": "normal",
+        "typed_score": 0.8333,
+        "failure_type": "success",
+        "stop_overridden": false,
+        "phi_q": 1.0,
+        "phi_c": 1.0,
+        "phi_s": 0.0
+      },
+      "node_2": {
+        "id": 2,
+        "step": 2,
+        "N": 3,
+        "Q": 0.7046,
+        "next_state": "reasoning",
+        "parent_id": 1,
+        "children_ids": [
+          3
+        ],
+        "action_name": "document_analysis",
+        "base_action_name": "document_analysis",
+        "query": "",
+        "answer": "",
+        "response": "Based on the query, the relevant evidence is <evidence>Sergei Aleksandrovich Tokarev was a professor at Moscow State University.</evidence>.",
+        "expansion_method": "normal",
+        "typed_score": 0.7833,
+        "failure_type": "success",
+        "stop_overridden": false,
+        "phi_q": 1.0,
+        "phi_c": 0.85,
+        "phi_s": 0.0
+      },
+      "node_3": {
+        "id": 3,
+        "step": 3,
+        "N": 2,
+        "Q": 0.6653,
+        "next_state": "document_analysis",
+        "parent_id": 2,
+        "children_ids": [
+          4
+        ],
+        "action_name": "reasoning",
+        "base_action_name": "reasoning",
+        "query": "year Moscow State University was founded",
+        "answer": "",
+        "response": "Information Sufficiency: The university where Sergei Aleksandrovich Tokarev was a professor is confirmed to be Moscow State University. Now, I need to determine the year it was founded.\n\nSo the next query is <query>year Moscow State University was founded</query>",
+        "expansion_method": "normal",
+        "typed_score": 0.5917,
+        "failure_type": "query_fail",
+        "stop_overridden": false,
+        "phi_q": 0.275,
+        "phi_c": 1.0,
+        "phi_s": 0.0
+      },
+      "node_4": {
+        "id": 4,
+        "step": 4,
+        "N": 1,
+        "Q": 0.7389,
+        "next_state": "document_analysis",
+        "parent_id": 3,
+        "children_ids": [],
+        "action_name": "query_rewrite",
+        "base_action_name": "document_analysis",
+        "query": "founding year of Moscow State University, where Sergei Aleksandrovich Tokarev was a professor",
+        "answer": "",
+        "response": "So the next query is <query>founding year of Moscow State University, where Sergei Aleksandrovich Tokarev was a professor</query>",
+        "expansion_method": "query_rewrite",
+        "typed_score": 0.7389,
+        "failure_type": "success",
+        "stop_overridden": false,
+        "phi_q": 0.7167,
+        "phi_c": 1.0,
+        "phi_s": 0.0
+      }
+    },
+    "n_rollouts": 4,
+    "total_llm_calls": 4,
+    "total_tokens": 1576,
+    "golden_answers": [
+      "1755"
+    ],
+    "type": "bridge",
+    "em": 0.0,
+    "f1": 0.0,
+    "llm_calls_this_sample": 4,
+    "tokens_this_sample": 1576
+  }
+]

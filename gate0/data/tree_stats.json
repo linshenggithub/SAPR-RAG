@@ -1,0 +1,8 @@
+{
+  "total": 3606,
+  "has_branches": 3606,
+  "total_branch_points": 20497,
+  "q_same_branches": 13846,
+  "q_diff_branches": 6651,
+  "q_same_content_diff_branches": 55
+}

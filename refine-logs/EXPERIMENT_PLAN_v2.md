@@ -11,14 +11,14 @@
 
 ## 1) Same-Budget 规则（所有实验必须遵守）
 
-所有方法固定以下参数：
+所有方法固定以下参数（基于 ReasonRAG 原始配置 my_config.yaml）：
 
 ```yaml
 max_steps: 3          # 最大检索步数
-top_k: 10             # 每步检索候选数
-inject_top: 3         # 注入 prompt 的文档数
+retrieval_topk: 5     # 每步检索候选数（ReasonRAG 默认 5）
+inject_top: 5         # 注入 prompt 的文档数（ReasonRAG 默认全注入）
 max_tokens: 256       # ReasonRAG 原始配置（不用 32!）
-num_candidates: 5     # query 候选数（如适用）
+use_reranker: False   # 与 ReasonRAG 相同
 ```
 
 **如果 ClosureRAG 需要更多步数才能 closure**，单独报告 same-budget 和 adaptive-budget 两组实验。

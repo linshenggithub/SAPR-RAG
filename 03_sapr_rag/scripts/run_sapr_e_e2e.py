@@ -14,11 +14,11 @@ Usage:
   CUDA_VISIBLE_DEVICES=0 python run_sapr_e_e2e.py --num_examples 30 --mode baseline
 """
 
-import os, sys, json, re, time, argparse
+import os, sys, json, re, time, argparse, datetime
 import numpy as np
 
-REASONRAG_ROOT = "/home/mayi/ReasonRAG"
-RESEARCH_ROOT = "/home/mayi/RAG/agentic-rag-process-optimization"
+REASONRAG_ROOT = os.environ.get("REASONRAG_ROOT", "/home/mayi/ReasonRAG")
+RESEARCH_ROOT = os.environ.get("RESEARCH_ROOT", "/home/mayi/RAG/agentic-rag-process-optimization")
 sys.path.insert(0, REASONRAG_ROOT)
 
 from flashrag.config import Config
@@ -30,12 +30,26 @@ from pipeline.reasonrag_pipeline import ReasonRAGPipeline
 parser = argparse.ArgumentParser()
 parser.add_argument("--num_examples", type=int, default=30)
 parser.add_argument("--mode", choices=["sapr_e", "baseline"], default="sapr_e")
+parser.add_argument("--run_id", default=None)
+parser.add_argument("--max_tokens", type=int, default=256)
+parser.add_argument("--gpu_id", default="0")
+parser.add_argument("--index_path", default=None)
+parser.add_argument("--corpus_path", default="/nas/mayi/RAG/corpus/wiki18_extended.jsonl")
+parser.add_argument("--bge_path", default="/nas/mayi/RAG/retrievers/bge-base-en-v1.5")
+parser.add_argument(
+    "--generator_path",
+    default="/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+)
+parser.add_argument("--gpu_memory_utilization", type=float, default=0.8)
 args = parser.parse_args()
 
 SLICE_SIZE = args.num_examples
 MODE = args.mode
+RUN_ID = args.run_id or "{}_sapr_e_e2e_{}samples_maxtok{}".format(
+    datetime.datetime.now().strftime("%Y%m%d"), SLICE_SIZE, args.max_tokens
+)
 OUTPUT_DIR = os.path.join(RESEARCH_ROOT, "04_experiments/logs",
-    "20260530_sapr_e_e2e_{}".format(MODE))
+    RUN_ID, MODE)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── SAPR-E v0 Scorer ────────────────────────────────────────────
@@ -103,37 +117,63 @@ def select_sapr_e_top3(question, history_thoughts, subquery, docs_raw):
 
 # ── Config ───────────────────────────────────────────────────────
 topk = 10 if MODE == "sapr_e" else 3
+index_path = args.index_path or os.path.join(REASONRAG_ROOT, "indexes/bge_extended/bge_Flat.index")
 config_dict = {
     "data_dir": os.path.join(REASONRAG_ROOT, "dataset/"),
     "dataset_name": "hotpotqa", "split": ["dev", "test"],
-    "index_path": os.path.join(REASONRAG_ROOT, "indexes/bge_extended/bge_Flat.index"),
+    "index_path": index_path,
     "retrieval_method": "bge",
-    "corpus_path": "/nas/mayi/RAG/corpus/wiki18_extended.jsonl",
+    "corpus_path": args.corpus_path,
     "faiss_gpu": False,
     "model2path": {
-        "bge": "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
-        "qwen2.5-instruct-ReasonRAG-lora": "/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide",
+        "bge": args.bge_path,
+        "qwen2.5-instruct-ReasonRAG-lora": args.generator_path,
     },
     "model2pooling": {"bge": "cls"}, "method2index": {"bge": None},
     "generator_model": "qwen2.5-instruct-ReasonRAG-lora",
     "generator_batch_size": 1, "tensor_parallel_size": 1,
-    "framework": "vllm", "gpu_id": "0", "gpu_memory_utilization": 0.8,
+    "framework": "vllm", "gpu_id": args.gpu_id,
+    "gpu_memory_utilization": args.gpu_memory_utilization,
     "generator_max_input_len": 8192,
+    "generation_params": {
+        "do_sample": False,
+        "max_tokens": args.max_tokens,
+    },
     "retrieval_topk": topk,
     "metrics": ["em", "f1", "acc"],
     "save_intermediate_data": True,
     "save_note": "sapr_e_e2e_{}".format(MODE),
     "save_dir": OUTPUT_DIR, "seed": 2024,
-    "disable_save": True, "test_sample_num": None, "random_sample": False,
+    "disable_save": False, "test_sample_num": None, "random_sample": False,
 }
+
+FORBIDDEN_DIR = os.path.join(REASONRAG_ROOT, "output")
+assert not os.path.abspath(OUTPUT_DIR).startswith(os.path.abspath(FORBIDDEN_DIR)), \
+    "SAFETY: save_dir must not be inside {}".format(FORBIDDEN_DIR)
+assert args.max_tokens >= 128, \
+    "max_tokens={} is too small for ReasonRAG routing markers; use 256.".format(args.max_tokens)
+assert os.path.exists(REASONRAG_ROOT), "Missing REASONRAG_ROOT={}".format(REASONRAG_ROOT)
+assert os.path.exists(index_path), "Missing index_path={}".format(index_path)
+assert os.path.exists(args.corpus_path), "Missing corpus_path={}".format(args.corpus_path)
+assert os.path.exists(args.bge_path), "Missing bge_path={}".format(args.bge_path)
+assert os.path.exists(args.generator_path), "Missing generator_path={}".format(args.generator_path)
 
 print("=" * 70)
 print("SAPR-E End-to-End Test - mode={}".format(MODE))
-print("Examples: {}, topk: {}".format(SLICE_SIZE, topk))
+print("Run ID: {}".format(RUN_ID))
+print("Examples: {}, topk: {}, max_tokens: {}, gpu_id: {}".format(
+    SLICE_SIZE, topk, args.max_tokens, args.gpu_id))
+print("ReasonRAG root: {}".format(REASONRAG_ROOT))
+print("Index: {}".format(index_path))
+print("Generator: {}".format(args.generator_path))
 print("Output: {}".format(OUTPUT_DIR))
 print("=" * 70)
 
 config = Config(config_dict=config_dict)
+resolved_max_tokens = config["generation_params"]["max_tokens"]
+assert resolved_max_tokens == args.max_tokens, \
+    "Resolved max_tokens mismatch: {} != {}".format(resolved_max_tokens, args.max_tokens)
+print("Resolved generation max_tokens: {}".format(resolved_max_tokens))
 all_split = get_dataset(config)
 dev_data = all_split["dev"]
 sliced_data = FlashRAGDataset(
@@ -294,7 +334,8 @@ print("F1: {:.4f}".format(f1))
 print("Runtime: {:.1f}s ({:.1f}min)".format(t_run, t_run/60))
 
 results = {
-    "mode": MODE, "num_examples": len(golds),
+    "run_id": RUN_ID, "mode": MODE, "num_examples": len(golds),
+    "max_tokens": args.max_tokens, "retrieval_topk": topk,
     "em": round(em, 4), "f1": round(f1, 4),
     "runtime_s": round(t_run, 1), "label": "debug_result",
 }

@@ -138,49 +138,44 @@ R_claim: supported_claims 的比例
 ```
 输入: question, retriever (BGE), generator (Qwen2.5-7B + LoRA)
 
+注意: ReasonRAG 原始配置是 retrieval_topk=5, 全部注入 prompt, 不做 evidence selection。
+      我们的 same-budget 规则是保持 top-5 全注入，不做 evidence selection。
+      Evidence selection 不作为核心贡献（降级为可选增强）。
+
 初始化:
   Board = {
-    entities: 从问题抽取的实体,
-    open_slots: 从问题分解的信息需求,
-    supported_claims: [],
-    missing_links: []
+    entities: 从问题抽取的实体 (NER),
+    open_gaps: 从问题分解的信息需求,
+    supported_claims: []
   }
 
-循环 (max_steps = N):
+循环 (max_steps = N, 与 ReasonRAG 相同):
   1. Query Generation
-     - 从 Board.open_slots 生成子查询
-     - 检查: 是否对准某个 open_slot? 是否保留 bridge entity?
-     - 不满足则重写
+     - ReasonRAG generator 正常生成子查询
+     - （可选增强）检查 query 是否对准某个 open_gap、是否保留 bridge entity
 
   2. Retrieval
-     - 用子查询检索 top-10
+     - 用子查询检索 top-5（与 ReasonRAG 相同）
+     - top-5 全部注入 prompt（与 ReasonRAG 相同，保持 same budget）
 
-  3. Evidence Selection (轻量 heuristic)
-     - slot_gain: 和 open_slot 的 embedding 相似度
-     - novelty: 和已有 evidence 的最大相似度取负
-     - entity_gain: 新增实体是否连接已有 entities
-     - noise_risk: 候选文档实体和问题实体的冲突程度
-     - 选 top-3 注入 prompt
-
-  4. Thought Generation
+  3. Thought Generation
      - ReasonRAG generator 生成 intermediate thought
 
-  5. Board Update (Extract → Validate → Merge)
-     - Extract: 从 thought + evidence 抽取 candidate claims/entities
+  4. Board Update (Extract → Validate → Merge)
+     - Extract: 从 thought + evidence 抽取 candidate claims/entities/gaps
      - Validate: 检查 claims 是否被 evidence 支持
      - Merge: 确定性规则更新 Board
 
-  6. Closure Check (deterministic + judge fallback)
-     - 规则: 每个 open_slot 有 supported_claim?
-            final answer entity 被 chain 连接?
-            无 missing_link?
+  5. Closure Check (deterministic + judge fallback)
+     - 规则: open_gaps 是否全部解决?
+            是否有足够的 supported_claims?
      - 全部满足 → 停止, 生成答案
      - 未满足 → 继续
      - 边界情况 → LLM judge fallback
 
-  7. Repair (if needed)
+  6. Repair (if needed)
      - unsupported claim → 补检索
-     - open_slot 未闭合 → 重写 query
+     - open_gap 未闭合 → 重写 query
 
 输出: final answer + Board (可审计)
 ```

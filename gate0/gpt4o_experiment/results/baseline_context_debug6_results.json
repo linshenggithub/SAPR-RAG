@@ -1,0 +1,57 @@
+[
+  {
+    "question": "In what year was the university where Sergei Aleksandrovich Tokarev was a professor founded?",
+    "prediction": "1755",
+    "tree": {
+      "node_0": {
+        "id": 0,
+        "step": 0,
+        "N": 1,
+        "Q": 1.0,
+        "next_state": "begin_reasoning",
+        "parent_id": -1,
+        "children_ids": [
+          1
+        ],
+        "action_name": "",
+        "base_action_name": "",
+        "query": "",
+        "answer": "",
+        "response": "",
+        "expansion_method": "",
+        "typed_score": null,
+        "failure_type": null,
+        "stop_overridden": false
+      },
+      "node_1": {
+        "id": 1,
+        "step": 1,
+        "N": 1,
+        "Q": 1.0,
+        "next_state": null,
+        "parent_id": 0,
+        "children_ids": [],
+        "action_name": "begin_reasoning",
+        "base_action_name": "begin_reasoning",
+        "query": "",
+        "answer": "1755",
+        "response": "To answer this, I need to determine the specific university where Sergei Aleksandrovich Tokarev was a professor and the year it was founded. \n\nSergei Aleksandrovich Tokarev was a scholar and ethnographer in the Soviet Union, and one of the universities he was associated with was Moscow State Univers",
+        "expansion_method": "normal",
+        "typed_score": null,
+        "failure_type": null,
+        "stop_overridden": false
+      }
+    },
+    "n_rollouts": 6,
+    "total_llm_calls": 2,
+    "total_tokens": 504,
+    "golden_answers": [
+      "1755"
+    ],
+    "type": "bridge",
+    "em": 1.0,
+    "f1": 1.0,
+    "llm_calls_this_sample": 2,
+    "tokens_this_sample": 504
+  }
+]

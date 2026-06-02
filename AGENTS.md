@@ -422,6 +422,43 @@ Before modifying files:
 
 When changing external repositories, inspect their git status first.
 
+## 11.5 Code Hygiene and AI Execution Behavior
+
+完整规则见 `docs/coding_standard.md`。最重要的几条复述如下，AI 在本仓库写代码 / 跑实验前**必须**遵守：
+
+### Script naming
+
+脚本命名格式：`<动词>_<对象>_<限定>.py`，动词前缀必须从下表选：
+`run_ / export_ / eval_ / analyze_ / compare_ / build_ / fetch_ / relabel_ / sample_ / compute_ / launch_`。
+不允许 `*_v1.py / *_v2.py / *_debug.py / *_temp.py / mock_*.py` 这种命名。
+不允许 `mcts_pilot.py / analyze_results.py / script1.py` 这种打开前看不出在做什么的命名。
+launcher 脚本必须能直接对应它启动的 Python 脚本。
+
+### Path management
+
+- 仓内路径用 `Path(__file__).resolve().parents[N]` 派生。
+- 仓外路径（数据集、索引、模型）写到 `config/paths.py`，通过 `SAPR_*` 环境变量覆盖。
+- 不在脚本里写绝对路径。
+
+### Bug fix
+
+修 bug 直接编辑原文件；不要新建 `xxx_v2.py / xxx_fixed.py`。在 commit message 里写清楚根因。
+
+### Slow / blocked runs（最重要）
+
+如果你被要求跑一个实验，发现它慢、卡或者报错：
+
+1. **必须先停下来报告**：跑了什么命令、哪一步慢、大致耗时、可能的根因；
+2. **不允许默默降级**：不能自作主张把 200 条切到 30 条、把真实检索换成 mock、把模型换小、给文件加 `_debug1 / _debug6 / _mock` 后缀跑一遍存下来；
+3. **等用户决定再继续**。
+
+历史上违反这条规则产生过 11 个配置不一致、不能横向比较的 results.json，最后只能全删（commit `cb867d1`）。这种行为对研究的价值是负的。
+
+### Debug 不入库
+
+debug、sanity check、最小配置 verify **只在命令行做**；OK 之后直接跑正式版。不在 git 里留 `*_debug.py`、`sanity_check_*.py`。
+正式脚本应通过 `--num_examples / --mode / --dry-run` 等参数同时支持小规模 verify 和正式跑，不需要 fork debug 副本。
+
 ## 12. Stage Timeline
 
 Key milestones:

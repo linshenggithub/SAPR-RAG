@@ -6,7 +6,9 @@ This project is the long-term research workspace for:
 
 > 面向复杂问答的 Agentic RAG 多步检索推理过程优化研究
 
-When continuing work in this repository, first read `AGENTS.md`, then inspect `README.md`, `ROADMAP.md`, `MANIFEST.md`, `refine-logs/PIPELINE_SUMMARY.md`, and the task-relevant directory. Treat `AGENTS.md` as the full project operating guide and single source of truth for research positioning, paths, server rules, experiment hygiene, and writing standards.
+When continuing work in this repository, first read `AGENTS.md`, then inspect `README.md`, `ROADMAP.md`, `MANIFEST.md`, `docs/history.md`, `gate0/GATE0_STATUS.md`, and the task-relevant directory. Treat `AGENTS.md` as the full project operating guide and single source of truth for research positioning, paths, server rules, experiment hygiene, and writing standards.
+
+Code-level规则（命名 / 路径 / debug / AI 执行行为约束）的详细版在 `docs/coding_standard.md`，AGENTS.md §11.5 有摘要。**跑实验遇到慢/卡/报错时必须先停下来报告，不允许默默降级**——这条规则违反过会让全部 debug 产物作废，详见 commit `cb867d1`。
 
 Current execution setup:
 
@@ -16,14 +18,10 @@ Current execution setup:
 
 Current research state:
 
-- SAPR-RAG has been refined from prompt-judge heuristic scoring into state-conditioned progress / action-value modeling for Agentic RAG trajectory repair.
-- Latest core artifacts:
-  - `refine-logs/FINAL_PROPOSAL.md`
-  - `refine-logs/EXPERIMENT_PLAN.md`
-  - `refine-logs/EXPERIMENT_TRACKER.md`
-  - `refine-logs/PIPELINE_SUMMARY.md`
-  - `MANIFEST.md`
-- First experiment priority for the current SAPR-E line: Evidence-only go/no-go on HotpotQA dev subset, matched compute, `debug_result` first.
+- SAPR-RAG idea 演化记录：见 `docs/history.md`（v1 → v2 → v3 → v4）。
+- 当前在做的事：Gate 0 验证（GPT-4o 重标 50 条 trajectory 看 typed eval 是否区分得出 scalar 区分不出的分支）。
+- Gate 0 状态：`gate0/GATE0_STATUS.md`。
+- 主要 docs：`docs/proposal.md` / `docs/experiment_plan.md` / `docs/experiment_tracker.md` / `docs/pipeline.md`。
 - Do not interpret earlier "no large-scale GRPO" notes as a ban on SFT/RL. The project should explore SFT, DPO, PRM training, GRPO/online RL, or larger-compute routes when they are the fastest credible path for a novel and feasible idea. The rule is to avoid expensive RL before small-scale evidence and a stable data/reward pipeline, not to avoid RL altogether.
 
 Server and path reminders:

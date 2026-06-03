@@ -1,0 +1,14 @@
+[
+  {
+    "index": 0,
+    "id": "dev_0",
+    "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+    "golden_answers": [
+      "yes"
+    ],
+    "status": "failed",
+    "error": "AttributeError: 'PromptTemplate' object has no attribute 'check_prompt_length'",
+    "elapsed_sec": 3.844,
+    "output": {}
+  }
+]

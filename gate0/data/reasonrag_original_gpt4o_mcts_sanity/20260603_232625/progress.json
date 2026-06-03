@@ -1,0 +1,251 @@
+[
+  {
+    "index": 0,
+    "id": "dev_1",
+    "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+    "golden_answers": [
+      "Chief of Protocol"
+    ],
+    "status": "ok",
+    "error": null,
+    "elapsed_sec": 631.387,
+    "output": {
+      "intermediate_node_0": {
+        "Q": 0.08421875000000001,
+        "step": 0,
+        "N": 64,
+        "reward": 0.019992948230653975,
+        "parent_id": -1,
+        "children_ids": [
+          1,
+          2
+        ]
+      },
+      "intermediate_node_1": {
+        "action_name": "begin_reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are an assistant for question answering with access to a retrieval tool. Upon receiving a question, your task is to:\n* Analyze and Decompose the Question: Break the question into smaller, manageable sub-questions to ensure all aspects are addressed.\n* Evaluate Your Knowledge: Assess each sub-question or component:\n- Identify parts you can confidently answer based on your existing knowledge.\n- Pinpoint parts that require additional information or verification through retrieval tools.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Respond Format:\nIf your knowledge is sufficient to answer the question, conclude with:\n\"So the answer is <answer>answer</answer>\"\nIf retrieval is necessary to provide a complete answer, conclude with:\n\"So the next query is <query>query</query>\"\n"
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?"
+          }
+        ],
+        "response": "To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query>",
+        "next_query": "Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?",
+        "answer": null,
+        "id": 1,
+        "parent_id": 0,
+        "Q": 0.0878125,
+        "step": 1,
+        "N": 32,
+        "reward": 0.04205413248516871,
+        "children_ids": [
+          3,
+          4
+        ]
+      },
+      "intermediate_node_2": {
+        "action_name": "begin_reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are an assistant for question answering with access to a retrieval tool. Upon receiving a question, your task is to:\n* Analyze and Decompose the Question: Break the question into smaller, manageable sub-questions to ensure all aspects are addressed.\n* Evaluate Your Knowledge: Assess each sub-question or component:\n- Identify parts you can confidently answer based on your existing knowledge.\n- Pinpoint parts that require additional information or verification through retrieval tools.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Respond Format:\nIf your knowledge is sufficient to answer the question, conclude with:\n\"So the answer is <answer>answer</answer>\"\nIf retrieval is necessary to provide a complete answer, conclude with:\n\"So the next query is <query>query</query>\"\n"
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?"
+          }
+        ],
+        "response": "To answer this, I need to determine:\n\n1. The woman who portrayed Corliss Archer in *Kiss and Tell*.\n2. Whether this actress held a government position and, if so, what that position was.\n\nI know that Shirley Temple portrayed Corliss Archer in *Kiss and Tell*. Shirley Temple later held a prominent government position as a U.S. Ambassador.\n\nSo the answer is <answer>U.S. Ambassador</answer>",
+        "next_query": null,
+        "answer": "U.S. Ambassador",
+        "id": 2,
+        "parent_id": 0,
+        "Q": 0.080625,
+        "step": 1,
+        "N": 32,
+        "reward": 0.0,
+        "children_ids": []
+      },
+      "intermediate_node_3": {
+        "action_name": "document_analysis",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are an information retrieval assistant. Your task is to extract relevant evidence from the provided Wikipedia documents based on the latest query.\n\n    Instructions:\n\n    * Identify key terms or concepts in the query.\n    * Search the documents for evidence that supports the query.\n    * Response format:\n    If relevant evidence is found, output:\n       Based on the query, the relevant evidence is <evidence>evidence</evidence>.\n    If no relevant evidence is found, output:\n       <evidence>None</evidence>.\n"
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query>. Reference: <reference>Wikipedia Title: \"Kiss and Tell (1945 film)\"\nKiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss and Tell\"\", which was based on the Corliss Archer short stories. The stories, play and movie were all written by F. Hugh Herbert. A sequel film, \"\"A Kiss for Corliss\"\", was released in\n\nWikipedia Title: \"Kiss and Tell (1945 film)\"\nreported that the film hadn't changed much from the \"\"protracted but reasonably diverting\"\" stage version, and singled out Jerome Courtland as \"\"one of the most capable adolescent actors to come along in years.\"\" Kiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss\n\nWikipedia Title: A Kiss for Corliss\nKiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer.  In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys.  The parents' bickering about which girl is the worse influence causes more problems than it solves.\n\n</reference>"
+          }
+        ],
+        "query": "Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?",
+        "response": "Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945). Shirley Temple later held a government position as the United States Ambassador to Ghana (1974–1976) and subsequently as the United States Ambassador to Czechoslovakia (1989–1992).</evidence>.",
+        "retrieval_result": [
+          {
+            "id": "19154654",
+            "title": "",
+            "contents": "\"Kiss and Tell (1945 film)\"\nKiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss and Tell\"\", which was based on the Corliss Archer short stories. The stories, play and movie were all written by F. Hugh Herbert. A sequel film, \"\"A Kiss for Corliss\"\", was released in"
+          },
+          {
+            "id": "19154662",
+            "title": "",
+            "contents": "\"Kiss and Tell (1945 film)\"\nreported that the film hadn't changed much from the \"\"protracted but reasonably diverting\"\" stage version, and singled out Jerome Courtland as \"\"one of the most capable adolescent actors to come along in years.\"\" Kiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss"
+          },
+          {
+            "id": "280976",
+            "title": "",
+            "contents": "A Kiss for Corliss\nKiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer.  In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys.  The parents' bickering about which girl is the worse influence causes more problems than it solves."
+          }
+        ],
+        "id": 3,
+        "parent_id": 1,
+        "Q": 0.046666666666666676,
+        "step": 2,
+        "N": 15,
+        "reward": 0.02679296875,
+        "children_ids": [
+          6,
+          8
+        ]
+      },
+      "intermediate_node_4": {
+        "action_name": "document_analysis",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are an information retrieval assistant. Your task is to extract relevant evidence from the provided Wikipedia documents based on the latest query.\n\n    Instructions:\n\n    * Identify key terms or concepts in the query.\n    * Search the documents for evidence that supports the query.\n    * Response format:\n    If relevant evidence is found, output:\n       Based on the query, the relevant evidence is <evidence>evidence</evidence>.\n    If no relevant evidence is found, output:\n       <evidence>None</evidence>.\n"
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query>. Reference: <reference>Wikipedia Title: \"Kiss and Tell (1945 film)\"\nKiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss and Tell\"\", which was based on the Corliss Archer short stories. The stories, play and movie were all written by F. Hugh Herbert. A sequel film, \"\"A Kiss for Corliss\"\", was released in\n\nWikipedia Title: \"Kiss and Tell (1945 film)\"\nreported that the film hadn't changed much from the \"\"protracted but reasonably diverting\"\" stage version, and singled out Jerome Courtland as \"\"one of the most capable adolescent actors to come along in years.\"\" Kiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss\n\nWikipedia Title: A Kiss for Corliss\nKiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer.  In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys.  The parents' bickering about which girl is the worse influence causes more problems than it solves.\n\n</reference>"
+          }
+        ],
+        "query": "Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?",
+        "response": "Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the 1945 film *Kiss and Tell*. Shirley Temple later held the government position of United States Ambassador to Ghana (1974–1976) and Czechoslovakia (1989–1992).</evidence>.",
+        "retrieval_result": [
+          {
+            "id": "19154654",
+            "title": "",
+            "contents": "\"Kiss and Tell (1945 film)\"\nKiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss and Tell\"\", which was based on the Corliss Archer short stories. The stories, play and movie were all written by F. Hugh Herbert. A sequel film, \"\"A Kiss for Corliss\"\", was released in"
+          },
+          {
+            "id": "19154662",
+            "title": "",
+            "contents": "\"Kiss and Tell (1945 film)\"\nreported that the film hadn't changed much from the \"\"protracted but reasonably diverting\"\" stage version, and singled out Jerome Courtland as \"\"one of the most capable adolescent actors to come along in years.\"\" Kiss and Tell (1945 film) Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer. In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys. The parents' bickering about which girl is the worse influence causes more problems than it solves. The movie was based on the Broadway play \"\"Kiss"
+          },
+          {
+            "id": "280976",
+            "title": "",
+            "contents": "A Kiss for Corliss\nKiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer.  In the film, two teenage girls cause their respective parents much concern when they start to become interested in boys.  The parents' bickering about which girl is the worse influence causes more problems than it solves."
+          }
+        ],
+        "id": 4,
+        "parent_id": 1,
+        "Q": 0.09125,
+        "step": 2,
+        "N": 16,
+        "reward": 0.05629788530465949,
+        "children_ids": [
+          5,
+          7
+        ]
+      },
+      "intermediate_node_6": {
+        "action_name": "reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are a question-answering assistant with access to a retrieval tool. Your goal is to provide a concise and accurate reasoning process.\nInstructions:\n* Error Reflection: If errors exist in previous thoughts, identify and correct them. Skip this step if no errors are present.\n* Information Sufficiency: Evaluate whether the current information is sufficient to fully and accurately answer the question. If additional retrieval is needed, deconstruct the question and generate the next query. Avoid repeating previous queries. If no meaningful new query can be generated, explain why and provide an answer based on the current information.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Conclusion:\nIf generating an answer:\n\"So the answer is <answer>answer</answer>\".\nIf more retrieval is needed:\n\"So the next query is <query>query</query>\".\n    "
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query> Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945). Shirley Temple later held a government position as the United States Ambassador to Ghana (1974–1976) and subsequently as the United States Ambassador to Czechoslovakia (1989–1992).</evidence>."
+          }
+        ],
+        "response": "The information provided is sufficient. \n\nShirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945) and later held government positions as the United States Ambassador to Ghana (1974–1976) and the United States Ambassador to Czechoslovakia (1989–1992).\n\nSo the answer is <answer>United States Ambassador to Ghana and United States Ambassador to Czechoslovakia</answer>",
+        "next_query": null,
+        "answer": "United States Ambassador to Ghana and United States Ambassador to Czechoslovakia",
+        "id": 6,
+        "parent_id": 3,
+        "Q": 0.047142857142857146,
+        "step": 3,
+        "N": 7,
+        "reward": 0.0,
+        "children_ids": []
+      },
+      "intermediate_node_8": {
+        "action_name": "reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are a question-answering assistant with access to a retrieval tool. Your goal is to provide a concise and accurate reasoning process.\nInstructions:\n* Error Reflection: If errors exist in previous thoughts, identify and correct them. Skip this step if no errors are present.\n* Information Sufficiency: Evaluate whether the current information is sufficient to fully and accurately answer the question. If additional retrieval is needed, deconstruct the question and generate the next query. Avoid repeating previous queries. If no meaningful new query can be generated, explain why and provide an answer based on the current information.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Conclusion:\nIf generating an answer:\n\"So the answer is <answer>answer</answer>\".\nIf more retrieval is needed:\n\"So the next query is <query>query</query>\".\n    "
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query> Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945). Shirley Temple later held a government position as the United States Ambassador to Ghana (1974–1976) and subsequently as the United States Ambassador to Czechoslovakia (1989–1992).</evidence>."
+          }
+        ],
+        "response": "Error Reflection: No errors are present in the reasoning process or evidence.\n\nInformation Sufficiency: The evidence is sufficient to answer the question.\n\nSo the answer is <answer>Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell* (1945), held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>",
+        "next_query": null,
+        "answer": "Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell* (1945), held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).",
+        "id": 8,
+        "parent_id": 3,
+        "Q": 0.047142857142857146,
+        "step": 3,
+        "N": 7,
+        "reward": 0.0535859375,
+        "children_ids": []
+      },
+      "intermediate_node_5": {
+        "action_name": "reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are a question-answering assistant with access to a retrieval tool. Your goal is to provide a concise and accurate reasoning process.\nInstructions:\n* Error Reflection: If errors exist in previous thoughts, identify and correct them. Skip this step if no errors are present.\n* Information Sufficiency: Evaluate whether the current information is sufficient to fully and accurately answer the question. If additional retrieval is needed, deconstruct the question and generate the next query. Avoid repeating previous queries. If no meaningful new query can be generated, explain why and provide an answer based on the current information.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Conclusion:\nIf generating an answer:\n\"So the answer is <answer>answer</answer>\".\nIf more retrieval is needed:\n\"So the next query is <query>query</query>\".\n    "
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query> Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the 1945 film *Kiss and Tell*. Shirley Temple later held the government position of United States Ambassador to Ghana (1974–1976) and Czechoslovakia (1989–1992).</evidence>."
+          }
+        ],
+        "response": "The information is sufficient to answer the question.\n\nSo the answer is <answer>Shirley Temple, who portrayed Corliss Archer in *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>",
+        "next_query": null,
+        "answer": "Shirley Temple, who portrayed Corliss Archer in *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).",
+        "id": 5,
+        "parent_id": 4,
+        "Q": 0.0775,
+        "step": 3,
+        "N": 8,
+        "reward": 0.057158333333333325,
+        "children_ids": []
+      },
+      "intermediate_node_7": {
+        "action_name": "reasoning",
+        "input_prompt": [
+          {
+            "role": "system",
+            "content": "You are a question-answering assistant with access to a retrieval tool. Your goal is to provide a concise and accurate reasoning process.\nInstructions:\n* Error Reflection: If errors exist in previous thoughts, identify and correct them. Skip this step if no errors are present.\n* Information Sufficiency: Evaluate whether the current information is sufficient to fully and accurately answer the question. If additional retrieval is needed, deconstruct the question and generate the next query. Avoid repeating previous queries. If no meaningful new query can be generated, explain why and provide an answer based on the current information.\n* Conciseness: Ensure both queries and answers are concise, using nouns or short phrases whenever possible.\n* Conclusion:\nIf generating an answer:\n\"So the answer is <answer>answer</answer>\".\nIf more retrieval is needed:\n\"So the next query is <query>query</query>\".\n    "
+          },
+          {
+            "role": "user",
+            "content": "Question: What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?\nPrevious Thoughts: To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \n\n\"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query> Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the 1945 film *Kiss and Tell*. Shirley Temple later held the government position of United States Ambassador to Ghana (1974–1976) and Czechoslovakia (1989–1992).</evidence>."
+          }
+        ],
+        "response": "The information provided is sufficient to answer the question.\n\nSo the answer is <answer>Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>",
+        "next_query": null,
+        "answer": "Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).",
+        "id": 7,
+        "parent_id": 4,
+        "Q": 0.07714285714285715,
+        "step": 3,
+        "N": 7,
+        "reward": 0.05531451612903226,
+        "children_ids": []
+      }
+    }
+  }
+]

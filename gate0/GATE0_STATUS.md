@@ -590,6 +590,73 @@ Index setting B: bge_extended + wiki18_extended
 
 否则 SAPR/typed evaluation 的收益会和 corpus/index 差异纠缠在一起。
 
+### 6.7 强模型根节点分支 sanity check（初步证据，2026-06-03）
+
+**实验定位：** 这是一个小规模诊断实验，不是正式主实验。它只用于初步判断：现有 `reward_data` 中大量重复 sibling，是否可能主要来自 Llama 轨迹质量 / 采样设置 / 扩展实现，而不是 ReasonRAG MCTS 必然重复。
+
+**实验脚本：**
+
+```text
+gate0/run_strong_model_branch_sanity.py
+```
+
+**输入选择：**
+
+- 从离线审计得到的 55 个 `q_same_content_diff` 关键分支中自动挑 5 个典型问题；
+- 只发送问题文本给 GPT-4o；
+- 不发送 golden answer；
+- 不发送已有轨迹；
+- 不发送检索结果。
+
+**生成设置：**
+
+```yaml
+model: gpt-4o
+n_questions: 5
+children_per_question: 2
+action: begin_reasoning only
+temperature: 0.7
+max_tokens: 256
+```
+
+**输出文件：**
+
+```text
+gate0/data/strong_model_branch_sanity/metrics.json
+gate0/data/strong_model_branch_sanity/results.json
+```
+
+**结果：**
+
+```text
+exact_duplicate_questions: 0 / 5
+near_duplicate_0_95_questions: 0 / 5
+same_action_questions: 4 / 5
+same_answer_questions: 4 / 5
+same_query_questions: 2 / 5
+avg_pair_similarity: 0.4658
+total_tokens: 2673
+```
+
+**初步结论：**
+
+在这 5 个典型问题上，GPT-4o 没有生成现有 ReasonRAG `reward_data` 中那种严重重复的根节点 sibling。该结果提供了一个**初步证据**：
+
+> 当前 `reward_data` 的重复分支问题，可能和 Llama 轨迹质量、采样设置或 ReasonRAG 扩展实现有关；不能直接用这批数据证明 scalar PRM 本身大量分不清不同分支。
+
+**限制：**
+
+- 样本只有 5 个问题，不能作为正式统计结论；
+- 只测试根节点 `begin_reasoning`，没有测试 `document_analysis` / `reasoning` 后续节点；
+- 没有接入检索，因此不能替代 Gate0-B；
+- 该实验只能支持“强模型未必也重复”的初步判断。
+
+**对下一步的影响：**
+
+1. 不建议继续按原版 Gate0-A 随机重打所有 sibling，成本会大量浪费在重复分支上。
+2. 在跑昂贵 Gate0-B 前，应先把有效分支生成 / 去重机制分析清楚。
+3. 若继续验证强模型轨迹质量，应扩大到更小心设计的少量节点级扩展实验，而不是直接跑 50 条完整 MCTS。
+
 ---
 
 ## 7) 实现代码（2026-06-01）

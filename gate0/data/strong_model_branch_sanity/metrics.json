@@ -1,0 +1,20 @@
+{
+  "label": "debug_result",
+  "description": "Tiny GPT-4o sibling-generation sanity check. Sends questions only.",
+  "model": "gpt-4o",
+  "n_questions": 5,
+  "children_per_question": 2,
+  "temperature": 0.7,
+  "max_tokens": 256,
+  "exact_duplicate_questions": 0,
+  "near_duplicate_0_95_questions": 0,
+  "same_action_questions": 4,
+  "same_answer_questions": 4,
+  "same_query_questions": 2,
+  "avg_pair_similarity": 0.4658,
+  "total_usage": {
+    "prompt_tokens": 1948,
+    "completion_tokens": 725
+  },
+  "total_tokens": 2673
+}

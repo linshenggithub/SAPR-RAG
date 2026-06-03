@@ -1,0 +1,227 @@
+[
+  {
+    "traj_idx": 436,
+    "bp_idx": 0,
+    "question": "In which school was the fictional character voiced by Marcia Wallace a teacher in 'The Simpsons'?",
+    "original_response_similarity": 0.4303,
+    "original_typed_scores": [
+      0.7433,
+      0.6667
+    ],
+    "original_typed_failures": [
+      "success",
+      "stop_fail"
+    ],
+    "generations": [
+      {
+        "child_idx": 0,
+        "response": "The fictional character voiced by Marcia Wallace in \"The Simpsons\" is Edna Krabappel, and she was a teacher at Springfield Elementary School. \n\nSo the answer is <answer>Springfield Elementary School</answer>.",
+        "response_norm": "the fictional character voiced by marcia wallace in \"the simpsons\" is edna krabappel, and she was a teacher at springfield elementary school. so the answer is <answer>springfield elementary school</answer>.",
+        "action_type": "answer",
+        "answer": "Springfield Elementary School",
+        "query": "",
+        "usage": {
+          "prompt_tokens": 194,
+          "completion_tokens": 46
+        }
+      },
+      {
+        "child_idx": 1,
+        "response": "The fictional character voiced by Marcia Wallace in 'The Simpsons' was Edna Krabappel, and she was a teacher at Springfield Elementary School. \n\nSo the answer is <answer>Springfield Elementary School</answer>",
+        "response_norm": "the fictional character voiced by marcia wallace in 'the simpsons' was edna krabappel, and she was a teacher at springfield elementary school. so the answer is <answer>springfield elementary school</answer>",
+        "action_type": "answer",
+        "answer": "Springfield Elementary School",
+        "query": "",
+        "usage": {
+          "prompt_tokens": 194,
+          "completion_tokens": 46
+        }
+      }
+    ],
+    "pair_similarity": 0.9175,
+    "exact_duplicate": false,
+    "same_action": true,
+    "same_answer": true,
+    "same_query": true
+  },
+  {
+    "traj_idx": 1886,
+    "bp_idx": 0,
+    "question": "The comedian starring alongside Bruce Vilanch and Whoopi Goldberg in the movie Get Bruce was credited with leading the comedy renaissance of what city?",
+    "original_response_similarity": 0.8121,
+    "original_typed_scores": [
+      0.5798,
+      0.5767
+    ],
+    "original_typed_failures": [
+      "stop_fail",
+      "stop_fail"
+    ],
+    "generations": [
+      {
+        "child_idx": 0,
+        "response": "Sub-questions:\n1. Who is the comedian starring alongside Bruce Vilanch and Whoopi Goldberg in the movie \"Get Bruce\"?\n2. What city is credited with the comedy renaissance led by this comedian?\n\nEvaluation of knowledge:\n1. I can confirm that Robin Williams starred alongside Bruce Vilanch and Whoopi Goldberg in \"Get Bruce.\"\n2. Robin Williams is credited with leading the comedy renaissance of San Francisco.\n\nSo the answer is <answer>San Francisco</answer>",
+        "response_norm": "sub-questions: 1. who is the comedian starring alongside bruce vilanch and whoopi goldberg in the movie \"get bruce\"? 2. what city is credited with the comedy renaissance led by this comedian? evaluation of knowledge: 1. i can confirm that robin williams starred alongside bruce vilanch and whoopi goldberg in \"get bruce.\" 2. robin williams is credited with leading the comedy renaissance of san francisco. so the answer is <answer>san francisco</answer>",
+        "action_type": "answer",
+        "answer": "San Francisco",
+        "query": "",
+        "usage": {
+          "prompt_tokens": 202,
+          "completion_tokens": 96
+        }
+      },
+      {
+        "child_idx": 1,
+        "response": "To answer this question, I need to determine:\n\n1. The comedian who starred alongside Bruce Vilanch and Whoopi Goldberg in the movie *Get Bruce*.\n2. The city associated with the comedy renaissance led by this comedian.\n\nI will attempt to answer this based on my existing knowledge. If additional details are required, I will specify a retrieval query.\n\nThe comedian in question is Robin Williams, who appeared in the documentary *Get Bruce* and was notable for leading the comedy renaissance in San Francisco.\n\nSo the answer is <answer>San Francisco</answer>",
+        "response_norm": "to answer this question, i need to determine: 1. the comedian who starred alongside bruce vilanch and whoopi goldberg in the movie *get bruce*. 2. the city associated with the comedy renaissance led by this comedian. i will attempt to answer this based on my existing knowledge. if additional details are required, i will specify a retrieval query. the comedian in question is robin williams, who appeared in the documentary *get bruce* and was notable for leading the comedy renaissance in san francisco. so the answer is <answer>san francisco</answer>",
+        "action_type": "answer",
+        "answer": "San Francisco",
+        "query": "",
+        "usage": {
+          "prompt_tokens": 202,
+          "completion_tokens": 113
+        }
+      }
+    ],
+    "pair_similarity": 0.2843,
+    "exact_duplicate": false,
+    "same_action": true,
+    "same_answer": true,
+    "same_query": true
+  },
+  {
+    "traj_idx": 1919,
+    "bp_idx": 0,
+    "question": "Which multi-campus private business school with headquarters in Switzerland did Nikos Sofis attend?",
+    "original_response_similarity": 0.3425,
+    "original_typed_scores": [
+      0.5482,
+      0.5576
+    ],
+    "original_typed_failures": [
+      "stop_fail",
+      "stop_fail"
+    ],
+    "generations": [
+      {
+        "child_idx": 0,
+        "response": "To determine the specific multi-campus private business school headquartered in Switzerland that Nikos Sofis attended, I need to verify this information.\n\n\"So the next query is <query>Nikos Sofis multi-campus private business school Switzerland</query>\"",
+        "response_norm": "to determine the specific multi-campus private business school headquartered in switzerland that nikos sofis attended, i need to verify this information. \"so the next query is <query>nikos sofis multi-campus private business school switzerland</query>\"",
+        "action_type": "query",
+        "answer": "",
+        "query": "Nikos Sofis multi-campus private business school Switzerland",
+        "usage": {
+          "prompt_tokens": 192,
+          "completion_tokens": 47
+        }
+      },
+      {
+        "child_idx": 1,
+        "response": "To answer this question, I need to identify a multi-campus private business school headquartered in Switzerland that Nikos Sofis attended.\n\nSo the next query is <query>multi-campus private business school headquartered in Switzerland attended by Nikos Sofis</query>",
+        "response_norm": "to answer this question, i need to identify a multi-campus private business school headquartered in switzerland that nikos sofis attended. so the next query is <query>multi-campus private business school headquartered in switzerland attended by nikos sofis</query>",
+        "action_type": "query",
+        "answer": "",
+        "query": "multi-campus private business school headquartered in Switzerland attended by Nikos Sofis",
+        "usage": {
+          "prompt_tokens": 192,
+          "completion_tokens": 51
+        }
+      }
+    ],
+    "pair_similarity": 0.4147,
+    "exact_duplicate": false,
+    "same_action": true,
+    "same_answer": true,
+    "same_query": false
+  },
+  {
+    "traj_idx": 5531,
+    "bp_idx": 0,
+    "question": "What South Korean television show did Ahn Hee-yeon and rapper Defconn both host?",
+    "original_response_similarity": 0.6241,
+    "original_typed_scores": [
+      0.5712,
+      0.5767
+    ],
+    "original_typed_failures": [
+      "stop_fail",
+      "stop_fail"
+    ],
+    "generations": [
+      {
+        "child_idx": 0,
+        "response": "The question asks for the South Korean television show co-hosted by Ahn Hee-yeon and rapper Defconn. I need to confirm the specific show.\n\nSo the next query is <query>South Korean TV show co-hosted by Ahn Hee-yeon and rapper Defconn</query>",
+        "response_norm": "the question asks for the south korean television show co-hosted by ahn hee-yeon and rapper defconn. i need to confirm the specific show. so the next query is <query>south korean tv show co-hosted by ahn hee-yeon and rapper defconn</query>",
+        "action_type": "query",
+        "answer": "",
+        "query": "South Korean TV show co-hosted by Ahn Hee-yeon and rapper Defconn",
+        "usage": {
+          "prompt_tokens": 195,
+          "completion_tokens": 64
+        }
+      },
+      {
+        "child_idx": 1,
+        "response": "To answer this, I need to identify the South Korean television show that featured both Ahn Hee-yeon (Hani from EXID) and rapper Defconn as hosts. \n\nSo the next query is <query>South Korean TV show hosted by Ahn Hee-yeon (Hani) and rapper Defconn</query>",
+        "response_norm": "to answer this, i need to identify the south korean television show that featured both ahn hee-yeon (hani from exid) and rapper defconn as hosts. so the next query is <query>south korean tv show hosted by ahn hee-yeon (hani) and rapper defconn</query>",
+        "action_type": "query",
+        "answer": "",
+        "query": "South Korean TV show hosted by Ahn Hee-yeon (Hani) and rapper Defconn",
+        "usage": {
+          "prompt_tokens": 195,
+          "completion_tokens": 71
+        }
+      }
+    ],
+    "pair_similarity": 0.4286,
+    "exact_duplicate": false,
+    "same_action": true,
+    "same_answer": true,
+    "same_query": false
+  },
+  {
+    "traj_idx": 1095,
+    "bp_idx": 0,
+    "question": "Which opera has more acts, The Bassarids or Don Quichotte?",
+    "original_response_similarity": 0.1651,
+    "original_typed_scores": [
+      0.6667,
+      0.6667
+    ],
+    "original_typed_failures": [
+      "stop_fail",
+      "stop_fail"
+    ],
+    "generations": [
+      {
+        "child_idx": 0,
+        "response": "To answer this question, I need to determine the number of acts in each opera:\n\n1. The number of acts in \"The Bassarids.\"\n2. The number of acts in \"Don Quichotte.\"\n3. Compare the two to determine which has more acts.\n\nSo the next query is <query>\"The Bassarids number of acts\" and \"Don Quichotte number of acts\"</query>",
+        "response_norm": "to answer this question, i need to determine the number of acts in each opera: 1. the number of acts in \"the bassarids.\" 2. the number of acts in \"don quichotte.\" 3. compare the two to determine which has more acts. so the next query is <query>\"the bassarids number of acts\" and \"don quichotte number of acts\"</query>",
+        "action_type": "query",
+        "answer": "",
+        "query": "\"The Bassarids number of acts\" and \"Don Quichotte number of acts\"",
+        "usage": {
+          "prompt_tokens": 191,
+          "completion_tokens": 84
+        }
+      },
+      {
+        "child_idx": 1,
+        "response": "To answer this question, I need to determine the number of acts in each opera:\n\n1. How many acts does *The Bassarids* have?\n2. How many acts does *Don Quichotte* have?\n\nI will evaluate my knowledge for each opera's structure.\n\n- *The Bassarids* by Hans Werner Henze is a one-act opera.\n- *Don Quichotte* by Jules Massenet is a five-act opera.\n\nSo the answer is <answer>Don Quichotte</answer>",
+        "response_norm": "to answer this question, i need to determine the number of acts in each opera: 1. how many acts does *the bassarids* have? 2. how many acts does *don quichotte* have? i will evaluate my knowledge for each opera's structure. - *the bassarids* by hans werner henze is a one-act opera. - *don quichotte* by jules massenet is a five-act opera. so the answer is <answer>don quichotte</answer>",
+        "action_type": "answer",
+        "answer": "Don Quichotte",
+        "query": "",
+        "usage": {
+          "prompt_tokens": 191,
+          "completion_tokens": 107
+        }
+      }
+    ],
+    "pair_similarity": 0.2841,
+    "exact_duplicate": false,
+    "same_action": false,
+    "same_answer": false,
+    "same_query": false
+  }
+]

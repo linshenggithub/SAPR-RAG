@@ -1,0 +1,343 @@
+[
+  {
+    "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_224136",
+    "summary": {
+      "label": "sanity_result",
+      "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_224136",
+      "elapsed_sec": 484.703,
+      "num_examples": 1,
+      "num_ok": 0,
+      "num_failed": 1,
+      "raw_stdout_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_224136/raw_stdout.log",
+      "stage_log_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_224136/stage.log"
+    },
+    "records": [
+      {
+        "id": "dev_0",
+        "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "golden_answers": [
+          "yes"
+        ],
+        "status": "failed",
+        "error": "AttributeError: 'PromptTemplate' object has no attribute 'check_prompt_length'",
+        "elapsed_sec": 2.85,
+        "n_nodes": 0,
+        "n_branch_points": 0,
+        "root_branch": null,
+        "branch_points": [],
+        "top_nodes": []
+      }
+    ]
+  },
+  {
+    "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230639",
+    "summary": {
+      "label": "sanity_result",
+      "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230639",
+      "elapsed_sec": 5.786,
+      "num_examples": 1,
+      "num_ok": 0,
+      "num_failed": 1,
+      "raw_stdout_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230639/raw_stdout.log",
+      "stage_log_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230639/stage.log"
+    },
+    "records": [
+      {
+        "id": "dev_0",
+        "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "golden_answers": [
+          "yes"
+        ],
+        "status": "failed",
+        "error": "AttributeError: 'PromptTemplate' object has no attribute 'check_prompt_length'",
+        "elapsed_sec": 3.844,
+        "n_nodes": 0,
+        "n_branch_points": 0,
+        "root_branch": null,
+        "branch_points": [],
+        "top_nodes": []
+      }
+    ]
+  },
+  {
+    "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230757",
+    "summary": {
+      "label": "sanity_result",
+      "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230757",
+      "elapsed_sec": 509.855,
+      "num_examples": 1,
+      "num_ok": 1,
+      "num_failed": 0,
+      "raw_stdout_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230757/raw_stdout.log",
+      "stage_log_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_230757/stage.log"
+    },
+    "records": [
+      {
+        "id": "dev_0",
+        "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "golden_answers": [
+          "yes"
+        ],
+        "status": "ok",
+        "error": null,
+        "elapsed_sec": 507.785,
+        "n_nodes": 3,
+        "n_branch_points": 1,
+        "root_branch": {
+          "parent_id": 0,
+          "children_ids": [
+            1,
+            2
+          ],
+          "children_q": [
+            0.6120930232558139,
+            0.39952380952380956
+          ],
+          "children_n": [
+            43,
+            21
+          ],
+          "exact_same_first_pair": false,
+          "similarity_first_pair": 0.5412960609911055,
+          "responses": [
+            "* Analyze and Decompose the Question: The question compares the nationalities of Scott Derrickson and Ed Wood to determine if they share the same nationality. * Evaluate Your Knowledge: Scott Derrickson is an American filmmaker. Ed Wood was also an American filmmaker. Both are known for their work in film, albeit in different eras and styles. So the answer is <answer>yes</answer>",
+            "* Analyze and Decompose the Question: - Who is Scott Derrickson, and what is his nationality? - Who is Ed Wood, and what is his nationality? - Compare their nationalities to determine if they are the same. * Evaluate Your Knowledge: - Scott Derrickson is an American filmmaker. - Ed Wood was also an American filmmaker. - Both are known to be of the same nationality. So the answer is <answer>yes</answer>"
+          ]
+        },
+        "branch_points": [
+          {
+            "parent_id": 0,
+            "children_ids": [
+              1,
+              2
+            ],
+            "children_q": [
+              0.6120930232558139,
+              0.39952380952380956
+            ],
+            "children_n": [
+              43,
+              21
+            ],
+            "exact_same_first_pair": false,
+            "similarity_first_pair": 0.5412960609911055,
+            "responses": [
+              "* Analyze and Decompose the Question: The question compares the nationalities of Scott Derrickson and Ed Wood to determine if they share the same nationality. * Evaluate Your Knowledge: Scott Derrickson is an American filmmaker. Ed Wood was also an American filmmaker. Both are known for their work in film, albeit in different eras and styles. So the answer is <answer>yes</answer>",
+              "* Analyze and Decompose the Question: - Who is Scott Derrickson, and what is his nationality? - Who is Ed Wood, and what is his nationality? - Compare their nationalities to determine if they are the same. * Evaluate Your Knowledge: - Scott Derrickson is an American filmmaker. - Ed Wood was also an American filmmaker. - Both are known to be of the same nationality. So the answer is <answer>yes</answer>"
+            ]
+          }
+        ],
+        "top_nodes": [
+          {
+            "node_id": 0,
+            "parent_id": -1,
+            "action_name": null,
+            "Q": 0.5423437499999999,
+            "N": 64,
+            "reward": 0.9500000000000001,
+            "answer": null
+          },
+          {
+            "node_id": 1,
+            "parent_id": 0,
+            "action_name": "begin_reasoning",
+            "Q": 0.6120930232558139,
+            "N": 43,
+            "reward": 0.9500000000000002,
+            "answer": "yes"
+          },
+          {
+            "node_id": 2,
+            "parent_id": 0,
+            "action_name": "begin_reasoning",
+            "Q": 0.39952380952380956,
+            "N": 21,
+            "reward": 0.9499999999999998,
+            "answer": "yes"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_232625",
+    "summary": {
+      "label": "sanity_result",
+      "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_232625",
+      "elapsed_sec": 633.312,
+      "num_examples": 1,
+      "num_ok": 1,
+      "num_failed": 0,
+      "raw_stdout_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_232625/raw_stdout.log",
+      "stage_log_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260603_232625/stage.log"
+    },
+    "records": [
+      {
+        "id": "dev_1",
+        "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+        "golden_answers": [
+          "Chief of Protocol"
+        ],
+        "status": "ok",
+        "error": null,
+        "elapsed_sec": 631.387,
+        "n_nodes": 9,
+        "n_branch_points": 4,
+        "root_branch": {
+          "parent_id": 0,
+          "children_ids": [
+            1,
+            2
+          ],
+          "children_q": [
+            0.0878125,
+            0.080625
+          ],
+          "children_n": [
+            32,
+            32
+          ],
+          "exact_same_first_pair": false,
+          "similarity_first_pair": 0.3372093023255814,
+          "responses": [
+            "To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query>",
+            "To answer this, I need to determine: 1. The woman who portrayed Corliss Archer in *Kiss and Tell*. 2. Whether this actress held a government position and, if so, what that position was. I know that Shirley Temple portrayed Corliss Archer in *Kiss and Tell*. Shirley Temple later held a prominent government position as a U.S. Ambassador. So the answer is <answer>U.S. Ambassador</answer>"
+          ]
+        },
+        "branch_points": [
+          {
+            "parent_id": 0,
+            "children_ids": [
+              1,
+              2
+            ],
+            "children_q": [
+              0.0878125,
+              0.080625
+            ],
+            "children_n": [
+              32,
+              32
+            ],
+            "exact_same_first_pair": false,
+            "similarity_first_pair": 0.3372093023255814,
+            "responses": [
+              "To answer this question, I need to identify the woman who portrayed Corliss Archer in *Kiss and Tell* (1945) and determine which government position she held. \"So the next query is <query>Who portrayed Corliss Archer in the film Kiss and Tell (1945), and what government position did she hold?</query>",
+              "To answer this, I need to determine: 1. The woman who portrayed Corliss Archer in *Kiss and Tell*. 2. Whether this actress held a government position and, if so, what that position was. I know that Shirley Temple portrayed Corliss Archer in *Kiss and Tell*. Shirley Temple later held a prominent government position as a U.S. Ambassador. So the answer is <answer>U.S. Ambassador</answer>"
+            ]
+          },
+          {
+            "parent_id": 1,
+            "children_ids": [
+              3,
+              4
+            ],
+            "children_q": [
+              0.046666666666666676,
+              0.09125
+            ],
+            "children_n": [
+              15,
+              16
+            ],
+            "exact_same_first_pair": false,
+            "similarity_first_pair": 0.8787878787878788,
+            "responses": [
+              "Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945). Shirley Temple later held a government position as the United States Ambassador to Ghana (1974–1976) and subsequently as the United States Ambassador to Czechoslovakia (1989–1992).</evidence>.",
+              "Based on the query, the relevant evidence is <evidence>Shirley Temple portrayed Corliss Archer in the 1945 film *Kiss and Tell*. Shirley Temple later held the government position of United States Ambassador to Ghana (1974–1976) and Czechoslovakia (1989–1992).</evidence>."
+            ]
+          },
+          {
+            "parent_id": 3,
+            "children_ids": [
+              6,
+              8
+            ],
+            "children_q": [
+              0.047142857142857146,
+              0.047142857142857146
+            ],
+            "children_n": [
+              7,
+              7
+            ],
+            "exact_same_first_pair": false,
+            "similarity_first_pair": 0.5120405576679341,
+            "responses": [
+              "The information provided is sufficient. Shirley Temple portrayed Corliss Archer in the film *Kiss and Tell* (1945) and later held government positions as the United States Ambassador to Ghana (1974–1976) and the United States Ambassador to Czechoslovakia (1989–1992). So the answer is <answer>United States Ambassador to Ghana and United States Ambassador to Czechoslovakia</answer>",
+              "Error Reflection: No errors are present in the reasoning process or evidence. Information Sufficiency: The evidence is sufficient to answer the question. So the answer is <answer>Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell* (1945), held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>"
+            ]
+          },
+          {
+            "parent_id": 4,
+            "children_ids": [
+              5,
+              7
+            ],
+            "children_q": [
+              0.0775,
+              0.07714285714285715
+            ],
+            "children_n": [
+              8,
+              7
+            ],
+            "exact_same_first_pair": false,
+            "similarity_first_pair": 0.97,
+            "responses": [
+              "The information is sufficient to answer the question. So the answer is <answer>Shirley Temple, who portrayed Corliss Archer in *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>",
+              "The information provided is sufficient to answer the question. So the answer is <answer>Shirley Temple, who portrayed Corliss Archer in the film *Kiss and Tell*, held the government positions of United States Ambassador to Ghana (1974–1976) and United States Ambassador to Czechoslovakia (1989–1992).</answer>"
+            ]
+          }
+        ],
+        "top_nodes": [
+          {
+            "node_id": 0,
+            "parent_id": -1,
+            "action_name": null,
+            "Q": 0.08421875000000001,
+            "N": 64,
+            "reward": 0.019992948230653975,
+            "answer": null
+          },
+          {
+            "node_id": 1,
+            "parent_id": 0,
+            "action_name": "begin_reasoning",
+            "Q": 0.0878125,
+            "N": 32,
+            "reward": 0.04205413248516871,
+            "answer": null
+          },
+          {
+            "node_id": 2,
+            "parent_id": 0,
+            "action_name": "begin_reasoning",
+            "Q": 0.080625,
+            "N": 32,
+            "reward": 0.0,
+            "answer": "U.S. Ambassador"
+          },
+          {
+            "node_id": 4,
+            "parent_id": 1,
+            "action_name": "document_analysis",
+            "Q": 0.09125,
+            "N": 16,
+            "reward": 0.05629788530465949,
+            "answer": null
+          },
+          {
+            "node_id": 3,
+            "parent_id": 1,
+            "action_name": "document_analysis",
+            "Q": 0.046666666666666676,
+            "N": 15,
+            "reward": 0.02679296875,
+            "answer": null
+          }
+        ]
+      }
+    ]
+  }
+]

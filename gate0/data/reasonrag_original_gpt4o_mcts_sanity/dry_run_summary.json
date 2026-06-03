@@ -1,0 +1,44 @@
+{
+  "label": "dry_run",
+  "purpose": "ReasonRAG original GPT-4o MCTS sanity config check",
+  "num_examples": 1,
+  "start_index": 1,
+  "data": {
+    "dataset": "hotpotqa/dev",
+    "path": "/home/mayi/ReasonRAG_modified/dataset/hotpotqa/dev.jsonl"
+  },
+  "retrieval": {
+    "retrieval_service_url": "http://127.0.0.1:18080",
+    "corpus_path": "/nas/mayi/RAG/corpus/wiki18_extended.jsonl",
+    "index_path": "/home/mayi/ReasonRAG_modified/indexes/bge_extended/bge_Flat.index",
+    "bge_model_path": "/nas/mayi/RAG/retrievers/bge-base-en-v1.5",
+    "faiss_gpu": false,
+    "retrieval_topk": 3
+  },
+  "source": {
+    "reasonrag_root": "/home/mayi/ReasonRAG_original",
+    "pipeline": "/home/mayi/ReasonRAG_original/pipeline/reasonrag_pipeline.py"
+  },
+  "mcts": {
+    "max_iter": 7,
+    "max_children": 2,
+    "max_rollouts": 64,
+    "temperature": 0.7,
+    "max_tokens": 256,
+    "model": "gpt-4o"
+  },
+  "api": {
+    "base_url": "https://www.dmxapi.cn/v1",
+    "key_env": "OPENAI_API_KEY or DMXAPI_API_KEY",
+    "estimated_upper_bound_calls": 128
+  },
+  "selected_items": [
+    {
+      "id": "dev_1",
+      "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+      "golden_answers": [
+        "Chief of Protocol"
+      ]
+    }
+  ]
+}

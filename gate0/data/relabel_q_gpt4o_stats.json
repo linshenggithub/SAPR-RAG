@@ -1,0 +1,18 @@
+{
+  "n_branch_points_with_complete_eval": 286,
+  "q_same_rate_llama": 0.6853,
+  "q_same_rate_gpt4o": 0.4406,
+  "q_same_both": 92,
+  "q_same_llama_diff_gpt4o": 104,
+  "q_diff_llama_same_gpt4o": 34,
+  "n_records_total": 572,
+  "n_records_with_q": 572,
+  "n_records_failed": 0,
+  "sample": {
+    "n_trajectories_sampled": 50,
+    "n_branch_points": 286,
+    "n_children": 572,
+    "seed": 2026,
+    "model": "gpt-4o"
+  }
+}

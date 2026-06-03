@@ -12,6 +12,8 @@ Default interaction language: Chinese (`language: zh`).
 
 When working in this repository, Copilot CLI, Codex, and ARIS skills should reply to the user in Chinese by default. Keep technical terms, paper titles, dataset names, model names, file paths, shell commands, code identifiers, and API names in English when that is clearer. Generated code, configs, command lines, YAML/JSON keys, and exact logs should remain in their original language. Paper notes and reusable writing material should be written in Chinese unless the user explicitly requests English.
 
+Do not mix Chinese and English casually in normal replies. Use Chinese for explanation, diagnosis, planning, and conclusions. English is acceptable only when quoting project terms, code identifiers, file paths, commands, model names, dataset names, paper titles, config keys, logs, or exact error messages. Avoid rare or showy English words; state the key problem directly and concisely.
+
 ## 1. Research Positioning
 
 This project is not a single-method modification of ReasonRAG. ReasonRAG has three roles:
@@ -459,6 +461,21 @@ launcher 脚本必须能直接对应它启动的 Python 脚本。
 
 debug、sanity check、最小配置 verify **只在命令行做**；OK 之后直接跑正式版。不在 git 里留 `*_debug.py`、`sanity_check_*.py`。
 正式脚本应通过 `--num_examples / --mode / --dry-run` 等参数同时支持小规模 verify 和正式跑，不需要 fork debug 副本。
+
+## 11.6 User Collaboration Rules
+
+以下规则来自用户的长期协作偏好，在本仓库中优先执行：
+
+1. 回答默认使用中文，不要中英夹杂；只有引用代码、路径、命令、配置项、模型名、数据集名、论文题名或项目既有术语时才保留英文。
+2. 表达要简练，直接指出问题要害；不要用一堆生僻英文或绕远的表述。
+3. 必须明确遵守本仓库已有规范，尤其是 `docs/coding_standard.md`、`docs/repo_overview.md` 和本文件。
+4. 不允许为了方便调试而私自改配置、缩小样本、换模型、换检索器、换数据源、降低 `max_tokens`、减少 rollout、替换真实检索为 mock，或把失败的小范围 debug 伪装成正式实验。
+5. 任何 debug、dry-run、小样本验证、失败实验、配置偏差，都必须明确标注；不能和正式结果混在一起比较。
+6. 文件命名必须遵守仓库规则，不新建 `*_v2.py`、`*_fixed.py`、`*_debug.py`、`*_temp.py`、`mock_*.py` 这类文件。修 bug 应直接改原文件，并说明根因。
+7. 仓外路径必须通过 `config/paths.py` 和 `SAPR_*` 环境变量管理，不在脚本中新增机器相关绝对路径。
+8. 自己跑实验前必须先做环境审计：确认当前机器、是否已 `source config/env_3090.sh` 或 `source config/env_5090.sh`、关键 `SAPR_*` 环境变量是否存在、路径是否真实存在、索引和语料是否配套、API key 是否按脚本要求设置。
+9. 如果环境变量缺失、路径不存在、路径语义不确定、索引和语料可能不配套，必须先停下来报告问题；不能私自换路径、换机器、换检索器、换小模型、使用 mock，或通过缩小样本绕过问题。
+10. 任何会改变实验结论、数据口径、配置口径或可比性的操作，必须先向用户说明并等待确认。
 
 ## 12. Stage Timeline
 

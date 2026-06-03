@@ -1,0 +1,51 @@
+{
+  "label": "real_result",
+  "description": "Offline audit. No API calls and no retrieval.",
+  "total_trajectories": 6577,
+  "trajectories_with_branch": 3606,
+  "branch_points": 20497,
+  "q_same": 13846,
+  "q_diff": 6651,
+  "content_same": 20171,
+  "content_diff": 326,
+  "q_same_content_same": 13791,
+  "q_same_content_diff": 55,
+  "q_diff_content_same": 6380,
+  "q_diff_content_diff": 271,
+  "content_diff_rate": 0.0159,
+  "q_same_content_diff_rate_among_q_same": 0.004,
+  "near_duplicate_0_95_all_branches": 20252,
+  "parent_action_counts": {
+    "unknown": 3606,
+    "begin_reasoning": 4405,
+    "document_analysis": 9786,
+    "reasoning": 2700
+  },
+  "parent_step_counts": {
+    "0": 3606,
+    "1": 4405,
+    "2": 8523,
+    "3": 2667,
+    "4": 1223,
+    "5": 32,
+    "6": 40,
+    "7": 1
+  },
+  "key_set": {
+    "definition": "q_same_content_diff",
+    "count": 55,
+    "near_duplicate_0_95": 19,
+    "typed_score_diff": 4,
+    "typed_failure_diff": 1,
+    "typed_score_diff_rate": 0.0727,
+    "typed_failure_diff_rate": 0.0182
+  },
+  "all_content_diff_set": {
+    "count": 326,
+    "near_duplicate_0_95": 81,
+    "typed_score_diff": 117,
+    "typed_failure_diff": 54,
+    "typed_score_diff_rate": 0.3589,
+    "typed_failure_diff_rate": 0.1656
+  }
+}

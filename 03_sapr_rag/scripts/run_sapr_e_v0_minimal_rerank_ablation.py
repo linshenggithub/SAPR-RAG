@@ -2,6 +2,12 @@
 """
 Minimal-intrusive SAPR-E rerank end-to-end ablation.
 
+Current narrowed v0 mainline candidate:
+keep ReasonRAG's original pipeline behavior and change only document selection
+at the retrieval boundary: retrieve top-10 candidates, score them with SAPR-E
+v0, and pass the selected top-3 documents to the original document-analysis
+prompt.
+
 This keeps ReasonRAG's original batch state machine, prompt routing, logging,
 and stopping behavior. The only intended behavior change is the retrieval step:
 retrieve top-10 candidates, apply the SAPR-E v0 state-aware heuristic, and pass
@@ -15,6 +21,8 @@ import os
 import re
 import sys
 import time
+import urllib.error
+import urllib.request
 
 # 让脚本能直接 `python 03_sapr_rag/scripts/xxx.py` 运行：把仓库根加进 sys.path
 from pathlib import Path as _Path
@@ -26,6 +34,7 @@ from config.paths import (  # noqa: E402
     REPO_ROOT,
     REASONRAG_ROOT,
     WIKI_CORPUS_PATH,
+    BGE_INDEX_PATH,
     BGE_MODEL_PATH,
     LORA_MODEL_PATH,
 )
@@ -36,6 +45,69 @@ from flashrag.config import Config
 from flashrag.dataset.dataset import Dataset as FlashRAGDataset
 from flashrag.utils import get_dataset
 from pipeline.reasonrag_pipeline import ReasonRAGPipeline
+
+
+class RetrievalServiceClient:
+    def __init__(self, base_url, timeout=120, max_content_chars=8000):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.max_content_chars = max_content_chars
+        self._check_health()
+
+    def _request_json(self, path, payload=None):
+        url = self.base_url + path
+        data = None
+        headers = {}
+        if payload is not None:
+            data = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(url, data=data, headers=headers)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=self.timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def _check_health(self):
+        try:
+            payload = self._request_json("/health")
+        except (urllib.error.URLError, TimeoutError) as exc:
+            raise RuntimeError(f"Retrieval service is not reachable: {self.base_url}") from exc
+        if payload.get("status") != "ok":
+            raise RuntimeError(f"Retrieval service health check failed: {payload}")
+
+    def search(self, query, return_score=False, top_k=None):
+        query = str(query or "").strip()
+        if not query:
+            return ([], []) if return_score else []
+        payload = {
+            "query": query,
+            "top_k": int(top_k or 3),
+            "max_content_chars": self.max_content_chars,
+        }
+        response = self._request_json("/retrieve", payload)
+        docs = []
+        scores = []
+        for item in response.get("results", []):
+            docs.append(
+                {
+                    "id": item.get("id"),
+                    "title": item.get("title", ""),
+                    "contents": item.get("contents", ""),
+                }
+            )
+            scores.append(float(item.get("score", 0.0)))
+        return (docs, scores) if return_score else docs
+
+    def batch_search(self, queries):
+        return [self.search(query, return_score=False, top_k=3) for query in queries]
+
+    def _batch_search(self, queries, num=10, return_score=False):
+        all_docs = []
+        all_scores = []
+        for query in queries:
+            docs, scores = self.search(query, return_score=True, top_k=num)
+            all_docs.append(docs)
+            all_scores.append(scores)
+        return (all_docs, all_scores) if return_score else all_docs
 
 
 def word_set(text):
@@ -123,12 +195,12 @@ def select_top3(question, thoughts, subquery, docs):
 
 
 def build_config(args, output_dir):
-    index_path = args.index_path or str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index")
+    save_note = "reasonrag_baseline" if args.mode == "baseline" else "sapr_e_minimal_rerank"
     return {
         "data_dir": str(REASONRAG_ROOT / "dataset/"),
         "dataset_name": "hotpotqa",
         "split": ["dev", "test"],
-        "index_path": index_path,
+        "index_path": args.index_path,
         "retrieval_method": "bge",
         "corpus_path": args.corpus_path,
         "faiss_gpu": False,
@@ -149,7 +221,7 @@ def build_config(args, output_dir):
         "retrieval_topk": 3,
         "metrics": ["em", "f1", "acc"],
         "save_intermediate_data": True,
-        "save_note": "sapr_e_minimal_rerank",
+        "save_note": save_note,
         "save_dir": output_dir,
         "seed": 2024,
         "disable_save": False,
@@ -279,25 +351,29 @@ def patch_minimal_rerank_run_batch(pipeline):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["sapr_e", "baseline"], default="sapr_e")
     parser.add_argument("--num_examples", type=int, default=50)
     parser.add_argument("--run_id", default=None)
     parser.add_argument("--max_tokens", type=int, default=256)
     parser.add_argument("--gpu_id", default="0")
-    parser.add_argument("--index_path", default=None)
+    parser.add_argument("--index_path", default=str(BGE_INDEX_PATH))
     parser.add_argument("--corpus_path", default=str(WIKI_CORPUS_PATH))
     parser.add_argument("--bge_path", default=str(BGE_MODEL_PATH))
     parser.add_argument(
         "--generator_path",
         default=str(LORA_MODEL_PATH),
     )
+    parser.add_argument("--retrieval_service_url", default=None)
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.8)
     args = parser.parse_args()
 
-    run_id = args.run_id or "{}_sapr_e_minimal_rerank_{}samples".format(
+    run_id = args.run_id or "{}_{}_{}samples".format(
         datetime.datetime.now().strftime("%Y%m%d"),
+        args.mode,
         args.num_examples,
     )
-    output_dir = os.path.join(str(REPO_ROOT), "04_experiments/logs", run_id, "sapr_e_minimal_rerank")
+    mode_dir = "baseline" if args.mode == "baseline" else "sapr_e_minimal_rerank"
+    output_dir = os.path.join(str(REPO_ROOT), "04_experiments/logs", run_id, mode_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     config = Config(config_dict=build_config(args, output_dir))
@@ -311,22 +387,33 @@ def main():
     )
 
     print("=" * 70)
-    print("SAPR-E minimal rerank E2E ablation")
+    print("SAPR-E v0 minimal rerank / baseline E2E")
     print("run_id:", run_id)
+    print("mode:", args.mode)
     print("examples:", len(sliced_data))
     print("max_tokens:", args.max_tokens)
+    print("index:", args.index_path)
+    print("corpus:", args.corpus_path)
+    print("bge:", args.bge_path)
+    print("retrieval_service_url:", args.retrieval_service_url or "disabled")
     print("output:", output_dir)
     print("=" * 70)
+
+    retriever = None
+    if args.retrieval_service_url:
+        retriever = RetrievalServiceClient(args.retrieval_service_url)
 
     pipeline = ReasonRAGPipeline(
         config,
         prompt_template=None,
         answer_format="answer",
+        retriever=retriever,
         max_iter=8,
         max_children=2,
         max_rollouts=64,
     )
-    patch_minimal_rerank_run_batch(pipeline)
+    if args.mode == "sapr_e":
+        patch_minimal_rerank_run_batch(pipeline)
 
     start = time.time()
     dataset = pipeline.run(sliced_data, batch_size=1, do_eval=True)
@@ -335,11 +422,12 @@ def main():
 
     meta = {
         "run_id": run_id,
-        "mode": "sapr_e_minimal_rerank",
+        "mode": args.mode,
         "num_examples": len(dataset.data),
         "max_tokens": args.max_tokens,
-        "candidate_topk": 10,
+        "candidate_topk": 3 if args.mode == "baseline" else 10,
         "selected_topk": 3,
+        "retrieval_service_url": args.retrieval_service_url,
         "runtime_s": round(runtime, 1),
         "label": "debug_result",
     }

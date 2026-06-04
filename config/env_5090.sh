@@ -5,12 +5,12 @@
 #   source config/env_5090.sh
 #   python gate0/run_mcts_typed_vs_scalar_pilot.py --mode sanity
 #
-# 状态：⚠️ 大部分值是 TODO 占位，第一次在 5090 上跑实验前必须 ssh 上去确认实际路径再填回来。
-# 已知线索来自 gate0/GATE0_STATUS.md §6.3：
-#   /home/mayi/ReasonRAG/indexes/bge_extended/bge_Flat.index   (BGE extended index)
+# 状态：已按当前 5090 机器 expm11 上的真实路径确认。
+# 已知线索来自 gate0/GATE0_STATUS.md §6.3 与本机路径审计：
+#   /home/mayi/ReasonRAG_modified/indexes/bge_extended/bge_Flat.index   (BGE extended index)
 #   /nas/mayi/RAG/corpus/wiki18_extended.jsonl                  (extended corpus)
 #   /nas/mayi/RAG/corpus/wiki18_100w.jsonl                      (non-extended corpus)
-#   /home/mayi/ReasonRAG                                         (ReasonRAG repo)
+#   /home/mayi/ReasonRAG_modified                                (current runnable ReasonRAG repo)
 #
 # 填值原则：
 # 1. ssh rag-5090 后用 `ls` 确认每条路径都存在；
@@ -19,34 +19,36 @@
 
 # ---- ReasonRAG MCTS reward_data*.json 目录 ----
 # 用途：gate0/sample_branch_points.py / relabel_q_with_gpt4o.py 的输入
-# 注意：5090 上 ReasonRAG 仓库在 /home/mayi/ReasonRAG，但 reward_data 是否同步过来 / 在哪个子目录待确认
-export SAPR_REASONRAG_OUTPUT_DIR="TODO_5090_REASONRAG_OUTPUT_DIR"
+# Gate 0 已暂停；仅保留给历史脚本使用。
+export SAPR_REASONRAG_OUTPUT_DIR="/home/mayi/SAPR-RAG/gate0/data/reasonrag_mcts"
 
 # ---- ReasonRAG 仓库根 ----
-export SAPR_REASONRAG_ROOT="/home/mayi/ReasonRAG"
+export SAPR_REASONRAG_ROOT="/home/mayi/ReasonRAG_modified"
 
 # ---- FlashRAG 仓库根 ----
-# 5090 上 FlashRAG 装在哪儿待确认（可能是 site-packages 全局装的，那这条就用不到）
-export SAPR_FLASHRAG_ROOT="TODO_5090_FLASHRAG_ROOT"
+# 当前 SAPR-E e2e 依赖 reasonrag 环境里的 flashrag 包；该变量主要给历史 Gate0 脚本使用。
+export SAPR_FLASHRAG_ROOT="/home/mayi/ReasonRAG_modified"
 
 # ---- BGE Flat 检索索引 ----
-# Gate 0 推荐用 extended（对齐论文 data_generation.py + extended corpus）
-export SAPR_BGE_INDEX_PATH="/home/mayi/ReasonRAG/indexes/bge_extended/bge_Flat.index"
+# 中期答辩主线对齐 modified baseline：extended index + extended corpus
+export SAPR_BGE_INDEX_PATH="/home/mayi/ReasonRAG_modified/indexes/bge_extended/bge_Flat.index"
 
 # ---- BGE encoder 模型 ----
-export SAPR_BGE_MODEL_PATH="TODO_5090_BGE_MODEL_PATH"
+export SAPR_BGE_MODEL_PATH="/nas/mayi/RAG/retrievers/bge-base-en-v1.5"
 
 # ---- 维基百科 corpus ----
 # 与 BGE_INDEX_PATH 配套：用 extended index 就配 extended corpus
 export SAPR_WIKI_CORPUS_PATH="/nas/mayi/RAG/corpus/wiki18_extended.jsonl"
 
 # ---- HotpotQA dev jsonl ----
-export SAPR_HOTPOTQA_DEV_PATH="TODO_5090_HOTPOTQA_DEV_PATH"
+export SAPR_HOTPOTQA_DEV_PATH="/home/mayi/ReasonRAG_modified/dataset/hotpotqa/dev.jsonl"
 
-# ---- qwen2.5-7B-LoRA-DPO 合并模型 ----
-export SAPR_LORA_MODEL_PATH="TODO_5090_LORA_MODEL_PATH"
+# ---- 实验 generator ----
+# 对齐用户 baseline：Qwen2.5-7B-Instruct-ReasonRAG LoRA 合并后的完整模型。
+# /home/mayi/models/Qwen2.5-7B-Instruct-ReasonRAG-Lora 是 adapter 目录，不是 vLLM 直接使用的完整模型。
+export SAPR_LORA_MODEL_PATH="/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide"
 
 # ---- conda 可执行 ----
-export SAPR_CONDA_BIN="TODO_5090_CONDA_BIN"
+export SAPR_CONDA_BIN="/home/mayi/miniconda3/bin/conda"
 
-echo "[env] sourced config/env_5090.sh (rag-5090 / 3xRTX5090) — 注意：含 TODO 占位，跑实验前先填全"
+echo "[env] sourced config/env_5090.sh (expm11 / 5090, extended corpus/index)"

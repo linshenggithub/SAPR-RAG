@@ -35,6 +35,7 @@ from config.paths import (  # noqa: E402
     REPO_ROOT,
     REASONRAG_ROOT,
     WIKI_CORPUS_PATH,
+    BGE_INDEX_PATH,
     BGE_MODEL_PATH,
     LORA_MODEL_PATH,
 )
@@ -65,7 +66,7 @@ config_dict = {
     "data_dir": str(REASONRAG_ROOT / "dataset/"),
     "dataset_name": "hotpotqa",
     "split": ["dev", "test"],
-    "index_path": str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index"),
+    "index_path": str(BGE_INDEX_PATH),
     "retrieval_method": "bge",
     "corpus_path": str(WIKI_CORPUS_PATH),
     "faiss_gpu": False,
@@ -99,6 +100,8 @@ print("=" * 70)
 print("Examples  : {}".format(SLICE_SIZE))
 print("top_k     : 10")
 print("max_iter  : 8")
+print("Index     : {}".format(BGE_INDEX_PATH))
+print("Corpus    : {}".format(WIKI_CORPUS_PATH))
 print("Output    : {}".format(OUTPUT_FILE))
 print("=" * 70)
 

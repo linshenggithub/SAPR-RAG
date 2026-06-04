@@ -4,6 +4,7 @@
 import json
 import re
 import sys
+import argparse
 from collections import Counter
 from pathlib import Path
 
@@ -16,15 +17,6 @@ from config.paths import REPO_ROOT  # noqa: E402
 
 
 ROOT = REPO_ROOT
-BASELINE_PATH = ROOT / (
-    "04_experiments/logs/20260531_sapr_e_e2e_200_maxtok256_seq_gpu0/"
-    "baseline/hotpotqa_2026_05_31_23_13_sapr_e_e2e_baseline/intermediate_data.json"
-)
-RERANK_PATH = ROOT / (
-    "04_experiments/logs/20260601_sapr_e_minimal_rerank_50_v1/"
-    "sapr_e_minimal_rerank/hotpotqa_2026_06_01_08_36_sapr_e_minimal_rerank/intermediate_data.json"
-)
-OUT_DIR = ROOT / "04_experiments/metrics/20260601_sapr_e_minimal_rerank_50_case_analysis"
 
 
 def normalize(text):
@@ -91,12 +83,26 @@ def doc_nodes(item):
 
 
 def title_of(doc):
+    if isinstance(doc, dict) and doc.get("title"):
+        return str(doc.get("title")).strip().strip('"')[:160]
     raw = doc if isinstance(doc, str) else doc.get("contents", doc.get("text", ""))
     return str(raw).split("\n", 1)[0].strip().strip('"')[:160]
 
 
+def content_of(doc):
+    if isinstance(doc, str):
+        return doc
+    if isinstance(doc, dict):
+        return str(doc.get("contents", doc.get("text", "")))
+    return str(doc or "")
+
+
 def titles(node):
     return [title_of(doc) for doc in node.get("retrieval_result") or []]
+
+
+def contents(node):
+    return [content_of(doc) for doc in node.get("retrieval_result") or []]
 
 
 def gold_titles(item):
@@ -107,6 +113,16 @@ def gold_titles(item):
 def hit_titles(candidate_titles, golds):
     normalized_candidates = {normalize(title) for title in candidate_titles}
     return [gold for gold in golds if normalize(gold) in normalized_candidates]
+
+
+def hit_contents(candidate_contents, values):
+    normalized_contents = [normalize(content) for content in candidate_contents]
+    hits = []
+    for value in values or []:
+        normalized_value = normalize(value)
+        if normalized_value and any(normalized_value in content for content in normalized_contents):
+            hits.append(value)
+    return hits
 
 
 def last_action(item):
@@ -125,14 +141,47 @@ def esc(value, limit=180):
     return str(value).replace("|", "/").replace("\n", " ")[:limit]
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--baseline_path",
+        type=Path,
+        default=ROOT
+        / "04_experiments/logs/20260531_sapr_e_e2e_200_maxtok256_seq_gpu0/"
+        / "baseline/hotpotqa_2026_05_31_23_13_sapr_e_e2e_baseline/intermediate_data.json",
+    )
+    parser.add_argument(
+        "--rerank_path",
+        type=Path,
+        default=ROOT
+        / "04_experiments/logs/20260601_sapr_e_minimal_rerank_50_v1/"
+        / "sapr_e_minimal_rerank/hotpotqa_2026_06_01_08_36_sapr_e_minimal_rerank/intermediate_data.json",
+    )
+    parser.add_argument(
+        "--out_dir",
+        type=Path,
+        default=ROOT / "04_experiments/metrics/20260601_sapr_e_minimal_rerank_50_case_analysis",
+    )
+    parser.add_argument("--limit", type=int, default=None)
+    return parser.parse_args()
+
+
 def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    baseline = {item["id"]: item for item in json.load(open(BASELINE_PATH))[:50]}
-    rerank = {item["id"]: item for item in json.load(open(RERANK_PATH))}
+    args = parse_args()
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    baseline_data = json.load(open(args.baseline_path))
+    rerank_data = json.load(open(args.rerank_path))
+    if args.limit:
+        baseline_data = baseline_data[: args.limit]
+        rerank_data = rerank_data[: args.limit]
+    baseline = {item["id"]: item for item in baseline_data}
+    rerank = {item["id"]: item for item in rerank_data}
 
     cases = []
     steps = []
     for item_id, baseline_item in baseline.items():
+        if item_id not in rerank:
+            continue
         rerank_item = rerank[item_id]
         gold_answers = baseline_item.get("golden_answers") or []
         support_titles = gold_titles(baseline_item)
@@ -161,8 +210,14 @@ def main():
         for step in range(max_steps):
             baseline_titles = titles(baseline_nodes[step]) if step < len(baseline_nodes) else []
             rerank_titles = titles(rerank_nodes[step]) if step < len(rerank_nodes) else []
+            baseline_contents = contents(baseline_nodes[step]) if step < len(baseline_nodes) else []
+            rerank_contents = contents(rerank_nodes[step]) if step < len(rerank_nodes) else []
             baseline_gold_hit = hit_titles(baseline_titles, support_titles)
             rerank_gold_hit = hit_titles(rerank_titles, support_titles)
+            baseline_content_gold_title_hit = hit_contents(baseline_contents, support_titles)
+            rerank_content_gold_title_hit = hit_contents(rerank_contents, support_titles)
+            baseline_content_gold_answer_hit = hit_contents(baseline_contents, gold_answers)
+            rerank_content_gold_answer_hit = hit_contents(rerank_contents, gold_answers)
             baseline_any_gold = baseline_any_gold or bool(baseline_gold_hit)
             rerank_any_gold = rerank_any_gold or bool(rerank_gold_hit)
             retrieval_changed = retrieval_changed or baseline_titles != rerank_titles
@@ -176,6 +231,10 @@ def main():
                 "overlap": len(set(baseline_titles) & set(rerank_titles)),
                 "baseline_gold_hit": baseline_gold_hit,
                 "rerank_gold_hit": rerank_gold_hit,
+                "baseline_content_gold_title_hit": baseline_content_gold_title_hit,
+                "rerank_content_gold_title_hit": rerank_content_gold_title_hit,
+                "baseline_content_gold_answer_hit": baseline_content_gold_answer_hit,
+                "rerank_content_gold_answer_hit": rerank_content_gold_answer_hit,
                 "baseline_query": baseline_nodes[step].get("query") if step < len(baseline_nodes) else None,
                 "rerank_query": rerank_nodes[step].get("query") if step < len(rerank_nodes) else None,
             }
@@ -228,13 +287,17 @@ def main():
             1 for step in steps if step["baseline_gold_hit"] and not step["rerank_gold_hit"]
         ),
         "both_gold_steps": sum(1 for step in steps if step["baseline_gold_hit"] and step["rerank_gold_hit"]),
+        "baseline_content_gold_title_steps": sum(1 for step in steps if step["baseline_content_gold_title_hit"]),
+        "rerank_content_gold_title_steps": sum(1 for step in steps if step["rerank_content_gold_title_hit"]),
+        "baseline_content_gold_answer_steps": sum(1 for step in steps if step["baseline_content_gold_answer_hit"]),
+        "rerank_content_gold_answer_steps": sum(1 for step in steps if step["rerank_content_gold_answer_hit"]),
     }
 
-    json.dump(summary, open(OUT_DIR / "summary.json", "w"), ensure_ascii=False, indent=2)
-    with open(OUT_DIR / "cases.jsonl", "w") as handle:
+    json.dump(summary, open(args.out_dir / "summary.json", "w"), ensure_ascii=False, indent=2)
+    with open(args.out_dir / "cases.jsonl", "w") as handle:
         for case in cases:
             handle.write(json.dumps(case, ensure_ascii=False) + "\n")
-    with open(OUT_DIR / "steps.jsonl", "w") as handle:
+    with open(args.out_dir / "steps.jsonl", "w") as handle:
         for step in steps:
             handle.write(json.dumps(step, ensure_ascii=False) + "\n")
 
@@ -273,11 +336,11 @@ def main():
                         )
                     )
 
-    with open(OUT_DIR / "case_analysis.md", "w") as handle:
+    with open(args.out_dir / "case_analysis.md", "w") as handle:
         handle.write("\n".join(md))
 
     print(json.dumps(summary, ensure_ascii=False, indent=2))
-    print("OUT", OUT_DIR)
+    print("OUT", args.out_dir)
 
 
 if __name__ == "__main__":

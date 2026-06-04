@@ -22,10 +22,10 @@
 
 | 路线 | 状态 | 做什么 |
 |---|---|---|
-| **SAPR-E v0** state-aware 字面重排 | retrieval 信号 +4.1pp hit@3 已稳定，但**端到端 EM/F1 因 `max_tokens=32` 配置 bug 从未被合法验证**（[overnight_summary.md §11](../04_experiments/overnight_summary.md#L193-L217)）；先修 bug + 重跑 e2e 才能下结论 | 见下文 §6 D1-D3 |
+| **SAPR-E v0** state-aware 文档选择 | **主线已收窄**：保持 ReasonRAG 原 pipeline 不变，只把 `retrieve top-3` 改成 `retrieve top-10 -> v0 score -> select top-3`；旧 LoRA e2e / inferred_subquery 诊断不能作为正式证据 | 见下文 §6 D1-D3 |
 | **SAPR-R v1** 微调 reranker（DPA-RAG 风格 + state-aware） | 设想中，作为 v0 e2e 跑不出收益时的兜底 / 锦上添花 | 见下文 §6 D4-D8 |
 
-**关键事实**：v0 evidence-only **不是"已经 work"**——它只在 retrieval 中间指标（hit@3）上有信号，**端到端没有任何合法证据**。
+**关键事实**：v0 evidence-only **不是"已经 work"**。已有 retrieval hit@3 信号只算弱证据；旧 e2e / inferred_subquery 诊断不能作为方法证据。正式 v0 只验证“同一 baseline generator + 同一 ReasonRAG pipeline 下，top-10 rerank top-3 是否优于原 top-3”。
 
 > v4 / Gate 0 的资产（[gate0/](../gate0/) 全部）保留作为"调研深度"素材，下一个 AI 不要再投精力推进 v4 idea。
 
@@ -33,7 +33,7 @@
 
 ## 1. 当前研究状态（一句话）
 
-毕业设计中期答辩冲刺，主方法是 **SAPR-E v0**（state-aware evidence reranking），bug 修复后跑 e2e 看是否有 EM/F1 收益；**SAPR-R v1**（DPA-RAG 启发的 trained reranker）作为升级 / 兜底。
+毕业设计中期答辩冲刺，主方法是 **SAPR-E v0**（state-aware evidence selection）：保持 ReasonRAG 原 pipeline 不变，只替换检索文档选择；**SAPR-R v1**（DPA-RAG 启发的 trained reranker）作为升级 / 兜底。
 
 历史 idea 演化：[docs/history.md](./history.md)（v1 → v4，已停 v4）。
 v0 方法 pipeline：[docs/pipeline.md](./pipeline.md)。
@@ -175,7 +175,7 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 | `BGE_MODEL_PATH` | BGE encoder（bge-base-en-v1.5） | `SAPR_BGE_MODEL_PATH` |
 | `WIKI_CORPUS_PATH` | 维基百科 corpus jsonl（与 index 配套） | `SAPR_WIKI_CORPUS_PATH` |
 | `HOTPOTQA_DEV_PATH` | HotpotQA dev jsonl（gate0 pilot 输入） | `SAPR_HOTPOTQA_DEV_PATH` |
-| `LORA_MODEL_PATH` | qwen2.5-7B-LoRA-DPO 合并模型 | `SAPR_LORA_MODEL_PATH` |
+| `LORA_MODEL_PATH` | baseline generator：LoRA 合并后的完整模型路径 | `SAPR_LORA_MODEL_PATH` |
 | `CONDA_BIN` | conda 可执行（仅 launch_*.sh 用） | `SAPR_CONDA_BIN` |
 | DMXAPI key | GPT-4o 调用凭据 | `gate0/.env` 里的 `DMXAPI_API_KEY` |
 
@@ -189,13 +189,13 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 
 ### P0 立刻做（D1，今天）
 
-1. **修 e2e 配置 bug**：在 [run_sapr_e_v0_e2e_eval.py](../03_sapr_rag/scripts/run_sapr_e_v0_e2e_eval.py) 把 `max_tokens=32` 改回 `256`（ReasonRAG 原版默认值）。
-   - bug 详情：见 [overnight_summary.md §11 根因](../04_experiments/overnight_summary.md#L203-L211)——`max_tokens=32` 导致模型来不及输出 `"So the next query is..."` 标记，batch pipeline 永远走 `answer_generation_prompt`（无文档 slot），SAPR-E 重排的文档**从未被模型看到**。
-2. **重跑 baseline 30 条 e2e**：期望 EM 从 0.2333 涨回 0.30+（接近 full dev 的 0.3495），证明 bug 修对了 + pipeline 真的注入文档。
+1. **固定 baseline generator**：使用用户 baseline 对齐的 LoRA 合并完整模型 `/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide`。`/home/mayi/models/Qwen2.5-7B-Instruct-ReasonRAG-Lora` 只是 adapter 目录，不作为 vLLM 完整模型路径。
+2. **按收窄定义修/用 v0 入口**：优先使用 [run_sapr_e_v0_minimal_rerank_ablation.py](../03_sapr_rag/scripts/run_sapr_e_v0_minimal_rerank_ablation.py)，它应保持 ReasonRAG 原 pipeline，只在检索边界做 `top-10 -> rerank -> top-3`。不要把 query-fix、inferred_subquery fallback 或解析逻辑变化混入 v0 主实验。
+3. **重跑 baseline 30 条 e2e**：baseline 是原 ReasonRAG `retrieve top-3 -> prompt`，用于确认 generator + 当前数据/索引配置能正常工作。
 
 ### P1 视 P0 结果决定（D2-D3）
 
-**跑 SAPR-E v0 e2e 30 条 + 200 条**，对比修复后的 baseline：
+**跑收窄版 SAPR-E v0 e2e 30 条 + 200 条**，对比同一 generator 下的 baseline：
 
 | 结果 | 应对 |
 |---|---|
@@ -235,6 +235,7 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 
 - ~~跑 Gate 0 验证 A：`gate0/relabel_q_with_gpt4o.py`~~ —— **已完成（6/2-6/3），结论：v4 立论被削弱，已暂停**
 - ~~Gate 0 验证 B：`gate0/run_mcts_typed_vs_scalar_pilot.py`~~ —— **已完成 5+2 条 sanity，重复分支不成立，停止扩样**
+- ~~旧 SAPR-E e2e：max_tokens/query 诊断~~ —— **只能作为工程排错历史，不能作为 v0 方法证据**
 
 ### 工程清理（不阻塞研究）
 
@@ -269,4 +270,5 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 2. **不要默默降级实验配置**——脚本慢/卡/报错时**先停下来报告**，不要自己把 200 条切成 30 条 / 加 `_debug` 后缀。违反过的代价是 11 个不能横向比较的 results.json 全删（commit `cb867d1`）。
 3. **不要新建 `xxx_v2.py / xxx_fixed.py`**——bug 修复直接覆盖原文件，演化记录靠 git 历史和 `docs/history.md`。
 4. **数据来源必须如实标注**——本仓库 `reward_data*.json` 是 Llama-70B-int4 复现的，**不是论文的 GPT-4o**。所有基于它的统计在写到论文前都需要 GPT-4o 无偏对照。
-5. **不要因为 retrieval 中间指标涨就声称"方法 work"**——v0 evidence-only 在 hit@3 上 +4.1pp，但端到端 EM/F1 因 `max_tokens=32` bug 从未被合法验证，下结论之前必须先修 bug 再跑 e2e。中间指标涨 ≠ 端到端涨。
+5. **不要因为 retrieval 中间指标涨就声称"方法 work"**——v0 evidence-only 在 hit@3 上 +4.1pp，但该信号来自历史诊断数据；正式结论必须来自收窄版在线 e2e。中间指标涨 ≠ 端到端涨。
+6. **不要混淆 adapter 和合并完整模型**——`/home/mayi/models/Qwen2.5-7B-Instruct-ReasonRAG-Lora` 是 adapter；正式 v0 generator 使用 `/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide`。

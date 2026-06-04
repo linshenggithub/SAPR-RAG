@@ -28,7 +28,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from config.paths import (  # noqa: E402
-    REASONRAG_ROOT,
     WIKI_CORPUS_PATH,
     BGE_INDEX_PATH,
     BGE_MODEL_PATH,
@@ -47,11 +46,7 @@ OUTPUT_DIR = os.path.join(
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "evidence_decision_points.jsonl")
 
 BGE_PATH = str(BGE_MODEL_PATH)
-_INDEX_CANDIDATES = [
-    str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index"),
-    str(BGE_INDEX_PATH),
-]
-INDEX_PATH = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[0])
+INDEX_PATH = str(BGE_INDEX_PATH)
 CORPUS_PATH = str(WIKI_CORPUS_PATH)
 TOP_K = 10
 

@@ -1,0 +1,22 @@
+{
+  "n": 30,
+  "category_counts": {
+    "both_correct": 7,
+    "both_wrong": 19,
+    "improvement": 2,
+    "regression": 2
+  },
+  "baseline_em_count": 9,
+  "rerank_em_count": 9,
+  "baseline_avg_f1": 0.43986772486772485,
+  "rerank_avg_f1": 0.4126190476190476,
+  "retrieval_changed_items": 22,
+  "baseline_any_gold_items": 16,
+  "rerank_any_gold_items": 16,
+  "step_count": 50,
+  "baseline_gold_hit_steps": 23,
+  "rerank_gold_hit_steps": 29,
+  "rerank_added_gold_steps": 11,
+  "rerank_removed_gold_steps": 5,
+  "both_gold_steps": 18
+}

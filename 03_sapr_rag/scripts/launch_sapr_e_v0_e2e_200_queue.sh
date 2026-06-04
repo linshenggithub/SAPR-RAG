@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 路径配置：默认值与 config/paths.py 保持一致，可通过 SAPR_* 环境变量覆盖
+# 路径配置：跑前必须 source config/env_5090.sh 或对应机器 env，避免使用错误默认路径。
 RUN_ID="${RUN_ID:-20260531_sapr_e_e2e_200_maxtok256}"
-REASONRAG_ROOT="${SAPR_REASONRAG_ROOT:-${REASONRAG_ROOT:-/home/mayi/ReasonRAG}}"
-CONDA_BIN="${SAPR_CONDA_BIN:-${CONDA_BIN:-/home/mayi/miniconda3/bin/conda}}"
+REASONRAG_ROOT="${SAPR_REASONRAG_ROOT:?source config/env_5090.sh before running this launcher}"
+CONDA_BIN="${SAPR_CONDA_BIN:?source config/env_5090.sh before running this launcher}"
 FREE_MEM_THRESHOLD_MB="${FREE_MEM_THRESHOLD_MB:-1000}"
 SLEEP_SEC="${SLEEP_SEC:-120}"
 

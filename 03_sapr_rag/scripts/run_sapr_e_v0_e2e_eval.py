@@ -2,6 +2,11 @@
 """
 SAPR-E v0 End-to-End Test (30 samples).
 
+Historical note:
+  This script rewrites substantial run_batch logic and is not the narrowed
+  v0 mainline. Use run_sapr_e_v0_minimal_rerank_ablation.py for formal v0
+  experiments unless this script is re-audited.
+
 Modifies ReasonRAG pipeline to:
 1. Retrieve top-10 (instead of top-3)
 2. Re-rank top-10 using SAPR-E v0 heuristic scorer
@@ -27,6 +32,7 @@ from config.paths import (  # noqa: E402
     REPO_ROOT,
     REASONRAG_ROOT,
     WIKI_CORPUS_PATH,
+    BGE_INDEX_PATH,
     BGE_MODEL_PATH,
     LORA_MODEL_PATH,
 )
@@ -45,7 +51,7 @@ parser.add_argument("--mode", choices=["sapr_e", "baseline"], default="sapr_e")
 parser.add_argument("--run_id", default=None)
 parser.add_argument("--max_tokens", type=int, default=256)
 parser.add_argument("--gpu_id", default="0")
-parser.add_argument("--index_path", default=None)
+parser.add_argument("--index_path", default=str(BGE_INDEX_PATH))
 parser.add_argument("--corpus_path", default=str(WIKI_CORPUS_PATH))
 parser.add_argument("--bge_path", default=str(BGE_MODEL_PATH))
 parser.add_argument(
@@ -129,7 +135,7 @@ def select_sapr_e_top3(question, history_thoughts, subquery, docs_raw):
 
 # ── Config ───────────────────────────────────────────────────────
 topk = 10 if MODE == "sapr_e" else 3
-index_path = args.index_path or str(REASONRAG_ROOT / "indexes/bge_extended/bge_Flat.index")
+index_path = args.index_path
 config_dict = {
     "data_dir": str(REASONRAG_ROOT / "dataset/"),
     "dataset_name": "hotpotqa", "split": ["dev", "test"],
@@ -177,6 +183,8 @@ print("Examples: {}, topk: {}, max_tokens: {}, gpu_id: {}".format(
     SLICE_SIZE, topk, args.max_tokens, args.gpu_id))
 print("ReasonRAG root: {}".format(REASONRAG_ROOT))
 print("Index: {}".format(index_path))
+print("Corpus: {}".format(args.corpus_path))
+print("BGE: {}".format(args.bge_path))
 print("Generator: {}".format(args.generator_path))
 print("Output: {}".format(OUTPUT_DIR))
 print("=" * 70)

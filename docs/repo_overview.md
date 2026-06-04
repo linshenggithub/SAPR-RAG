@@ -4,7 +4,11 @@
 >
 > 角色定位：本文档是"地图"，不重复 `README.md` / `AGENTS.md` / `docs/proposal.md` 里已有的内容，只做指引。
 >
-> 上次更新：2026-06-04
+> 上次更新：2026-06-04（SAPR-R v1 数据构造管线 step2/3/4/5 + 一键 launcher 全部落地）
+>
+> ⚡ **当前正在做**：SAPR-R v1 离线训练数据构造管线（step2 ✅ step3 ✅ step4 ✅ step5 ✅ launcher ✅，**管线代码全部就位**，下一步是在 5090 上实跑）。**所有跑法、代码清单、下一步任务、红线**集中在 → [sapr_r_v1_handoff.md](./sapr_r_v1_handoff.md)（单一信源）。本文档只保留高层方案。
+>
+> 一键跑法：`bash 03_sapr_rag/data/build_v1/launch_build_v1_data.sh`（先 `source config/env_5090.sh && conda activate reasonrag`；smoke 模式加 `LIMIT_DEBUG=10 RUN_NAME=v1_smoke`）。
 
 ---
 
@@ -28,6 +32,129 @@
 **关键事实**：v0 evidence-only **不是"已经 work"**。已有 retrieval hit@3 信号只算弱证据；旧 e2e / inferred_subquery 诊断不能作为方法证据。正式 v0 只验证“同一 baseline generator + 同一 ReasonRAG pipeline 下，top-10 rerank top-3 是否优于原 top-3”。
 
 > v4 / Gate 0 的资产（[gate0/](../gate0/) 全部）保留作为"调研深度"素材，下一个 AI 不要再投精力推进 v4 idea。
+
+---
+
+## 0bis. SAPR-R v1 数据 / 架构最终方案（2026-06-04 敲定）
+
+> 适用范围：v1 trained reranker 的数据构造、训练目标、e2e 接入。下面所有决策都已与用户对齐，下一个 AI 直接按此实施，不要再回炉。
+
+### 0bis.1 架构定位：小替换，不脱离 ReasonRAG
+
+**保留** ReasonRAG 推理 pipeline + 已训好的 Qwen LoRA generator（`qwen2.5-7B-lora-dpo-RAG-ProGuide`）作为推理外壳；**只替换** reranker 调用点为我们训好的 SAPR-R v1。
+
+理由：
+- 中期答辩需要"同 pipeline 仅替换 reranker 一处"的干净对比口径。
+- Qwen LoRA generator 是已有训练资产，脱离 ReasonRAG = 浪费。
+- 若推理时引入 DeepSeek 替代 generator，无法解释 reranker 单点改进的真实增益。
+
+**反例（已否决）**：用 DeepSeek 驱动的全自研 e2e pipeline。
+
+### 0bis.2 训-推 thought 分布对齐：接口处翻译
+
+**核心问题**：训练用 DeepSeek 干净 thought，推理时 ReasonRAG-Qwen 产出脏 thought（含 `<query>` / `<answer>` XML、"Error Reflection:" / "Information Sufficiency:" 等 meta 元素）。
+
+> ⚠️ raw thought 的"采样源"必须是 **Qwen LoRA generator（`qwen2.5-7B-lora-dpo-RAG-ProGuide`）在 HotpotQA 上跑 ReasonRAG inference 的 response**，而不是 [gate0/data/reasonrag_mcts/](../gate0/data/reasonrag_mcts/) 下的 reward_data*.json——后者是 Llama-70B-int4 复现版 MCTS，不代表我们实际推理时的 generator 分布。审计 clean_thought() 黑名单覆盖率必须用 Qwen LoRA 真实推理产物，否则适配错对象。
+
+**作用域明确**：
+
+```
+Qwen LoRA generator → raw thought
+  ├─→ 流向 1：拼回 generator 下一步 prompt   →  保持脏（generator 训练分布）
+  ├─→ 流向 2：trajectory log / reward 计算   →  保持脏
+  └─→ 流向 3：喂给 reranker 算 (state,doc)    →  ★ 插 clean_thought() ★
+                                                 → reranker 见干净 thought
+```
+
+只在 **reranker 调用入口** 做一次 `clean_thought()` / `clean_subquery()` 字符串规则化（去 XML、去 meta 前缀、抽 `<evidence>` 优先、≤25 词、失败 fallback 到 subquery）。其他链路一概不动。
+
+实施落点：[run_sapr_e_v0_minimal_rerank_ablation.py](../03_sapr_rag/scripts/run_sapr_e_v0_minimal_rerank_ablation.py) 的 `select_top3()` 入口加适配层。
+
+### 0bis.3 数据构造：DeepSeek API 离线驱动
+
+| 决策点 | 选择 | 理由 |
+|---|---|---|
+| 数据底库 | HotpotQA train ~90k | 无需 ReasonRAG MCTS（GPT-4o 版未跑、Llama 版 sibling 重复 98.4%；DPO pair 没有 retrieved docs） |
+| 推理打标 LLM | **DeepSeek-V3 API** | ¥2/1M 输入 ¥8/1M 输出，50-100 并发，30000 调用 ~30-40 分钟 ~¥45 |
+| candidate doc 来源 | BGE 从 wiki18 检索 top-10 | HotpotQA 自带 supporting_facts 与 BGE 检索语料不同源，启发式不可信 |
+| reasoning_steps 生成 | DeepSeek 一次输出 `{subquery, thought, step_gold}` 列表 | thought ≤20 词、陈述句、无 meta；step_gold 为该 subquery 的局部答案锚点 |
+| cls 打标方式 | **方案 I：answer-aware LLM verify** | 喂 `(q, history, subquery, doc, step_gold)` 五元组，binary verify "doc 是否显式陈述 step_gold"；引入 GT answer 锚点降低 LLM judge 噪声 |
+| 训练信号 | **cls=0/1 + listwise rank loss 联合** | cls 用 BCE+sigmoid 自动学连续度；rank loss target = `softmax(α·rationale_score + (1-α)·retriever_score)`，提供连续监督；α=0.7 |
+| history_thoughts 风格 | **H1：DeepSeek 干净事实陈述** | ≤20 词、无 XML、无 meta；与 ReasonRAG 原 thought 不连贯问题脱钩 |
+
+### 0bis.4 训练样本格式
+
+```json
+{
+  "qid": "hotpot_xxx",
+  "step_idx": 0,
+  "state": {
+    "question": "...",
+    "history_thoughts": ["...", "..."],
+    "subquery": "..."
+  },
+  "doc": {"title": "...", "text": "...", "doc_id": "..."},
+  "cls_label": 0|1,
+  "retriever_score": float,
+  "step_gold": "..."
+}
+```
+
+**state 三元组定义（训-推统一）**：
+
+| 字段 | 内容 | 训练时来源 | 推理时来源 |
+|---|---|---|---|
+| `question` | 原始多跳问题 | HotpotQA `question` | ReasonRAG pipeline 输入 |
+| `history_thoughts` | **已确认的事实陈述列表**（不含元-计划 / 元-元话语） | DeepSeek 生成的前 k-1 个 `thought` 句（完整 SVO 陈述） | 前面所有 document_analysis 步的 `extract_evidence()` 结果 |
+| `subquery` | 当前这一跳要解决的子问题 | DeepSeek 生成的第 k 个 `subquery` | reasoning / begin_reasoning 步的 `clean_subquery()` 结果 |
+
+> 注：训练时不用 `step_gold` 进 `history_thoughts`（片段太短、信息密度低、上下文不完整）；`step_gold` 仅在 step4 cls 标注时作为"current step GT atomic fact"使用。
+
+> ⚠️ history_thoughts **只装事实**：
+> - ❌ begin_reasoning 输出（计划性的 "1. Identify... 2. Find..."）
+> - ❌ reasoning 输出（元-元话语 "No errors found in the previous thoughts"）
+> - ❌ answer 标签（trajectory 终点，本就不进 reranker history）
+> - ✅ document_analysis 抽出的 evidence（"X is Y" 形式的事实）
+>
+> 这是为了让 history_thoughts 在训练（DeepSeek step_gold）和推理（generator evidence）两端都是"事实陈述列表"，分布对齐。
+
+**state-aware 信号的预期作用**（v1 答辩故事 / ablation 关键对照）：
+
+1. **distractor 抑制**：history 锁定多跳上下文中的正确实体/关系，排除字面相关但实体错的 doc
+2. **重复信息抑制**：识别 history 已含信息的 doc，降权避免 generator 浪费 step
+3. **歧义消解**：subquery 单独看有歧义时，question + history 提供消岐线索
+
+ablation 必跑：`subquery-only` vs `state (subquery + history + question)`。如果差异不显著，说明 HotpotQA distractor 不够多，v1 故事需重新立。
+
+### 0bis.5 训练超参
+
+- backbone：BGE-reranker-v2-m3（568M，冻结），LoRA r=16
+- loss：`L = 1.0 * L_cls + 0.5 * L_rank`，α=0.7
+- batch：8 group × 10 doc = 80
+- lr 1e-5，epoch 3
+- 硬件：5090 单卡
+
+### 0bis.6 OOD 风险与缓解
+
+`(state, doc)` 多段拼接对 BGE-reranker-v2-m3 是 OOD。缓解：
+1. state 用自然语言句式拼接（不用结构化标签）
+2. LoRA 而非全参微调
+3. ablation：对比 single-query 输入 vs state 输入
+
+### 0bis.7 三层防线（推理 thought 分布偏差）
+
+1. **必做**：推理端 `clean_thought()` 适配层（纯字符串规则）
+2. **推荐**：训练数据混入 ~15% ReasonRAG-Qwen rollout 风格样本（+1 天数据构造，+¥10）
+3. **兜底**：ablation 对比 A（仅干净）/ B（干净+15% raw）/ C（仅 raw）三个 reranker 在同 pipeline 上的 EM/F1
+
+实施顺序：先做 1 + A 看效果，A 不够再上 2 + B。
+
+### 0bis.8 已否决方案备忘
+
+- ❌ 用 ReasonRAG MCTS reward_data 直接抽训练样本（数据是 Llama 复现，sibling 重复严重）
+- ❌ HotpotQA 自带 supporting_facts 做 cls 启发式（语料不同源，无法验证）
+- ❌ closed-book A/B 测试（让 LLM 用 doc 生成 answer 判 EM，方案 J，复杂度高且仍有 LLM 噪声）
+- ❌ 全面脱离 ReasonRAG 用 DeepSeek 做 e2e generator（丢失已有 LoRA 资产，对比口径不干净）
 
 ---
 
@@ -85,6 +212,7 @@ SAPR-RAG/
 
 | 文件 | 用途 | 当前状态 |
 |---|---|---|
+| `sapr_r_v1_handoff.md` | **SAPR-R v1 数据构造单一信源**（管线/代码/跑法/下一步/红线） | **活跃，正在执行** |
 | `proposal.md` | v4 当前 idea 完整版 | 活跃 |
 | `history.md` | idea v1→v4 演化历史与教训 | 活跃 |
 | `experiment_plan.md` | 实验计划 | 活跃 |

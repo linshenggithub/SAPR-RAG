@@ -56,7 +56,19 @@ def require_dir(path: Path, label: str) -> None:
 def load_api_key() -> str:
     key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DMXAPI_API_KEY")
     if not key:
-        raise RuntimeError("Set OPENAI_API_KEY or DMXAPI_API_KEY before formal run.")
+        env_path = REPO_ROOT / "gate0" / ".env"
+        if env_path.exists():
+            with env_path.open("r", encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    name, value = line.split("=", 1)
+                    if name.strip() in {"OPENAI_API_KEY", "DMXAPI_API_KEY"}:
+                        key = value.strip().strip('"').strip("'")
+                        break
+    if not key:
+        raise RuntimeError("Set OPENAI_API_KEY or DMXAPI_API_KEY in environment or gate0/.env before formal run.")
     return key
 
 

@@ -657,6 +657,99 @@ total_tokens: 2673
 2. 在跑昂贵 Gate0-B 前，应先把有效分支生成 / 去重机制分析清楚。
 3. 若继续验证强模型轨迹质量，应扩大到更小心设计的少量节点级扩展实验，而不是直接跑 50 条完整 MCTS。
 
+### 6.8 ReasonRAG original + GPT-4o 完整 MCTS sanity（初步证据，2026-06-03/04）
+
+**目的：**
+
+验证“原始 ReasonRAG 源码 + GPT-4o + 完整 MCTS”在小样本上是否也出现本地 Llama `reward_data` 中观察到的严重重复分支问题。
+
+**关键背景：**
+
+- 当前 `gate0/data/reasonrag_mcts/reward_data*.json` 已确认不是论文原始 GPT-4o MCTS 数据，而是本地 Llama-70B-int4 复现/拷贝数据；
+- 离线审计显示该数据大量 sibling 内容重复，因此不能直接推出“原始 ReasonRAG GPT-4o MCTS 也重复”；
+- 为避免每次实验冷加载 64G FAISS index，先启动长驻检索服务。
+
+**检索服务：**
+
+```text
+service: http://127.0.0.1:18080
+source: /home/mayi/ReasonRAG_modified/retrieval_service.py
+index: /home/mayi/ReasonRAG_modified/indexes/bge_extended/bge_Flat.index
+corpus: /nas/mayi/RAG/corpus/wiki18_extended.jsonl
+bge_model: /nas/mayi/RAG/retrievers/bge-base-en-v1.5
+faiss_gpu: false
+```
+
+已验证：
+
+- 服务进程监听 `127.0.0.1:18080`；
+- `/health` 返回 `{"status": "ok"}`；
+- 真实检索请求可返回相关 Wikipedia 文档；
+- 服务进程 RSS 约 66GiB，说明 64G 级别索引已常驻在服务进程中。
+
+**入口脚本：**
+
+```text
+gate0/run_reasonrag_original_mcts_sanity.py
+gate0/analyze_reasonrag_original_mcts_sanity.py
+```
+
+其中 `run_reasonrag_original_mcts_sanity.py` 支持：
+
+- `--retrieval-service-url http://127.0.0.1:18080`：通过 `RemoteRetriever` 注入检索结果，避免每次重新加载 index；
+- `--start-index`：精确指定从 HotpotQA dev 的哪条样本开始跑；
+- `--dry-run`：只检查路径、样本选择和参数，不调 API。
+
+**运行设置：**
+
+```yaml
+source_code: /home/mayi/ReasonRAG_original/pipeline/reasonrag_pipeline.py
+data: /home/mayi/ReasonRAG_modified/dataset/hotpotqa/dev.jsonl
+model: gpt-4o
+temperature: 0.7
+max_tokens: 256
+max_iter: 7
+max_children: 2
+max_rollouts: 64
+retrieval_topk: 3
+```
+
+**输出文件：**
+
+```text
+gate0/data/reasonrag_original_gpt4o_mcts_sanity/
+gate0/data/reasonrag_original_gpt4o_mcts_sanity/analysis_summary.md
+gate0/data/reasonrag_original_gpt4o_mcts_sanity/analysis_summary.json
+```
+
+**小样本结果：**
+
+| sample | status | sec | nodes | branch points | root similarity | root exact duplicate | root Q | top answer |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `dev_0` | ok | 507.785 | 3 | 1 | 0.5413 | false | `[0.6121, 0.3995]` | `yes` |
+| `dev_1` | ok | 631.387 | 9 | 4 | 0.3372 | false | `[0.0878, 0.0806]` | `U.S. Ambassador` |
+
+**初步结论：**
+
+1. 在已跑的 2 条 dev 样本上，`ReasonRAG_original + GPT-4o + 完整 MCTS` 没有出现根节点 sibling 严重重复。
+2. 这进一步支持一个**初步证据**：本地 Llama `reward_data` 的重复分支问题不能直接外推到原始 GPT-4o ReasonRAG MCTS。
+3. `dev_1` 没有重复分支，但 top answer 为 `U.S. Ambassador`，与 golden answer `Chief of Protocol` 不一致；因此“不重复”不等于“轨迹质量高”。
+4. 长驻检索服务有效：pipeline 初始化从 10-20 分钟冷加载降到秒级；当前主要成本来自 GPT-4o rollout 调用。
+
+**限制：**
+
+- 只有 2 条 dev 样本，不能作为正式统计结论；
+- 只验证了 HotpotQA dev 前两条，没有覆盖更广泛问题类型；
+- 当前脚本只记录 item 级进度，还没有 rollout 级 token/cost 统计；
+- 由于使用 DMXAPI，实际费用需要以平台账单为准。
+
+**下一步建议：**
+
+1. 先不要直接上 50 条 Gate0-B；
+2. 在当前检索服务保持运行的情况下，再补 3 条 dev 完整 MCTS，使样本达到 5 条；
+3. 同时补充 rollout 级进度和调用量统计，避免之后长时间运行时无法判断进度与成本；
+4. 若 5 条仍无严重重复，再把结论定位为“Llama reproduction artifact 更可能”，并重新评估 SAPR-RAG v4 的核心动机。
+
 ---
 
 ## 7) 实现代码（2026-06-01）

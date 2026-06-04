@@ -1,0 +1,38 @@
+[
+  {
+    "index": 0,
+    "id": "dev_2",
+    "question": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+    "golden_answers": [
+      "Animorphs"
+    ],
+    "status": "failed",
+    "error": "RemoteDisconnected: Remote end closed connection without response",
+    "elapsed_sec": 18.285,
+    "output": {}
+  },
+  {
+    "index": 1,
+    "id": "dev_3",
+    "question": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+    "golden_answers": [
+      "no"
+    ],
+    "status": "failed",
+    "error": "RemoteDisconnected: Remote end closed connection without response",
+    "elapsed_sec": 19.357,
+    "output": {}
+  },
+  {
+    "index": 2,
+    "id": "dev_4",
+    "question": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+    "golden_answers": [
+      "Greenwich Village, New York City"
+    ],
+    "status": "failed",
+    "error": "RemoteDisconnected: Remote end closed connection without response",
+    "elapsed_sec": 15.974,
+    "output": {}
+  }
+]

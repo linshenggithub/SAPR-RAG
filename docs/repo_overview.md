@@ -4,17 +4,40 @@
 >
 > 角色定位：本文档是"地图"，不重复 `README.md` / `AGENTS.md` / `docs/proposal.md` 里已有的内容，只做指引。
 >
-> 上次更新：2026-06-02
+> 上次更新：2026-06-04
+
+---
+
+## 0. ⚠️ 主线切换（2026-06-04）—— 必读
+
+**v4 FailureAttributedMCTS / Gate 0 验证已暂停。** 原因：
+
+- Gate 0-A（GPT-4o 重打 50 条 trajectory）+ 离线全量审计（20K+ 分支点）+ 5 条 sanity + 2 条原版 GPT-4o 完整 MCTS 结果显示：**reward_data 里 98.4% 的 sibling 是字面重复**，"标量 PRM 对分支盲"不成立——重复来自 Llama-70B-int4 复现，**不是 ReasonRAG MCTS 本身的问题**。
+- 在真正"内容不同 Q 相同"的子集（55 个）上，**typed eval 也只能区分 7.3%**，v4 立论被严重削弱。
+- 详细数字与产物：[gate0/data/branch_quality_offline/summary.md](../gate0/data/branch_quality_offline/summary.md)、[gate0/data/data_source_audit/summary.md](../gate0/data/data_source_audit/summary.md)、[gate0/data/relabel_q_gpt4o_stats.json](../gate0/data/relabel_q_gpt4o_stats.json)、[gate0/data/reasonrag_original_gpt4o_mcts_sanity/analysis_summary.md](../gate0/data/reasonrag_original_gpt4o_mcts_sanity/analysis_summary.md)。
+
+**当前主线**：**毕业设计中期答辩冲刺**（约 10 天，目标 2026-06-15 前后）——做出一个"有工作量 + 比 baseline 好一点"的方法即可，不再追求新颖性。
+
+**主方法路线**（双线并行，根据 D1-D3 结果再决定哪个为主）：
+
+| 路线 | 状态 | 做什么 |
+|---|---|---|
+| **SAPR-E v0** state-aware 字面重排 | retrieval 信号 +4.1pp hit@3 已稳定，但**端到端 EM/F1 因 `max_tokens=32` 配置 bug 从未被合法验证**（[overnight_summary.md §11](../04_experiments/overnight_summary.md#L193-L217)）；先修 bug + 重跑 e2e 才能下结论 | 见下文 §6 D1-D3 |
+| **SAPR-R v1** 微调 reranker（DPA-RAG 风格 + state-aware） | 设想中，作为 v0 e2e 跑不出收益时的兜底 / 锦上添花 | 见下文 §6 D4-D8 |
+
+**关键事实**：v0 evidence-only **不是"已经 work"**——它只在 retrieval 中间指标（hit@3）上有信号，**端到端没有任何合法证据**。
+
+> v4 / Gate 0 的资产（[gate0/](../gate0/) 全部）保留作为"调研深度"素材，下一个 AI 不要再投精力推进 v4 idea。
 
 ---
 
 ## 1. 当前研究状态（一句话）
 
-SAPR-RAG idea 已迭代到 **v4 FailureAttributedMCTS**（typed transition evaluation：φ_q / φ_c / φ_s），目前**正在做 Gate 0 验证**——用 GPT-4o 重打 ReasonRAG MCTS 的 Q 值，判断"标量 PRM 真的对分支盲吗"，结果决定 v4 是 Go / Pivot / Stop。
+毕业设计中期答辩冲刺，主方法是 **SAPR-E v0**（state-aware evidence reranking），bug 修复后跑 e2e 看是否有 EM/F1 收益；**SAPR-R v1**（DPA-RAG 启发的 trained reranker）作为升级 / 兜底。
 
-详细演化：[docs/history.md](./history.md)（v1 → v4）。
-当前 idea 完整版：[docs/proposal.md](./proposal.md)。
-Gate 0 现状（含本地资源、参数对齐审计、API key 位置）：[gate0/GATE0_STATUS.md](../gate0/GATE0_STATUS.md)。
+历史 idea 演化：[docs/history.md](./history.md)（v1 → v4，已停 v4）。
+v0 方法 pipeline：[docs/pipeline.md](./pipeline.md)。
+Gate 0 阶段成果（已暂停）：[gate0/GATE0_STATUS.md](../gate0/GATE0_STATUS.md)。
 
 ---
 
@@ -160,29 +183,65 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 
 ---
 
-## 6. 下一步要做什么
+## 6. 下一步要做什么（中期答辩 10 天作战计划）
 
-按优先级：
+> 目标：2026-06-15 前后中期答辩，交付一个"有工作量 + 比 baseline 好一点"的完整方法。新颖性次要，**实验闭环 > 故事完整 > 增益大小**。
 
-### P0 立即可做
-1. **把 4 个 commit `cb867d1 / 6a61a82 / a87a507 / c43df7e` push 到 `origin/main`**（命名规范 + 清理 debug + 写规约的产物，本地已 commit，未推送）。
-2. **跑 Gate 0 验证 A**：`gate0/relabel_q_with_gpt4o.py`（GPT-4o 重标 50 条 trajectory 的兄弟节点 Q 值，预算 ¥15-30，5-10 分钟）。
-   - 看完结果回答关键问题：兄弟节点 Q 值用 GPT-4o 重打后，分布是否仍然集中？标量 PRM 是否真的对分支盲？
-   - **结果决定 v4 走 Go / Pivot / Stop**，详见 [docs/history.md](./history.md) 末节。
+### P0 立刻做（D1，今天）
 
-### P1 视 Gate 0-A 结果决定
-- 若结果显示标量 PRM 确实盲：跑 Gate 0-B（`gate0/run_mcts_typed_vs_scalar_pilot.py` 50 条无泄漏 inference-aligned MCTS pilot），对比 typed eval 和 scalar self-eval 的 EM/F1。
-- 若结果显示 PRM 并不盲：暂停 v4，回到 idea 设计室找替代切入点（见 [docs/history.md §教训 1](./history.md)）。
+1. **修 e2e 配置 bug**：在 [run_sapr_e_v0_e2e_eval.py](../03_sapr_rag/scripts/run_sapr_e_v0_e2e_eval.py) 把 `max_tokens=32` 改回 `256`（ReasonRAG 原版默认值）。
+   - bug 详情：见 [overnight_summary.md §11 根因](../04_experiments/overnight_summary.md#L203-L211)——`max_tokens=32` 导致模型来不及输出 `"So the next query is..."` 标记，batch pipeline 永远走 `answer_generation_prompt`（无文档 slot），SAPR-E 重排的文档**从未被模型看到**。
+2. **重跑 baseline 30 条 e2e**：期望 EM 从 0.2333 涨回 0.30+（接近 full dev 的 0.3495），证明 bug 修对了 + pipeline 真的注入文档。
 
-### P2 写作类
-- 完成 30 篇核心文献综述（[ROADMAP.md](../ROADMAP.md) 06-01 → 06-07 段）。
-- 整理 SAPR-RAG v0 evidence-only 6-way ablation 的 case study，准备写到 midterm report。
+### P1 视 P0 结果决定（D2-D3）
 
-### P3 工程清理（不阻塞研究）
-- `MANIFEST.md` 已偏离当前布局（仍引用已删的 refine-logs/），下次清理时一起重写或废弃。
-- `TODO.md` 部分项过时（refine-logs 阶段的），需要更新或合并到 ROADMAP。
-- `CHANGELOG.md` 仅有 2026-05-23 一条，要么定期更新要么明确废弃改用 git log。
-- `idea-stage/` 和 `research-wiki/` 多数文件已不活跃，可考虑归档到一个 `archive/` 目录。
+**跑 SAPR-E v0 e2e 30 条 + 200 条**，对比修复后的 baseline：
+
+| 结果 | 应对 |
+|---|---|
+| EM/F1 涨（哪怕 +1pp） | ✅ v0 当主方法，按"v0 主线 + v1 锦上添花"走 |
+| EM/F1 平 | ⚠️ pivot 到"evidence selection 提升 retrieval quality 但 LLM 鲁棒"的分析故事，**同时立刻启动 v1 trained reranker** |
+| EM/F1 跌 | ❌ v0 退为 ablation 中的"heuristic baseline"，**全力做 v1 trained reranker** |
+
+### P2 v1 trained reranker（D4-D8，根据 P1 结果决定优先级）
+
+**SAPR-R**：State-Aware Process-Refined Reranker。受 [DPA-RAG (WWW 2025)](../../DPA-RAG/) 启发，微调 BGE 重排器。
+
+**核心创新点**（用于答辩讲故事）：
+> DPA-RAG 把"LLM 偏好"对齐到 reranker，但**它是 single-turn 的**；而 agentic RAG 是 multi-turn——同一个 query 在不同 trajectory state 下偏好的文档不同。我们提出 **state-aware reranker**：把 `[original_question, inferred_subquery, history_thoughts]` 拼接作为 query 编码，让 reranker 学到"在 state s 下，LLM 偏好哪些 doc"。
+
+**预估工作量**：8 天（数据构造 2d / 模型适配 2d / 训练 1d / 评估接入 1d / 实验 + ablation 2d）。
+
+**实现入口参考**：
+- [DPA-RAG/train_bge_joined.py](../../DPA-RAG/train_bge_joined.py)：3-loss 训练（cls + rank + scl）
+- [DPA-RAG/bge_joined_model.py](../../DPA-RAG/bge_joined_model.py)：模型结构
+- [DPA-RAG/joined_dataset.py](../../DPA-RAG/joined_dataset.py)：数据格式
+
+**数据来源候选**（按可行性排序）：
+1. **首选**：从 ReasonRAG trajectory 抽 `(state, doc, label)`，label = 该 doc 是否在最终 hit 的 evidence 里（约 5K 三元组）
+2. **进阶**（时间富裕时）：从 MCTS reward_data 蒸馏，用高 Q 子树的 evidence 作 positive、低 Q 子树作 negative——把 v4 调研资产用上
+
+### P3 写作 + 答辩准备（D9-D10）
+
+- 中期 PPT 骨架 + figure：方法图、主表、ablation、case study
+- 中期报告：背景 / 方法 / 实验 / 总结 / 后续工作
+- 现成资产可直接复用：
+  - [overnight_summary.md](../04_experiments/overnight_summary.md) §5 的 4-way / §10 的 6-way ablation 数字
+  - [04_experiments/metrics/](../04_experiments/metrics/) 现有数据
+  - [analyze_minimal_rerank_vs_baseline_cases.py](../03_sapr_rag/scripts/analyze_minimal_rerank_vs_baseline_cases.py) 出 case study
+- 第二个数据集泛化：2WikiMultihopQA 或 Musique 选 50 条小验证
+
+### 历史 P0/P1（已弃）
+
+- ~~跑 Gate 0 验证 A：`gate0/relabel_q_with_gpt4o.py`~~ —— **已完成（6/2-6/3），结论：v4 立论被削弱，已暂停**
+- ~~Gate 0 验证 B：`gate0/run_mcts_typed_vs_scalar_pilot.py`~~ —— **已完成 5+2 条 sanity，重复分支不成立，停止扩样**
+
+### 工程清理（不阻塞研究）
+
+- `MANIFEST.md` 已偏离当前布局
+- `TODO.md` 部分项过时
+- `CHANGELOG.md` 已不维护
+- `idea-stage/` 和 `research-wiki/` 多数文件已不活跃
 
 ---
 
@@ -190,18 +249,17 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 
 按这个顺序读，半小时内能上手：
 
-1. **本文档** `docs/repo_overview.md`：地图。
+1. **本文档 §0 主线切换**：当前主线、为什么不再做 v4、要做什么。
 2. `AGENTS.md`：项目硬规则（语言、布局、git、服务器、§11.5 命名/路径/AI 行为）。
 3. `docs/coding_standard.md`：写代码前必看的硬约束。
-4. `docs/proposal.md`：当前 v4 idea。
-5. `docs/history.md`：v1→v4 演化与教训（不要再次踩坑）。
-6. `gate0/GATE0_STATUS.md`：当前主线 Gate 0 的全部上下文。
-7. `config/paths.py`：所有仓外路径与 `SAPR_*` 环境变量。
+4. `docs/pipeline.md`：v0 evidence-only 主方法 pipeline。
+5. `04_experiments/overnight_summary.md`：v0 现有所有实验数字（**§11 是 e2e bug 根因，必读**）。
+6. `config/paths.py` + `config/env_<host>.sh`：所有仓外路径与 `SAPR_*` 环境变量。
+7. **历史背景（可选读）**：`docs/history.md`（v1→v4 演化）、`gate0/GATE0_STATUS.md`（v4 调研到哪一步）、`gate0/data/branch_quality_offline/summary.md`（为什么 v4 停了）。
 
 跑实验之前再读：
 - `docs/experiment_plan.md` / `experiment_tracker.md`
 - `docs/experiment_protocol.md`
-- `docs/pipeline.md`（v0 evidence-only 是怎么跑通的）
 
 ---
 
@@ -211,3 +269,4 @@ Fix: source config/env_3090.sh (or env_5090.sh) before running this script.
 2. **不要默默降级实验配置**——脚本慢/卡/报错时**先停下来报告**，不要自己把 200 条切成 30 条 / 加 `_debug` 后缀。违反过的代价是 11 个不能横向比较的 results.json 全删（commit `cb867d1`）。
 3. **不要新建 `xxx_v2.py / xxx_fixed.py`**——bug 修复直接覆盖原文件，演化记录靠 git 历史和 `docs/history.md`。
 4. **数据来源必须如实标注**——本仓库 `reward_data*.json` 是 Llama-70B-int4 复现的，**不是论文的 GPT-4o**。所有基于它的统计在写到论文前都需要 GPT-4o 无偏对照。
+5. **不要因为 retrieval 中间指标涨就声称"方法 work"**——v0 evidence-only 在 hit@3 上 +4.1pp，但端到端 EM/F1 因 `max_tokens=32` bug 从未被合法验证，下结论之前必须先修 bug 再跑 e2e。中间指标涨 ≠ 端到端涨。

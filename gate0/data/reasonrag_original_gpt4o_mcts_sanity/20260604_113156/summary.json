@@ -1,0 +1,10 @@
+{
+  "label": "sanity_result",
+  "run_dir": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260604_113156",
+  "elapsed_sec": 1391.057,
+  "num_examples": 3,
+  "num_ok": 2,
+  "num_failed": 1,
+  "raw_stdout_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260604_113156/raw_stdout.log",
+  "stage_log_path": "/home/mayi/SAPR-RAG/gate0/data/reasonrag_original_gpt4o_mcts_sanity/20260604_113156/stage.log"
+}

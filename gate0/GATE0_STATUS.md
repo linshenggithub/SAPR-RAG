@@ -728,27 +728,42 @@ gate0/data/reasonrag_original_gpt4o_mcts_sanity/analysis_summary.json
 |---|---:|---:|---:|---:|---:|---:|---|---|
 | `dev_0` | ok | 507.785 | 3 | 1 | 0.5413 | false | `[0.6121, 0.3995]` | `yes` |
 | `dev_1` | ok | 631.387 | 9 | 4 | 0.3372 | false | `[0.0878, 0.0806]` | `U.S. Ambassador` |
+| `dev_2` | ok | 835.502 | 65 | 31 | 0.1969 | false | `[0.0584, 0.0531]` | empty |
+| `dev_3` | ok | 404.953 | 3 | 1 | 0.1444 | false | `[0.0414, 0.2164]` | `No` |
+| `dev_4` | failed | 149.477 | 0 | 0 | n/a | n/a | n/a | n/a |
+
+`dev_4` 失败原因：
+
+```text
+TypeError: float() argument must be a string or a real number, not 'NoneType'
+```
+
+该错误来自原始 ReasonRAG 的 `evaluate_thoughts` 分数解析：某次评价模型输出中没有可解析数字，`extract_last_number(...)` 返回 `None`，随后代码直接执行 `float(None)`。这不是检索连接错误，也不是索引服务失效。
+
+另有一次 `20260604_111929` 启动记录中 `dev_2/dev_3/dev_4` 都因检索服务 `/retrieve` 空响应失败。该问题已通过给 `retrieval_service.py` 增加异常日志和 JSON 500 返回后定位，并在重启服务后恢复；有效结果来自 `20260604_113156`。
 
 **初步结论：**
 
-1. 在已跑的 2 条 dev 样本上，`ReasonRAG_original + GPT-4o + 完整 MCTS` 没有出现根节点 sibling 严重重复。
+1. 在已成功跑完的 4 条 dev 样本上，`ReasonRAG_original + GPT-4o + 完整 MCTS` 没有出现根节点 sibling 严重重复。
 2. 这进一步支持一个**初步证据**：本地 Llama `reward_data` 的重复分支问题不能直接外推到原始 GPT-4o ReasonRAG MCTS。
 3. `dev_1` 没有重复分支，但 top answer 为 `U.S. Ambassador`，与 golden answer `Chief of Protocol` 不一致；因此“不重复”不等于“轨迹质量高”。
-4. 长驻检索服务有效：pipeline 初始化从 10-20 分钟冷加载降到秒级；当前主要成本来自 GPT-4o rollout 调用。
+4. `dev_2` 搜索树明显更大（65 nodes、31 branch points），但 top answer 为空，说明当前原始 MCTS sanity 还需要同时看答案质量和分支结构，不能只看重复率。
+5. 长驻检索服务有效：pipeline 初始化从 10-20 分钟冷加载降到秒级；当前主要成本来自 GPT-4o rollout 调用。
 
 **限制：**
 
-- 只有 2 条 dev 样本，不能作为正式统计结论；
-- 只验证了 HotpotQA dev 前两条，没有覆盖更广泛问题类型；
+- 只有 4 条成功 dev 样本，不能作为正式统计结论；
+- `dev_4` 因评价分数解析失败，尚未形成完整 MCTS 树；
 - 当前脚本只记录 item 级进度，还没有 rollout 级 token/cost 统计；
 - 由于使用 DMXAPI，实际费用需要以平台账单为准。
 
 **下一步建议：**
 
 1. 先不要直接上 50 条 Gate0-B；
-2. 在当前检索服务保持运行的情况下，再补 3 条 dev 完整 MCTS，使样本达到 5 条；
-3. 同时补充 rollout 级进度和调用量统计，避免之后长时间运行时无法判断进度与成本；
-4. 若 5 条仍无严重重复，再把结论定位为“Llama reproduction artifact 更可能”，并重新评估 SAPR-RAG v4 的核心动机。
+2. 先给受控入口的评价分数解析加显式容错：记录原始评价文本、无法解析时重试或按预设策略失败退出，不能静默改分；
+3. 在检索服务保持运行的情况下，只重跑 `dev_4`，补齐 5 条 sanity；
+4. 同时补充 rollout 级进度和调用量统计，避免之后长时间运行时无法判断进度与成本；
+5. 若 5 条仍无严重重复，再把结论定位为“Llama reproduction artifact 更可能”，并重新评估 SAPR-RAG v4 的核心动机。
 
 ---
 

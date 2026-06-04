@@ -145,6 +145,12 @@ HOTPOTQA_DEV_PATH = _RequiredPath(
     "HotpotQA dev jsonl",
 )
 
+# HotpotQA train jsonl（SAPR-R v1 离线训练数据构造的输入）
+HOTPOTQA_TRAIN_PATH = _RequiredPath(
+    "SAPR_HOTPOTQA_TRAIN_PATH",
+    "HotpotQA train jsonl (FlashRAG format) for SAPR-R v1 data construction",
+)
+
 
 __all__ = [
     "REPO_ROOT",
@@ -157,4 +163,5 @@ __all__ = [
     "LORA_MODEL_PATH",
     "CONDA_BIN",
     "HOTPOTQA_DEV_PATH",
+    "HOTPOTQA_TRAIN_PATH",
 ]

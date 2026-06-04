@@ -43,6 +43,9 @@ export SAPR_WIKI_CORPUS_PATH="/nas/mayi/RAG/corpus/wiki18_extended.jsonl"
 # ---- HotpotQA dev jsonl ----
 export SAPR_HOTPOTQA_DEV_PATH="/home/mayi/ReasonRAG_modified/dataset/hotpotqa/dev.jsonl"
 
+# ---- HotpotQA train jsonl (SAPR-R v1 离线数据构造输入) ----
+export SAPR_HOTPOTQA_TRAIN_PATH="/home/mayi/ReasonRAG_modified/dataset/hotpotqa/train.jsonl"
+
 # ---- 实验 generator ----
 # 对齐用户 baseline：Qwen2.5-7B-Instruct-ReasonRAG LoRA 合并后的完整模型。
 # /home/mayi/models/Qwen2.5-7B-Instruct-ReasonRAG-Lora 是 adapter 目录，不是 vLLM 直接使用的完整模型。

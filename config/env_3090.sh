@@ -38,6 +38,9 @@ export SAPR_WIKI_CORPUS_PATH="/home/mayi/RAG/corpus/wiki18_100w.jsonl"
 # 用途：gate0 GPT-4o pilot 输入 query 来源
 export SAPR_HOTPOTQA_DEV_PATH="/home/mayi/RAG/ReasonRAG/dataset/hotpotqa/dev.jsonl"
 
+# ---- HotpotQA train jsonl (SAPR-R v1 离线数据构造输入) ----
+export SAPR_HOTPOTQA_TRAIN_PATH="/home/mayi/RAG/ReasonRAG/dataset/hotpotqa/train.jsonl"
+
 # ---- qwen2.5-7B-LoRA-DPO 合并模型 ----
 # 用途：03_sapr_rag/scripts/run_*.py 的 generator
 export SAPR_LORA_MODEL_PATH="/home/mayi/LLaMA-Factory/examples/merge_lora/output/qwen2.5-7B-lora-dpo-RAG-ProGuide"

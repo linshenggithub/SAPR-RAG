@@ -1,5 +1,15 @@
 # Gate 0 实验现状文档
 
+> **⚠️ 状态：已暂停（2026-06-04）**
+>
+> Gate 0-A（GPT-4o 重打 50 条 trajectory 的兄弟节点 Q 值）+ 离线全量审计（20K+ 分支点）+ 5 条根分支 sanity + 2 条原版 GPT-4o 完整 MCTS 结果显示：
+> - reward_data 里 98.4% 的 sibling 是字面重复，"标量 PRM 对分支盲"不成立——重复来自 Llama-70B-int4 复现，不是 ReasonRAG MCTS 本身的问题。
+> - 在真正"内容不同 Q 相同"的 55 个分支上，typed eval 也只能区分 7.3%，v4 立论严重削弱。
+>
+> **当前主线已切换到毕业设计中期答辩冲刺**——SAPR-E v0 evidence-only + 视情况叠加 SAPR-R v1 trained reranker（DPA-RAG 启发）。完整下一步见 [docs/repo_overview.md §0 + §6](../docs/repo_overview.md)。
+>
+> 本文档保留作为 v4 调研深度的存档，下一个 AI 请不要再继续推进 v4 / Gate 0 的实验。
+
 **Date**: 2026-05-31
 **Goal**: 用 GPT-4o 跑 v4 typed eval prompt 版，与 ReasonRAG baseline 对比 EM/F1
 

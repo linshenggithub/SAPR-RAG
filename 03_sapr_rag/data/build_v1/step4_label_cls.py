@@ -181,19 +181,33 @@ class LabelValidation:
     evidence: str = ""
 
 
+_YES_TOKENS = {"yes", "1", "true", "positive", "pos", "y"}
+_NO_TOKENS = {"no", "0", "false", "negative", "neg", "n"}
+
+
 def validate_label_response(obj: Any) -> LabelValidation:
     """对 DeepSeek 返回的 JSON 做 schema 校验。
 
-    期望: {"label": 0|1, "evidence": "..."}（evidence 可为空字符串，label=0 时尤甚）
+    Prompt 要求 {"label": "yes"|"no", "evidence": "..."}；为兼容旧调用也接受 0/1/bool。
+    归一化为 cls_label ∈ {0, 1}（1=yes / positive evidence）。
     """
     if not isinstance(obj, dict):
         return LabelValidation(ok=False, reason="root_not_object")
     label = obj.get("label")
-    if label is None or label not in (0, 1, "0", "1", True, False):
+    if isinstance(label, bool):
+        label_int = int(label)
+    elif isinstance(label, int) and label in (0, 1):
+        label_int = label
+    elif isinstance(label, str):
+        token = label.strip().lower()
+        if token in _YES_TOKENS:
+            label_int = 1
+        elif token in _NO_TOKENS:
+            label_int = 0
+        else:
+            return LabelValidation(ok=False, reason=f"bad_label={label!r}")
+    else:
         return LabelValidation(ok=False, reason=f"bad_label={label!r}")
-    label_int = int(bool(label)) if isinstance(label, bool) else int(label)
-    if label_int not in (0, 1):
-        return LabelValidation(ok=False, reason=f"label_out_of_range={label_int}")
     evidence = obj.get("evidence", "")
     if not isinstance(evidence, str):
         return LabelValidation(ok=False, reason=f"evidence_not_str={type(evidence).__name__}")
@@ -256,7 +270,7 @@ def main() -> int:
     parser.add_argument("--prefer", type=str, default="deepseek",
                         choices=["deepseek", "dmxapi"])
     parser.add_argument("--limit-debug", type=int, default=0,
-                        help="只跑前 N 个 task 做 debug，0 = 全量")
+                        help="只跑前 N 个 (qid, step_idx) 单元的全部 candidates 做 debug，0 = 全量")
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
 
@@ -279,7 +293,20 @@ def main() -> int:
     # --- 1. load tasks + dedup against existing output ---
     tasks = load_candidates(in_jsonl)
     if args.limit_debug > 0:
-        tasks = tasks[: args.limit_debug]
+        kept_units: set = set()
+        truncated: List[LabelTask] = []
+        for t in tasks:
+            key = (t.qid, t.step_idx)
+            if key not in kept_units:
+                if len(kept_units) >= args.limit_debug:
+                    break
+                kept_units.add(key)
+            truncated.append(t)
+        logger.info(
+            "limit_debug=%d → kept %d units, %d tasks",
+            args.limit_debug, len(kept_units), len(truncated),
+        )
+        tasks = truncated
 
     completed = load_completed_keys(out_jsonl)
     if completed:

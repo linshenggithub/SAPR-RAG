@@ -115,11 +115,26 @@ def load_hotpotqa_train(path: Path, n_samples: int, seed: int) -> List[Dict[str,
 
 
 def extract_supporting_titles(item: Dict[str, Any]) -> List[str]:
-    """从 metadata.supporting_facts 抽 unique titles，保持出现顺序。"""
+    """从 metadata.supporting_facts 抽 unique titles，保持出现顺序。
+
+    支持的 schema:
+      list[[title, sent_idx], ...]              旧 / 官方原始
+      list[{"title": ..., "sent_id": ...}, ...] 字典形式
+      {"title": [...], "sent_id": [...]}        FlashRAG_datasets columnar dict
+    """
     metadata = item.get("metadata") or {}
     facts = metadata.get("supporting_facts") or []
     seen: set = set()
     titles: List[str] = []
+
+    if isinstance(facts, dict):
+        for t in facts.get("title") or []:
+            title = str(t).strip()
+            if title and title not in seen:
+                seen.add(title)
+                titles.append(title)
+        return titles
+
     for entry in facts:
         if isinstance(entry, (list, tuple)) and entry:
             title = str(entry[0]).strip()

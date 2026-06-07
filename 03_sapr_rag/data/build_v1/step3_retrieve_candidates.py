@@ -355,9 +355,13 @@ def main() -> int:
 
     import os as _os
     idx_size_gb = _os.path.getsize(bge_index) / 1e9
-    logger.info("loading FAISS index (%.1f GB) ...", idx_size_gb)
+    use_mmap = _os.environ.get("FAISS_MMAP", "1") == "1"
+    logger.info("loading FAISS index (%.1f GB, mmap=%s) ...", idx_size_gb, use_mmap)
     t0 = time.time()
-    index = faiss.read_index(bge_index)
+    if use_mmap:
+        index = faiss.read_index(bge_index, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+    else:
+        index = faiss.read_index(bge_index)
     logger.info("FAISS loaded in %.1fs, ntotal=%d", time.time() - t0, index.ntotal)
 
     t0 = time.time()

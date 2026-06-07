@@ -1,0 +1,22 @@
+{
+  "sapr_reasoning": {
+    "file_name": "out/sft_v2_reasoning.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "sapr_evidence": {
+    "file_name": "out/sft_v2_evidence.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  }
+}

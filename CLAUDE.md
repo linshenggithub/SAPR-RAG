@@ -6,6 +6,8 @@ This project is the long-term research workspace for:
 
 > 面向复杂问答的 Agentic RAG 多步检索推理过程优化研究
 
+**新 AI / 新会话第一件事**：先读 [`docs/handoff_2026-06-07.md`](./docs/handoff_2026-06-07.md) —— 这是当前进度的最新快照（SFT 已训完到 step 1650 / LoRA 已上传 HF / 推理被开发机盘容量阻塞 / 正在扩容）。**长期设计文档（AGENTS.md / repo_overview.md / sft_dpo_plan.md）只是背景，最新状态以 handoff 为准。**
+
 When continuing work in this repository, first read `AGENTS.md`, then inspect `README.md`, `ROADMAP.md`, `MANIFEST.md`, `docs/repo_overview.md`, `docs/history.md`, `gate0/GATE0_STATUS.md`, and the task-relevant directory. Treat `AGENTS.md` as the full project operating guide and single source of truth for research positioning, paths, server rules, experiment hygiene, and writing standards.
 
 **新机器 / 新会话拉下仓库后的第一步**：先 `source config/env_3090.sh` 或 `source config/env_5090.sh`（或复制 `config/env_<host>.sh`），否则脚本会在用到外部路径时主动 `RuntimeError`。换机器流程详见 `docs/repo_overview.md` §5。

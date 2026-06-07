@@ -1,0 +1,30 @@
+# SAPR-R v1 离线数据构造管线（step2-step5）所需依赖
+# 本地从零起步：pip install -r 03_sapr_rag/requirements_v1_offline.txt
+#
+# 不包含 ReasonRAG 推理 / 训练阶段所需依赖（vllm / flashrag 等），仅覆盖：
+#   - step2/step4: DeepSeek API 调用
+#   - step3:       BGE 编码 + FAISS 检索
+#   - step5:       jsonl 拼装（纯 stdlib + numpy）
+#   - 00_prep:     HuggingFace 资产下载 + mini corpus 构建
+
+# ---- 核心 ----
+torch>=2.0
+transformers>=4.40
+sentence-transformers>=2.7
+numpy>=1.24
+
+# ---- FAISS：CPU 版即可（mini corpus 5-10k 篇，CPU 检索毫秒级）----
+# 如有 NVIDIA GPU 想加速，可改装 faiss-gpu（需要 conda）
+faiss-cpu>=1.7
+
+# ---- LLM API ----
+openai>=1.30
+requests>=2.31
+
+# ---- HuggingFace 资产下载 ----
+huggingface_hub>=0.20
+datasets>=2.18
+
+# ---- 工具 ----
+tqdm>=4.65
+orjson>=3.9

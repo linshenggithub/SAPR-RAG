@@ -34,8 +34,12 @@ wandb/
 *.faiss
 datasets/
 corpus/
+/data/
 models/
 checkpoints/
+03_sapr_rag/saves/
+03_sapr_rag/data/sft_build/out/
+03_sapr_rag/data/build_v1/out/
 
 # Local environment
 .env
@@ -50,3 +54,4 @@ env/
 .DS_Store
 .vscode/
 gate0/.env
+03_sapr_rag/.env

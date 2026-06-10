@@ -18,5 +18,17 @@
       "response": "output",
       "system": "system"
     }
+  },
+  "sapr_proguide_dpo": {
+    "file_name": "out/sapr_proguide_dpo.jsonl",
+    "formatting": "alpaca",
+    "ranking": true,
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "chosen": "chosen",
+      "rejected": "rejected",
+      "system": "system"
+    }
   }
 }

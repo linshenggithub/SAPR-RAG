@@ -15,6 +15,7 @@ BGE-base-en-v1.5 编码 query → FAISS IP 检索 wiki18_extended → 取 top-3 
 
 import argparse
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -29,7 +30,7 @@ from transformers import AutoModel, AutoTokenizer
 PROJ_ROOT = Path("/mlx_devbox/users/mayi.summer/playground/SAPR-RAG")
 
 BASE_MODEL = PROJ_ROOT / "03_sapr_rag/models/Qwen2.5-7B-Instruct"
-LORA_ADAPTER = PROJ_ROOT / "03_sapr_rag/saves/qwen2_5_7b/lora/sft"
+LORA_ADAPTER = PROJ_ROOT / "03_sapr_rag/saves/qwen2_5_7b/lora/sft/checkpoint-1650"
 
 BGE_PATH = PROJ_ROOT / "models/bge-base-en-v1.5"
 INDEX_PATH = PROJ_ROOT / "data/index/bge_extended_Flat.index"
@@ -71,14 +72,25 @@ class BGEFaissRetriever:
         self.model = AutoModel.from_pretrained(bge_path).to(device).eval()
         self.device = device
 
-        print(f"[retriever] loading FAISS index ({index_path}) ...")
+        # mmap 模式：8 个 DP 进程通过 OS page cache 共享同一份 64GB 物理 RAM
+        print(f"[retriever] loading FAISS index ({index_path}, mmap) ...")
         t0 = time.time()
-        self.index = faiss.read_index(str(index_path))
+        self.index = faiss.read_index(
+            str(index_path), faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY,
+        )
         print(f"[retriever] index loaded in {time.time()-t0:.1f}s, "
               f"n_vectors={self.index.ntotal}, dim={self.index.d}")
 
-        self.corpus_path = corpus_path
-        self._line_cache = {}  # doc_id -> {title, text}
+        # FlashRAG 风格：HF datasets 把 jsonl 转 Arrow 缓存，O(1) 随机访问
+        # 首次会扫一遍 jsonl 建 cache（~5-10 min for 14GB），后续进程共享 cache
+        print(f"[retriever] loading corpus via HF datasets ({corpus_path}) ...")
+        t0 = time.time()
+        import datasets
+        self.corpus = datasets.load_dataset(
+            "json", data_files=str(corpus_path), split="train",
+        )
+        print(f"[retriever] corpus loaded in {time.time()-t0:.1f}s, "
+              f"n_docs={len(self.corpus)}")
 
     @torch.no_grad()
     def encode(self, queries):
@@ -90,29 +102,37 @@ class BGEFaissRetriever:
         return np.ascontiguousarray(emb.cpu().numpy().astype("float32"))
 
     def search(self, query, top_k=3):
-        emb = self.encode([query])
-        scores, doc_ids = self.index.search(emb, top_k)
-        doc_ids = doc_ids[0].tolist()
-        docs = self._fetch(doc_ids)
-        return [{"title": docs[d]["title"], "text": docs[d]["text"], "score": float(s)}
-                for d, s in zip(doc_ids, scores[0]) if d in docs]
+        return self.search_batch([query], top_k=top_k)[0]
+
+    def search_batch(self, queries, top_k=3):
+        """queries -> List[List[doc]]，一次 BGE 前向 + 一次 FAISS 2D search。"""
+        if not queries:
+            return []
+        embs = self.encode(queries)
+        scores, doc_ids = self.index.search(embs, top_k)
+        results = []
+        for row_ids, row_scores in zip(doc_ids, scores):
+            row_ids = row_ids.tolist()
+            docs = self._fetch(row_ids)
+            results.append(
+                [{"title": docs[d]["title"], "text": docs[d]["text"],
+                  "score": float(s)}
+                 for d, s in zip(row_ids, row_scores) if d in docs]
+            )
+        return results
 
     def _fetch(self, doc_ids):
-        needed = [d for d in doc_ids if d >= 0 and d not in self._line_cache]
-        if needed:
-            needed_set = set(needed)
-            with open(self.corpus_path, "r", encoding="utf-8") as f:
-                for idx, line in enumerate(f):
-                    if idx in needed_set:
-                        d = json.loads(line)
-                        raw = d.get("contents", "")
-                        first = raw.split("\n", 1)[0].strip().strip('"')
-                        text = raw[len(first):].strip()[:500]
-                        self._line_cache[idx] = {"title": first, "text": text}
-                        needed_set.discard(idx)
-                        if not needed_set:
-                            break
-        return {d: self._line_cache[d] for d in doc_ids if d in self._line_cache}
+        docs = {}
+        for d in doc_ids:
+            if d < 0:
+                continue
+            item = self.corpus[int(d)]
+            raw = item.get("contents", "") or ""
+            parts = raw.split("\n", 1)
+            first = parts[0].strip().strip('"')
+            text = (parts[1] if len(parts) > 1 else "").strip()[:500]
+            docs[d] = {"title": first, "text": text}
+        return docs
 
 
 # ─────────── prompt 拼装 ───────────
@@ -171,26 +191,32 @@ class VLLMBackend:
     def __init__(self, base_model, lora_path, max_model_len, gpu_memory_utilization,
                  max_lora_rank=16):
         from vllm import LLM, SamplingParams
-        from vllm.lora.request import LoRARequest
 
         self._SamplingParams = SamplingParams
+        # lora_path=None -> zero-shot，纯 backbone，不挂 LoRA
+        self.use_lora = lora_path is not None
         self.llm = LLM(
             model=str(base_model),
-            enable_lora=True,
+            enable_lora=self.use_lora,
             max_lora_rank=max_lora_rank,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
             dtype="bfloat16",
+            enable_prefix_caching=True,
         )
-        self.lora_request = LoRARequest("sapr_sft", 1, str(lora_path))
+        if self.use_lora:
+            from vllm.lora.request import LoRARequest
+            self.lora_request = LoRARequest("sapr_sft", 1, str(lora_path))
+        else:
+            self.lora_request = None
 
-    def chat(self, system, user, sampling, stop):
+    def chat(self, system, user, sampling, stop, max_tokens=None):
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
         sp = self._SamplingParams(
-            max_tokens=sampling["max_tokens"],
+            max_tokens=max_tokens or sampling["max_tokens"],
             temperature=sampling["temperature"],
             top_p=sampling["top_p"],
             stop=stop,
@@ -200,24 +226,47 @@ class VLLMBackend:
                             use_tqdm=False)
         return out[0].outputs[0].text
 
+    def chat_batch(self, convs, sampling, stop, max_tokens=None):
+        """convs = [(system, user), ...] -> [text, ...]，一次性喂 vllm 走 continuous batching。"""
+        if not convs:
+            return []
+        messages_list = [
+            [{"role": "system", "content": s}, {"role": "user", "content": u}]
+            for s, u in convs
+        ]
+        sp = self._SamplingParams(
+            max_tokens=max_tokens or sampling["max_tokens"],
+            temperature=sampling["temperature"],
+            top_p=sampling["top_p"],
+            stop=stop,
+        )
+        outs = self.llm.chat(messages_list, sampling_params=sp,
+                             lora_request=self.lora_request,
+                             use_tqdm=False)
+        return [o.outputs[0].text for o in outs]
+
 
 class TransformersBackend:
     def __init__(self, base_model, lora_path, device="cuda:0",
                  dtype=torch.bfloat16):
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        from peft import PeftModel
 
         print(f"[backend=transformers] loading base {base_model} ...")
         self.tokenizer = AutoTokenizer.from_pretrained(str(base_model))
         base = AutoModelForCausalLM.from_pretrained(
             str(base_model), torch_dtype=dtype,
         ).to(device).eval()
-        print(f"[backend=transformers] attaching LoRA from {lora_path} ...")
-        self.model = PeftModel.from_pretrained(base, str(lora_path)).eval()
+        if lora_path is not None:
+            from peft import PeftModel
+            print(f"[backend=transformers] attaching LoRA from {lora_path} ...")
+            self.model = PeftModel.from_pretrained(base, str(lora_path)).eval()
+        else:
+            print("[backend=transformers] ZERO-SHOT (no LoRA)")
+            self.model = base
         self.device = device
 
     @torch.no_grad()
-    def chat(self, system, user, sampling, stop):
+    def chat(self, system, user, sampling, stop, max_tokens=None):
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -227,7 +276,7 @@ class TransformersBackend:
         )
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         gen_kwargs = dict(
-            max_new_tokens=sampling["max_tokens"],
+            max_new_tokens=max_tokens or sampling["max_tokens"],
             do_sample=sampling["temperature"] > 0,
             temperature=max(sampling["temperature"], 1e-5),
             top_p=sampling["top_p"],
@@ -244,57 +293,129 @@ class TransformersBackend:
                 cut = min(cut, i + len(s))
         return text[:cut]
 
+    def chat_batch(self, convs, sampling, stop, max_tokens=None):
+        """transformers 路径退化为逐条循环，只为兼容性 sanity，不追吞吐。"""
+        return [self.chat(s, u, sampling, stop, max_tokens=max_tokens)
+                for s, u in convs]
+
 
 # ─────────── agent loop ───────────
 class SAPRAgent:
-    def __init__(self, backend, sampling, retriever, max_turns=6):
+    def __init__(self, backend, sampling, retriever, max_turns=6,
+                 evidence_max_tokens=128):
         self.backend = backend
         self.sampling = sampling
         self.retriever = retriever
         self.max_turns = max_turns
+        self.evidence_max_tokens = evidence_max_tokens
 
-    def _chat(self, system, user, stop):
-        return self.backend.chat(system, user, self.sampling, stop)
+    def _chat(self, system, user, stop, max_tokens=None):
+        return self.backend.chat(system, user, self.sampling, stop,
+                                 max_tokens=max_tokens)
 
     def run(self, question, top_k=3):
-        history = []
-        trace = []
+        return self.run_batch([question], top_k=top_k)[0]
+
+    def run_batch(self, questions, top_k=3):
+        """lockstep cohort 状态机：所有题按阶段同步推进，单阶段内 batched 喂 vllm。
+
+        返回 List[result]，每个 result 结构与单条 run 完全一致
+        （answer/history/trace[/error]）。
+        """
+        states = [{"question": q, "history": [], "trace": [],
+                   "status": "running", "result": None,
+                   "pending_query": None, "pending_docs": None}
+                  for q in questions]
+
         for turn in range(self.max_turns):
-            sys, user = build_reasoning_prompt(question, history)
-            text = self._chat(sys, user, stop=["</query>", "</answer>"])
-            # vllm 会吃掉 stop 字符串本身，补回去再 parse
-            if "</query>" not in text and "<query>" in text:
-                text += "</query>"
-            if "</answer>" not in text and "<answer>" in text:
-                text += "</answer>"
-            action = parse_action(text)
-            trace.append({"turn": turn, "stage": "reason", "out": text, "parsed": action})
+            active = [s for s in states if s["status"] == "running"]
+            if not active:
+                break
 
-            if action["type"] == "answer":
-                return {"answer": action["value"], "history": history, "trace": trace}
-            if action["type"] != "query":
-                return {"answer": None, "history": history, "trace": trace,
-                        "error": "no_query_or_answer"}
+            # ── 阶段 A：REASONING（batched）──
+            convs = [build_reasoning_prompt(s["question"], s["history"])
+                     for s in active]
+            outs = self.backend.chat_batch(
+                convs, self.sampling, stop=["</query>", "</answer>"])
+            need_retrieve = []
+            for s, text in zip(active, outs):
+                # vllm 会吃掉 stop 字符串本身，补回去再 parse
+                if "</query>" not in text and "<query>" in text:
+                    text += "</query>"
+                if "</answer>" not in text and "<answer>" in text:
+                    text += "</answer>"
+                action = parse_action(text)
+                s["trace"].append({"turn": turn, "stage": "reason",
+                                   "out": text, "parsed": action})
+                if action["type"] == "answer":
+                    s["result"] = {"answer": action["value"],
+                                   "history": s["history"], "trace": s["trace"]}
+                    s["status"] = "done"
+                elif action["type"] == "query":
+                    s["pending_query"] = action["value"]
+                    need_retrieve.append(s)
+                else:
+                    s["result"] = {"answer": None, "history": s["history"],
+                                   "trace": s["trace"],
+                                   "error": "no_query_or_answer"}
+                    s["status"] = "done"
 
-            query = action["value"]
-            docs = self.retriever.search(query, top_k=top_k)
-            trace.append({"turn": turn, "stage": "retrieve", "query": query, "docs": docs})
+            if not need_retrieve:
+                continue
 
-            sys, user = build_evidence_prompt(query, docs)
-            ev_text = self._chat(sys, user, stop=["</evidence>"])
-            if "</evidence>" not in ev_text and "<evidence>" in ev_text:
-                ev_text += "</evidence>"
-            evidence = parse_evidence(ev_text)
-            trace.append({"turn": turn, "stage": "evidence", "out": ev_text,
-                          "parsed": evidence})
+            # ── 阶段 B：RETRIEVE（batched encode + 2D FAISS）──
+            queries = [s["pending_query"] for s in need_retrieve]
+            docs_list = self.retriever.search_batch(queries, top_k=top_k)
+            for s, docs in zip(need_retrieve, docs_list):
+                s["pending_docs"] = docs
+                s["trace"].append({"turn": turn, "stage": "retrieve",
+                                   "query": s["pending_query"], "docs": docs})
 
-            history.append({"query": query, "evidence": evidence})
+            # ── 阶段 C：EVIDENCE（batched）──
+            convs = [build_evidence_prompt(s["pending_query"], s["pending_docs"])
+                     for s in need_retrieve]
+            outs = self.backend.chat_batch(
+                convs, self.sampling, stop=["</evidence>"],
+                max_tokens=self.evidence_max_tokens)
+            for s, ev_text in zip(need_retrieve, outs):
+                if "</evidence>" not in ev_text and "<evidence>" in ev_text:
+                    ev_text += "</evidence>"
+                evidence = parse_evidence(ev_text)
+                s["trace"].append({"turn": turn, "stage": "evidence",
+                                   "out": ev_text, "parsed": evidence})
+                s["history"].append({"query": s["pending_query"],
+                                     "evidence": evidence})
 
-        return {"answer": None, "history": history, "trace": trace,
-                "error": "max_turns_exceeded"}
+        # 收尾：仍 running 的题 = 超出最大轮数
+        for s in states:
+            if s["status"] == "running":
+                s["result"] = {"answer": None, "history": s["history"],
+                               "trace": s["trace"],
+                               "error": "max_turns_exceeded"}
+                s["status"] = "done"
+
+        return [s["result"] for s in states]
 
 
 # ─────────── main ───────────
+def _rewrite_clean(path):
+    """去掉文件里无法解析的行（多为被 kill 截断的末尾半行），原地重写。"""
+    good = []
+    with open(path) as f:
+        for line in f:
+            s = line.strip()
+            if not s:
+                continue
+            try:
+                json.loads(s)
+            except json.JSONDecodeError:
+                continue
+            good.append(s)
+    with open(path, "w") as f:
+        for s in good:
+            f.write(s + "\n")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--question", type=str, default=None)
@@ -303,31 +424,46 @@ def main():
     p.add_argument("--output_jsonl", type=str, default=None)
     p.add_argument("--top_k", type=int, default=3)
     p.add_argument("--max_turns", type=int, default=6)
-    p.add_argument("--max_tokens", type=int, default=512)
+    p.add_argument("--max_tokens", type=int, default=512,
+                   help="reasoning agent 单轮生成上限")
+    p.add_argument("--evidence_max_tokens", type=int, default=128,
+                   help="evidence agent 单轮生成上限（只输出一句话，128 足够）")
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_p", type=float, default=1.0)
     p.add_argument("--lora_path", type=str, default=str(LORA_ADAPTER))
+    p.add_argument("--no_lora", action="store_true",
+                   help="zero-shot：不挂 LoRA，纯 backbone 推理（4-setting 对照基准）")
     p.add_argument("--backend", type=str, default="vllm",
                    choices=["vllm", "transformers"],
                    help="vllm: 快但环境苛刻; transformers: 慢但兼容性好")
     p.add_argument("--gpu_memory_utilization", type=float, default=0.5,
                    help="仅 vllm: 占多少显存，BGE encoder 还要 ~3G")
-    p.add_argument("--max_model_len", type=int, default=4096,
-                   help="仅 vllm: KV cache 上限")
+    p.add_argument("--max_model_len", type=int, default=8192,
+                   help="仅 vllm: KV cache 上限；history 累积 + 长 evidence 时需要")
+    p.add_argument("--shard_id", type=int, default=0,
+                   help="DP 切片 id (0..num_shards-1)，本进程只跑 i%%num_shards==shard_id 的题")
+    p.add_argument("--num_shards", type=int, default=1,
+                   help="DP 切片总数")
+    p.add_argument("--cohort_size", type=int, default=0,
+                   help="批处理 cohort 大小；0=整 shard 作为一个 cohort（方案X）")
+    p.add_argument("--resume", action="store_true",
+                   help="断点续跑：读已有 output_jsonl 里完成的 id，跳过它们并以 append 追加")
     args = p.parse_args()
 
-    print(f"[main] backend={args.backend}, lora={args.lora_path}")
+    lora_path = None if args.no_lora else args.lora_path
+    print(f"[main] backend={args.backend}, "
+          f"{'ZERO-SHOT (no LoRA)' if lora_path is None else 'lora='+str(lora_path)}")
     if args.backend == "vllm":
         backend = VLLMBackend(
             base_model=BASE_MODEL,
-            lora_path=args.lora_path,
+            lora_path=lora_path,
             max_model_len=args.max_model_len,
             gpu_memory_utilization=args.gpu_memory_utilization,
         )
     else:
         backend = TransformersBackend(
             base_model=BASE_MODEL,
-            lora_path=args.lora_path,
+            lora_path=lora_path,
             device="cuda:0",
         )
 
@@ -342,6 +478,7 @@ def main():
                   "top_p": args.top_p},
         retriever=retriever,
         max_turns=args.max_turns,
+        evidence_max_tokens=args.evidence_max_tokens,
     )
 
     # 单条
@@ -354,18 +491,67 @@ def main():
     assert args.input_jsonl and args.output_jsonl, "批量需要 --input_jsonl --output_jsonl"
     with open(args.input_jsonl) as f:
         questions = [json.loads(l) for l in f]
-    with open(args.output_jsonl, "w") as fo:
-        for i, q in enumerate(questions):
+    # DP 切片：每个进程只跑自己负责的 idx
+    if args.num_shards > 1:
+        questions = [(i, q) for i, q in enumerate(questions)
+                     if i % args.num_shards == args.shard_id]
+        print(f"[shard {args.shard_id}/{args.num_shards}] 负责 {len(questions)} 条")
+    else:
+        questions = list(enumerate(questions))
+
+    # 断点续跑：读已完成 id，过滤掉；append 模式追加
+    write_mode = "w"
+    if args.resume and os.path.exists(args.output_jsonl):
+        done_ids = set()
+        with open(args.output_jsonl) as fr:
+            for line in fr:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    # 被 kill 截断的末尾半行，跳过
+                    continue
+                if "id" in rec:
+                    done_ids.add(rec["id"])
+        before = len(questions)
+        questions = [(i, q) for (i, q) in questions
+                     if (q.get("id", i)) not in done_ids]
+        write_mode = "a"
+        print(f"[shard {args.shard_id}] resume: 已完成 {len(done_ids)}，"
+              f"本 shard 剩余 {len(questions)}/{before}")
+        # 末尾若有截断半行，重写干净（去掉无法解析的最后一行）
+        _rewrite_clean(args.output_jsonl)
+
+    with open(args.output_jsonl, write_mode) as fo:
+        cohort_size = args.cohort_size if args.cohort_size > 0 else len(questions)
+        n_done = 0
+        t_start = time.time()
+        for c0 in range(0, len(questions), cohort_size):
+            cohort = questions[c0:c0 + cohort_size]
+            qs = [q["question"] for _, q in cohort]
             t0 = time.time()
-            res = agent.run(q["question"], top_k=args.top_k)
-            res["id"] = q.get("id", i)
-            res["question"] = q["question"]
-            res["gold"] = q.get("answer") or q.get("golden_answers")
-            res["latency_s"] = round(time.time() - t0, 2)
-            fo.write(json.dumps(res, ensure_ascii=False) + "\n")
+            try:
+                results = agent.run_batch(qs, top_k=args.top_k)
+            except Exception as e:
+                # cohort 级容错：整批失败仍落盘，不丢已完成的其它 cohort
+                results = [{"answer": None, "history": [], "trace": [],
+                            "error": f"exception: {type(e).__name__}: {e}"}
+                           for _ in cohort]
+            dt = time.time() - t0
+            for (orig_i, q), res in zip(cohort, results):
+                res["id"] = q.get("id", orig_i)
+                res["question"] = q["question"]
+                res["gold"] = q.get("answer") or q.get("golden_answers")
+                res["latency_s"] = round(dt / max(len(cohort), 1), 2)  # cohort 均摊
+                fo.write(json.dumps(res, ensure_ascii=False) + "\n")
             fo.flush()
-            print(f"[{i+1}/{len(questions)}] {res['latency_s']:.1f}s "
-                  f"answer={res.get('answer')}")
+            n_done += len(cohort)
+            tput = n_done / max(time.time() - t_start, 1e-6)
+            print(f"[shard {args.shard_id}] cohort {c0}-{c0+len(cohort)-1} "
+                  f"done in {dt:.1f}s | {n_done}/{len(questions)} "
+                  f"| {tput:.2f} q/s", flush=True)
 
 
 if __name__ == "__main__":

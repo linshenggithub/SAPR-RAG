@@ -32,6 +32,28 @@ def em_score(pred, golds):
     return float(any(p == normalize_answer(g) for g in golds))
 
 
+def _tokens_contain(hay_toks, needle_toks):
+    """needle_toks 作为连续子序列出现在 hay_toks 中（token 级，避免 no 命中 not）"""
+    if not needle_toks:
+        return False
+    n, m = len(hay_toks), len(needle_toks)
+    for i in range(n - m + 1):
+        if hay_toks[i:i + m] == needle_toks:
+            return True
+    return False
+
+
+def cover_em_score(pred, golds):
+    """cover-EM / acc：normalize 后 gold 作为连续 token 子序列出现在 pred 中。
+    针对 SFT 长句答案的标准口径（与 ReasonRAG/FlashRAG 对齐）。"""
+    p_toks = normalize_answer(pred).split()
+    for g in golds:
+        g_toks = normalize_answer(g).split()
+        if g_toks and _tokens_contain(p_toks, g_toks):
+            return 1.0
+    return 0.0
+
+
 def f1_score(pred, golds):
     p_toks = normalize_answer(pred).split()
     best = 0.0
@@ -57,6 +79,7 @@ def evaluate(results):
     n_answered = 0
     n_max_turns = 0
     em_sum = 0.0
+    cover_em_sum = 0.0
     f1_sum = 0.0
     turns_sum = 0
     empty_ev_count = 0
@@ -75,6 +98,7 @@ def evaluate(results):
         if pred is not None:
             n_answered += 1
             em_sum += em_score(pred, gold)
+            cover_em_sum += cover_em_score(pred, gold)
             f1_sum += f1_score(pred, gold)
 
         # turns / evidence 行为指标
@@ -93,6 +117,7 @@ def evaluate(results):
         "n_max_turns_exceeded": n_max_turns,
         # 答案质量（分母 = 全部题，不是 n_answered，因为 None 计 0 分）
         "em": round(em_sum / n, 4) if n else 0.0,
+        "cover_em": round(cover_em_sum / n, 4) if n else 0.0,
         "f1": round(f1_sum / n, 4) if n else 0.0,
         # 行为指标
         "avg_turns": round(turns_sum / n, 3) if n else 0.0,

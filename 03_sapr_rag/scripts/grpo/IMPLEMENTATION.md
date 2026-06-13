@@ -232,7 +232,49 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 swift rlhf \
 
 ---
 
-## §8 开放项与风险
+## §8 已知问题与踩坑记录
+
+### 8.1 vLLM rollout 500 错误：多轮 RAG prompt 超长导致 max_tokens 为负数
+
+**现象**（v4-formatfix, step 234/1220, 训练 35h 后崩）：
+
+```
+rollout 日志：
+  ValueError: max_tokens must be at least 1, got -366.
+  INFO: 127.0.0.1:46996 - "POST /infer/" HTTP/1.1 500 Internal Server Error
+
+训练日志：
+  RuntimeError: Multiple errors: [Exception('Server 0 failed: 500, Internal Server Error')]
+```
+
+**根因链**：
+1. 多轮 RAG 每轮检索到的 evidence 会追加到 prompt 中，轮数越多 prompt 越长
+2. 某次请求的 prompt token 数超过 `vllm_max_model_len=8192`
+3. vLLM 计算 `max_tokens = max_model_len - num_tokens` 得到负数（-366）
+4. `SamplingParams._verify_args()` 校验失败抛 `ValueError`
+5. rollout server 返回 500 → 训练端收到后抛 `RuntimeError` → 全进程退出
+
+**调用栈**：
+```
+vllm_engine.py:874 infer_async()
+  → vllm_engine.py:521 _prepare_generation_config()
+    → vllm/sampling_params.py:353 __post_init__()
+      → vllm/sampling_params.py:408 _verify_args()
+        → ValueError: max_tokens must be at least 1, got -366.
+```
+
+**修复方向**：
+- 增大 `vllm_max_model_len`（如 16384），代价是 KV cache 利用率下降
+- 限制 `max_turns` 更小（当前 6），减少上下文累积
+- 在 scheduler 中对 prompt 做 token 截断（保留 system + 最近 N 轮）
+
+### 8.2 SaprFormatORM 原始实现 bug
+
+原实现检查整个 completion 中**不能有任何** `<query>` 标签，导致正常多轮 RAG 轨迹（前序轮有 `<query>`，末轮以 `<answer>` 结束）被误判为格式非法。修复为：只要求最后一个协议标签是非空 `<answer>`。详见 v4-formatfix 的 plugin.py 改动。
+
+---
+
+## §9 开放项与风险
 
 - **evidence 是否单独受训**：首版方案 A 不训（对齐评估口径风险最低），sanity 后视效果升方案 B。
 - **vllm 版本**：当前 0.10.0，ms-swift 4.4 推荐更高 → 1A 决策"先试跑踩坑再升"。

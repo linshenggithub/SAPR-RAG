@@ -1,7 +1,7 @@
 # SAPR-RAG 中期实验结果
 
-**最后更新**：2026-06-09
-**状态**：进行中（5 个实验中 #1 #2 已出 HotpotQA 结果）
+**最后更新**：2026-06-13
+**状态**：进行中（#1/#2/#4 已完成三数据集评测；#5 GRPO v4-formatfix ckpt-175 已完成三数据集评测与 LLM-judge）
 
 ---
 
@@ -11,11 +11,11 @@
 
 | # | Setting | 起点 | 算法 | 训练数据 | 状态 |
 |---|---|---|---|---|---|
-| 1 | Zeroshot | Qwen2.5-7B-Instruct | — | — | ✅ HotpotQA |
-| 2 | SFT | Qwen2.5-7B-Instruct | LoRA SFT | R3-RAG cold-start (178k, HotpotQA+2Wiki+MuSiQue) | ✅ HotpotQA |
+| 1 | Zeroshot | Qwen2.5-7B-Instruct | — | — | ✅ 三数据集 |
+| 2 | SFT | Qwen2.5-7B-Instruct | LoRA SFT | R3-RAG cold-start (178k, HotpotQA+2Wiki+MuSiQue) | ✅ 三数据集 |
 | 3 | DPO (no SFT) | Qwen2.5-7B-Instruct | 全参 DPO | RAG-ProGuide (5k, HotpotQA+2Wiki) | ⏳ 待训 |
-| 4 | SFT + DPO | SFT ckpt | DPO over SFT | RAG-ProGuide (5k) | ⏳ 待训 |
-| 5 | SFT + GRPO | SFT ckpt | GRPO + 三 reward | HotpotQA 子集 2k + 在线 reward | ⏳ 训练中（W-A） |
+| 4 | SFT + DPO | SFT ckpt | DPO over SFT | RAG-ProGuide (5k) | ✅ 三数据集 |
+| 5 | SFT + GRPO | SFT ckpt | GRPO + 三 reward | HotpotQA 子集 2k + 在线 reward | ✅ ckpt-175 三数据集已评测 |
 
 **评估指标**：
 - **`cover_em`（主指标）**：归一化 gold 是否作为连续 token 子序列出现在预测里（对齐 ReasonRAG / R3-RAG / Search-R1 论文口径）
@@ -66,12 +66,15 @@
 | **#2 SFT** | 7405 | **0.507** | **0.607** | 0.097 | 0.263 | 2.51 | 10.7% | 21.3% |
 | #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
 | **#4 SFT + DPO** | 7405 | **0.469** | **0.606** | **0.401** | **0.523** | **2.15** | **3.4%** | 26.2% |
-| #5 SFT + GRPO | — | — | — | — | — | — | — | — |
+| **#5 SFT + GRPO (ckpt-125)** | 7405 | **0.5080** | **0.6109** | 0.1086 | 0.2742 | 2.50 | 10.7% | 21.2% |
+| **#5 SFT + GRPO (ckpt-175)** | 7405 | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.48 | 10.4% | 21.5% |
 
 **产物路径**：
 - #1 [zeroshot_20260608_193355/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/zeroshot_20260608_193355/metrics.json)
 - #2 [20260608_175824/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/20260608_175824/metrics.json)
 - #4 [sft_dpo_20260610_145349/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/sft_dpo_20260610_145349/metrics.json)
+- #5 ckpt-125 [grpo_v4_ckpt125_20260612_115852/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/grpo_v4_ckpt125_20260612_115852/metrics.json)
+- #5 ckpt-175 [grpo_v4_ckpt175_20260613_113015/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/grpo_v4_ckpt175_20260613_113015/metrics.json)
 
 ### 关键观察（HotpotQA）
 
@@ -260,18 +263,18 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 - 所以 **#4 vs #5 的差异既有"算法差异"也有"数据差异"**
 - 处理：HotpotQA 没有现成可在线评估的 reward signal，所以只能用各自最适合的数据。**评估口径统一为 HotpotQA dev cover_em**，下游公平；训练数据各取所长是现实约束。在报告里直接陈述这个 trade-off，不掩盖。
 
-**P2.4 GRPO 子集 2000 条 vs 全量 7321 条**
-- 1 周 deadline 内全量 1 epoch 训不完（按当前速度需 ~100h）
-- 子集 2000 条选自 SFT 训练集随机采样（待执行）
-- 风险：子集训练的 GRPO 可能未充分收敛，cover_em 数字偏保守
-- 处理：报告中明确标注"#5 在 2k 子集 1 epoch 上的初步结果"，不与 #2 SFT (用全量) 直接画"训练数据量对等"的等号
+**P2.4 GRPO 训练数据量与 SFT/DPO 不对等**
+- 当前 v4-formatfix 使用 HotpotQA GRPO 训练集 7321 条，从 SFT ckpt-1650 继续训练
+- 训练在 global_step=234/1220 因 rollout prompt 超长崩溃，尚未跑满 1 epoch
+- 风险：GRPO ckpt-175 是中间 checkpoint，数字偏保守，且与 #2 SFT / #4 SFT+DPO 的训练数据量和数据来源不完全对等
+- 处理：报告中明确标注"#5 是 GRPO 中间 checkpoint 的初步结果"，不与 #2/#4 画"训练数据完全对等"的等号
 
 **🟢 P3 轻度（实现层细节，不影响主结论）**
 
-**P3.1 GRPO SaprFormatORM 当前 0.0 死信号**
-- Sanity 16 步全部样本 format reward = 0，权重 0.05 几乎不起作用
-- 根因：判据"末轮 completion 含且仅含 `<answer>`"过严；多轮拼接时末轮往往不是终止轮
-- 处理：D1 修宽松判据（"任一轮含合法 `<answer>`"），重跑 sanity 验证
+**P3.1 GRPO SaprFormatORM 原始实现 bug（已修复）**
+- 原问题：旧规则要求 completion 中不能出现任何 `<query>`，误伤正常多轮 RAG 轨迹
+- 修复：允许前序 `<query>`，只要求最后一个协议标签是非空 `<answer>`
+- 验证：旧 completions 离线重算通过率从 2.41% 提升到 51.89%，v4-formatfix 训练中 Format reward 稳定在 0.5-0.8
 
 **P3.2 SaprRelevanceORM 的 reward hacking 风险**
 - 已识别 5 条潜在路径：(a) 答案文本塞进 query；(b) 复述题目；(c) 钻 doc 长正文漏洞 等
@@ -407,7 +410,7 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 
 ---
 
-## 3. 2Wiki dev 结果（部分已出）
+## 3. 2Wiki dev 结果（已出）
 
 12576 题。`MAX_MODEL_LEN=4096 STAGGER_SEC=5 COHORT_SIZE=64`；中途断开过一次，用 `RESUME_DIR` 续跑完成。
 
@@ -417,9 +420,9 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 | **#2 SFT** | 12576 | **0.4488** | **0.4431** | 0.1018 | 0.2515 | 3.58 | 27.9% | 35.8% |
 | #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
 | **#4 SFT + DPO** | 12576 | **0.4452** | **0.4705** | **0.3915** | **0.4688** | **3.26** | **17.3%** | 41.5% |
-| #5 SFT + GRPO | — | — | — | — | — | — | — | — |
+| **#5 SFT + GRPO (ckpt-175)** | 12576 | **0.4573** | **0.4528** | 0.1169 | 0.2693 | 3.51 | 26.2% | **34.3%** |
 
-**产物路径**：#1 [zeroshot_20260609_184744/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/zeroshot_20260609_184744/metrics.json) · #2 [sft_20260609_232951/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_20260609_232951/metrics.json) · #4 [sft_dpo_20260610_155526/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_dpo_20260610_155526/metrics.json)
+**产物路径**：#1 [zeroshot_20260609_184744/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/zeroshot_20260609_184744/metrics.json) · #2 [sft_20260609_232951/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_20260609_232951/metrics.json) · #4 [sft_dpo_20260610_155526/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_dpo_20260610_155526/metrics.json) · #5 [grpo_v4_ckpt175_20260613_113418/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/grpo_v4_ckpt175_20260613_113418/metrics.json)
 
 ### 关键观察（2Wiki）
 
@@ -452,7 +455,7 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 
 ---
 
-## 4. MuSiQue dev 结果（部分已出）
+## 4. MuSiQue dev 结果（已出）
 
 2417 题。MuSiQue 没有 `supporting_facts` 字段（用 `question_decomposition` 替代），**仅报答案指标**（与 ReasonRAG 论文一致），不报检索召回。
 
@@ -462,9 +465,9 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 | **#2 SFT** | 2417 | **0.1911** | **0.2081** | 0.0492 | 0.1205 | 3.89 | 33.4% | 31.1% |
 | #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
 | **#4 SFT + DPO** | 2417 | **0.2069** | **0.2462** | **0.1667** | **0.2477** | 3.28 | **16.9%** | 42.9% |
-| #5 SFT + GRPO | — | — | — | — | — | — | — | — |
+| **#5 SFT + GRPO (ckpt-175)** | 2417 | **0.1986** | **0.2131** | 0.0571 | 0.1303 | 3.83 | 32.8% | **30.2%** |
 
-**产物路径**：#1 [zeroshot_20260609_173552/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/zeroshot_20260609_173552/metrics.json) · #2 [sft_20260610_112233/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_20260610_112233/metrics.json) · #4 [sft_dpo_20260610_142115/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_dpo_20260610_142115/metrics.json)
+**产物路径**：#1 [zeroshot_20260609_173552/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/zeroshot_20260609_173552/metrics.json) · #2 [sft_20260610_112233/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_20260610_112233/metrics.json) · #4 [sft_dpo_20260610_142115/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_dpo_20260610_142115/metrics.json) · #5 [grpo_v4_ckpt175_20260613_113944/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/grpo_v4_ckpt175_20260613_113944/metrics.json)
 
 ### 关键观察（MuSiQue）
 
@@ -502,101 +505,97 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 - **HotpotQA / MuSiQue 上 SFT 的 EM 反向下降**（虽然 cover_em 翻倍）——这是 EM 局限性的 **3 个数据集中 2 个独立证据**，强烈支撑报告主指标切换至 cover_em + LLM-judge（§2.5 P1.1 / §2.6）。
 - **2Wiki 增益最大（4×），MuSiQue 增益最小（2×）**：SFT 能很好处理多跳关系链，但难以拟合 MuSiQue 的 4 跳问题分解结构，这正是 GRPO 应当主攻的方向。
 
+### 三数据集后训练对照（SFT / SFT+DPO / SFT+GRPO ckpt-175）
+
+ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数据集完整评测与 LLM-judge 已完成。
+
+| 数据集 | Setting | **cover_em** | **llm_acc_deepseek** | EM | F1 | avg_turns | max_turns_rate | empty_evidence_rate |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| HotpotQA | SFT | 0.5070 | **0.6073** | 0.0971 | 0.2634 | 2.513 | 10.7% | 21.3% |
+| HotpotQA | SFT+DPO | 0.4693 | 0.6062 | **0.4008** | **0.5233** | **2.151** | **3.4%** | 26.2% |
+| HotpotQA | GRPO ckpt-125 | 0.5080 | **0.6109** | 0.1086 | 0.2742 | 2.496 | 10.7% | **21.2%** |
+| HotpotQA | **GRPO ckpt-175** | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.475 | 10.4% | 21.5% |
+| 2Wiki | SFT | 0.4488 | 0.4431 | 0.1018 | 0.2515 | 3.577 | 27.9% | 35.8% |
+| 2Wiki | SFT+DPO | 0.4452 | **0.4705** | **0.3915** | **0.4688** | **3.255** | **17.3%** | 41.5% |
+| 2Wiki | **GRPO ckpt-175** | **0.4573** | 0.4528 | 0.1169 | 0.2693 | 3.510 | 26.2% | **34.3%** |
+| MuSiQue | SFT | 0.1911 | 0.2081 | 0.0492 | 0.1205 | 3.885 | 33.4% | 31.1% |
+| MuSiQue | SFT+DPO | **0.2069** | **0.2462** | **0.1667** | **0.2477** | **3.278** | **16.9%** | 42.9% |
+| MuSiQue | GRPO ckpt-175 | 0.1986 | 0.2131 | 0.0571 | 0.1303 | 3.828 | 32.8% | **30.2%** |
+
+**GRPO ckpt-175 初步结论**：
+- **HotpotQA**：ckpt-175 相比 SFT 的 cover_em 基本持平（0.5070→0.5082），LLM-acc 小幅领先 SFT/SFT+DPO（0.6082 vs 0.6073/0.6062），但略低于 ckpt-125（0.6109）。说明 GRPO 对 HotpotQA 有真实但很小的事实正确率收益，ckpt-125/175 差距在 0.3pt 内。
+- **2Wiki**：GRPO ckpt-175 是当前 cover_em 最优（0.4573），比 SFT +0.85pt、比 SFT+DPO +1.21pt；LLM-acc 为 0.4528，高于 SFT（0.4431）但低于 SFT+DPO（0.4705）。说明 GRPO 的 cover_em/证据质量收益没有完全转化为 LLM-judge 事实正确率最优。
+- **MuSiQue**：GRPO ckpt-175 高于 SFT（cover_em 0.1986 vs 0.1911；LLM-acc 0.2131 vs 0.2081），但低于 SFT+DPO（cover_em 0.2069；LLM-acc 0.2462）。这符合训练数据预期：GRPO 阶段未使用 MuSiQue reward 数据，跨到 MuSiQue 的泛化收益有限。
+- **指标风格差异仍存在**：SFT+DPO 在 EM/F1 上遥遥领先，主要来自简洁答案风格；GRPO 更接近 SFT 的长答案风格，因此 cover_em/LLM-judge 更适合判断其真实收益。
+
 ---
 
-## 5. GRPO 训练曲线（#5，进行中）
+## 5. GRPO 训练与评测（#5，v4-formatfix）
 
 ### 5.1 配置
 
 | 配置项 | 值 |
 |---|---|
 | 起点 | SFT ckpt-1650（继承多轮 RAG 协议）|
-| 训练数据 | HotpotQA + 2Wiki 混合 7320 题（50/50） |
+| 训练数据 | HotpotQA 训练子集（`data/grpo/hotpotqa_train.jsonl`） |
 | 框架 | ms-swift 4.4 GRPO（vLLM rollout server 模式）|
 | 卡分配 | GPU0-5 训练 / GPU6 rollout / GPU7 检索 daemon |
 | reward 函数 | `SaprF1ORM`(w=1.0) + `SaprRelevanceORM`(w=0.2) + `SaprFormatORM`(w=0.05) |
 | 关键超参 | per_device_bs=2, num_generations=8, grad_accum=4, lr=1e-6, max_completion_length=8192, max_turns=6 |
 | 总步数 | 1220（1 epoch）|
-| 节奏 | save_steps=25（48 个 ckpt 全保留）|
+| 节奏 | save_steps=25，评测 ckpt-125 / ckpt-175 |
 
-### 5.2 Sanity 阶段（v1，100 条数据，max_steps=16，已完成）
+### 5.2 格式 reward 修复
 
-100 条小数据 sanity 跑通整条链路：reward 0.21→0.32（震荡上行），reward_std 0.08-0.17 持续非零，frac_reward_zero_std 从 42% 降到 8-25%，sapr_relevance/mean 0.69→0.83（+20%），证明 advantage 信号有效。`SaprFormatORM` 全 0 —— 末轮触发条件过严，待修。
+v3 训练中 `SaprFormatORM` 长期接近 0，根因是旧实现要求 completion 中不能出现任何 `<query>`，误伤了正常多轮 RAG 轨迹（前序轮 `<query>`，末轮 `<answer>`）。v4-formatfix 已修复为：允许前序 `<query>`，只要求最后一个协议标签是非空 `<answer>`。
 
-完整 16 步日志见 [v1-20260609-160142/logging.jsonl](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/grpo/v1-20260609-160142/logging.jsonl)。
+离线重算旧 completions 的 format 通过率：
+- 旧规则：2.41%（74/3072）
+- 新规则：51.89%（1594/3072）
+- 提升：+49.48pp
 
-### 5.3 全量训练（v3，进行中，step 52/1220 ≈ 4.3%）
+### 5.3 v4-formatfix 训练进展与崩溃原因
 
-启动时间 2026-06-10 10:58，已运行 ~8h，按当前节奏预计还需 **80h（3 天多）**才能跑完。中间产物 ckpt-25 已落盘，ckpt-50 即将出。
+v4-formatfix 从 SFT LoRA 重新起训，已保存 ckpt-25/50/75/100/125/150/175/200/225。训练在 global_step=234/1220 崩溃，最后有效 checkpoint 为 ckpt-225；评测优先选择 reward 峰值附近的 ckpt-175。
 
-#### 训练曲线
+**训练 reward 走势（按 global step 分组）**：
 
-![GRPO v3 训练曲线](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/grpo/v3-20260610-105844/training_curves.png)
+| step | reward | F1 | Format | Relevance | KL |
+|---:|---:|---:|---:|---:|---:|
+| 1-39 | 0.2809 | 0.1182 | 0.5229 | 0.6824 | 0.815 |
+| 41-79 | 0.3007 | 0.1392 | 0.5240 | 0.6762 | 0.867 |
+| 81-119 | 0.3144 | 0.1421 | 0.6437 | 0.7008 | 0.823 |
+| 121-159 | **0.3429** | **0.1646** | **0.6536** | **0.7279** | 0.798 |
+| 161-199 | 0.3403 | **0.1647** | 0.6495 | 0.7158 | 0.802 |
+| 201-233 | 0.3103 | 0.1407 | 0.6005 | 0.6981 | 0.864 |
 
-四面板含义：
-- **左上 reward 组件**：total reward + 三个分量（f1/relevance/format）
-- **右上 advantage 信号**：reward_std + frac_reward_zero_std
-- **左下 KL & turns**：策略漂移量 + 多轮行为
-- **右下 completion_length**：输出长度，反映探索行为
+**checkpoint 选择**：ckpt-175 落在 reward 峰值/平台区间，ckpt-200 基本持平，ckpt-225 已进入回落区间。因此三数据集评测以 ckpt-175 为主。
 
-#### 当前健康度（截至 step 52）
+**崩溃原因**：
+```
+ValueError: max_tokens must be at least 1, got -366.
+RuntimeError: Multiple errors: [Exception('Server 0 failed: 500, Internal Server Error')]
+```
 
-| 指标 | step 1（早期）| **step 51（最新）** | 趋势 | 判断 |
-|---|---:|---:|---|---|
-| **reward** | 0.268 | **0.162** | ⬇️ -40% | ⚠️ 偏低（值得监控）|
-| reward_std | 0.247 | 0.134 | ⬇️ 收窄 | ⚠️ advantage 空间被压缩 |
-| frac_reward_zero_std | 0.00 | 0.25 | ⬆️ | 25% 的 prompt 失去学习信号 |
-| sapr_f1/mean | 0.071 | ~0.15 平均 | 持平 | 正常 |
-| **sapr_relevance/mean** | 0.646 | **0.406** | ⬇️ -37% | ⚠️ 检索质量下降 |
-| **sapr_format/mean** | 0.000 | ~0.02 | 几乎 0 | 🔴 **死信号**（同 sanity 阶段，待修）|
-| kl | 0.74 | 0.72 | 平稳 | ✅ 没有"跑飞" |
-| num_turns | 4.99 | 5.00 | 持平 | 行为模式稳定 |
-| completion_length | 203 | 295 | ⬆️ 不稳 | 模型在探索更长输出 |
+根因是多轮 RAG 的 prompt 随检索 evidence 累积，某次请求超过 `vllm_max_model_len=8192`，vLLM 计算出的 `max_tokens = max_model_len - num_tokens` 变成负数，rollout server 返回 500，训练端随之退出。后续若继续训练，需要提高 `vllm_max_model_len`、降低 `max_turns`，或在 scheduler 里做 token 截断。
 
-#### 关键观察与诊断
+### 5.4 ckpt-175 下游评测结论
 
-1. **reward / sapr_relevance 双下降**：两个指标都持续下降，且趋势同步（相关性高），说明模型不是在"为奖励 hack relevance"，而是 **policy 真的在 relevance 指标上变差**。可能机制：
-   - lr=1e-6 + warmup 在 step 60 左右达峰，权重大幅探索期，相对 SFT 起点出现"暂时性退化"；
-   - 混合数据（HotpotQA 2 跳 + 2Wiki 多跳）的 reward landscape 有冲突，policy 在两类策略间摇摆。
-2. **kl 没爆**（一直 < 1.2）：策略漂移在控制范围内，**不是失控崩溃**，是受控震荡。
-3. **format reward 死信号**：50 步过去 SaprFormatORM/mean 仍 ~0，权重 0.05 几乎不起作用——印证 §2.5 P3.1 已识别的问题。考虑训练完成后再用更宽松判据重训。
-4. **advantage 信号尚可用**：reward_std 仍 > 0.1，frac_reward_zero_std < 30%，每个 step 仍有约 75% 的 prompt 能产生学习梯度。如果继续恶化（rstd→0、fzs→1），则进入"死亡螺旋"，需立即介入。
-
-#### 中间评估的取舍
-
-> 是否现在用 ckpt-25 / ckpt-50 跑下游评估？**结论：暂不评估**。
-
-理由：
-- **step 51 reward 处于局部低点**（0.16 vs 早期 0.27），ckpt-50 大概率比 SFT 起点 cover_em 更低，无诊断价值；
-- 30 分钟的 MuSiQue 评估只会带来"GRPO 是否在退化"的焦虑，不解决根因；
-- **替代方案**：等 ckpt-100 / ckpt-200 出现，看 reward 是否反弹；如反弹证明这是早期震荡而非趋势性下降，那时再做评估更有意义。
-
-#### 监控计划与触发条件
-
-| 监控点 | 触发动作 |
-|---|---|
-| step 100（约 +18h）| 看 reward 是否反弹回 0.25+；若是则继续，若否则准备介入 |
-| step 200（约 +36h）| 第一次中间评估（MuSiQue 2417 题，30min）|
-| step 400 / 800 / 1200 | 各自评估一次，画 cover_em vs step 学习曲线 |
-| reward < 0.10 持续 10+ steps | **紧急介入**：暂停训练，重启 rollout、检查 lr / KL 系数 |
-| sapr_relevance < 0.3 持续 10+ steps | reward hacking 嫌疑，检查 trace |
-| frac_reward_zero_std > 0.7 持续 10+ steps | advantage 死亡，需重启或调温度 |
-
-#### 待办
-
-- [ ] step 100 后再次审视曲线，决定是否继续
-- [ ] 训练完成后写中间 ckpt 学习曲线（cover_em vs step）作为报告核心可视化
-- [ ] 修 `SaprFormatORM` 末轮判据（§2.5 P3.1）后用 ckpt-1220 做一次 ablation 对比
+ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测和 LLM-judge。核心结论见 §4 后的"三数据集后训练对照"：
+- HotpotQA：cover_em 与 SFT 持平，LLM-acc 小幅高于 SFT/SFT+DPO。
+- 2Wiki：cover_em 达到当前最优 0.4573，LLM-acc 高于 SFT 但低于 SFT+DPO。
+- MuSiQue：cover_em 与 LLM-acc 均高于 SFT，但低于 SFT+DPO，符合 GRPO 未在 MuSiQue 上训练的预期。
 
 ---
 
 ## 6. 待办
 
-- [ ] 修 SaprFormatORM 判据（看 `--log_completions` 真实末轮样本后改宽松条件）
-- [ ] 切 GRPO 子集 2000 条，启动 W-A 全量训练
-- [ ] W-B 跑 #1 #2 在 2Wiki / MuSiQue 上的评估
-- [ ] D2 启动 #3 DPO（论文同款 LLaMA-Factory 配置）+ #4 SFT+DPO
-- [ ] D5 评估 #5 GRPO ckpt
-- [ ] **写 LLM-judge 评估脚本**（DeepSeek API + 标准 judge prompt + cache + 100 题人工核对）→ 5 ckpt × 3 数据集打分
+- [x] 修 SaprFormatORM 判据，并离线重算旧 completions 的新旧 format 通过率
+- [x] 完成 #1/#2/#4 在 HotpotQA / 2Wiki / MuSiQue 三数据集评测
+- [x] 完成 #5 GRPO v4-formatfix ckpt-125 HotpotQA 评测 + LLM-judge
+- [x] 完成 #5 GRPO v4-formatfix ckpt-175 HotpotQA / 2Wiki / MuSiQue 三数据集评测
+- [x] 写 LLM-judge 评估脚本（DeepSeek API + 标准 judge prompt + cache）
+- [x] 补跑 #5 GRPO ckpt-175 三数据集 LLM-judge，验证 cover_em 增益是否转化为事实正确率
+- [ ] 抽样 100 题做 case study，分析 SFT / SFT+DPO / GRPO 的输出风格差异
 - [ ] D6 汇总数字 + 画图
 - [ ] D7 写中期报告正文 + OPD 后续计划

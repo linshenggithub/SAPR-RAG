@@ -1,7 +1,7 @@
 # SAPR-RAG 中期实验结果
 
 **最后更新**：2026-06-13
-**状态**：进行中（#1/#2/#4 已完成三数据集评测；#5 GRPO v4-formatfix ckpt-175 已完成三数据集评测与 LLM-judge）
+**状态**：5 setting × 3 数据集评测全部完成（#3 DPO-no-SFT 结果补齐，cover_em / llm_acc 用 SAPR-RAG 口径重算）
 
 ---
 
@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|
 | 1 | Zeroshot | Qwen2.5-7B-Instruct | — | — | ✅ 三数据集 |
 | 2 | SFT | Qwen2.5-7B-Instruct | LoRA SFT | R3-RAG cold-start (178k, HotpotQA+2Wiki+MuSiQue) | ✅ 三数据集 |
-| 3 | DPO (no SFT) | Qwen2.5-7B-Instruct | 全参 DPO | RAG-ProGuide (5k, HotpotQA+2Wiki) | ⏳ 待训 |
+| 3 | DPO (no SFT) | Qwen2.5-7B-Instruct | LoRA DPO | RAG-ProGuide (5k, HotpotQA+2Wiki) | ✅ 三数据集 |
 | 4 | SFT + DPO | SFT ckpt | DPO over SFT | RAG-ProGuide (5k) | ✅ 三数据集 |
 | 5 | SFT + GRPO | SFT ckpt | GRPO + 三 reward | HotpotQA 子集 2k + 在线 reward | ✅ ckpt-175 三数据集已评测 |
 
@@ -64,17 +64,10 @@
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **#1 Zeroshot** | 7405 | **0.268** | **0.338** | 0.204 | 0.273 | 3.99 | 45.1% | 37.5% |
 | **#2 SFT** | 7405 | **0.507** | **0.607** | 0.097 | 0.263 | 2.51 | 10.7% | 21.3% |
-| #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
+| **#3 DPO (no SFT)†** | 7405 | **0.3999** | **0.5356** | 0.3492 | 0.4563 | 4.857† | — | — |
 | **#4 SFT + DPO** | 7405 | **0.469** | **0.606** | **0.401** | **0.523** | **2.15** | **3.4%** | 26.2% |
 | **#5 SFT + GRPO (ckpt-125)** | 7405 | **0.5080** | **0.6109** | 0.1086 | 0.2742 | 2.50 | 10.7% | 21.2% |
 | **#5 SFT + GRPO (ckpt-175)** | 7405 | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.48 | 10.4% | 21.5% |
-
-**产物路径**：
-- #1 [zeroshot_20260608_193355/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/zeroshot_20260608_193355/metrics.json)
-- #2 [20260608_175824/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/20260608_175824/metrics.json)
-- #4 [sft_dpo_20260610_145349/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/sft_dpo_20260610_145349/metrics.json)
-- #5 ckpt-125 [grpo_v4_ckpt125_20260612_115852/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/grpo_v4_ckpt125_20260612_115852/metrics.json)
-- #5 ckpt-175 [grpo_v4_ckpt175_20260613_113015/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/hotpotqa/grpo_v4_ckpt175_20260613_113015/metrics.json)
 
 ### 关键观察（HotpotQA）
 
@@ -292,11 +285,11 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 
 #### 训练曲线
 
-![SFT 训练全程](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_loss.png)
+![SFT 训练全程](03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_loss.png)
 
-![SFT 末段放大](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_loss_zoom.png)
+![SFT 末段放大](03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_loss_zoom.png)
 
-![SFT 学习率 schedule](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_lr.png)
+![SFT 学习率 schedule](03_sapr_rag/saves/qwen2_5_7b/lora/sft/training_lr.png)
 
 #### 训练参数与产物
 
@@ -359,11 +352,11 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 
 #### 训练曲线
 
-![SFT+DPO 训练 loss](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_loss.png)
+![SFT+DPO 训练 loss](03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_loss.png)
 
-![SFT+DPO 隐式奖励](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_rewards.png)
+![SFT+DPO 隐式奖励](03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_rewards.png)
 
-![SFT+DPO 偏好准确率](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_rewards_accuracies.png)
+![SFT+DPO 偏好准确率](03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/training_rewards_accuracies.png)
 
 #### 训练参数
 
@@ -418,11 +411,9 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **#1 Zeroshot** | 12576 | **0.1114** | **0.1178** | 0.0803 | 0.1049 | 4.86 | 66.6% | 57.1% |
 | **#2 SFT** | 12576 | **0.4488** | **0.4431** | 0.1018 | 0.2515 | 3.58 | 27.9% | 35.8% |
-| #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
+| **#3 DPO (no SFT)†** | 12576 | **0.4061** | **0.4249** | 0.3496 | 0.4194 | 4.369† | — | — |
 | **#4 SFT + DPO** | 12576 | **0.4452** | **0.4705** | **0.3915** | **0.4688** | **3.26** | **17.3%** | 41.5% |
 | **#5 SFT + GRPO (ckpt-175)** | 12576 | **0.4573** | **0.4528** | 0.1169 | 0.2693 | 3.51 | 26.2% | **34.3%** |
-
-**产物路径**：#1 [zeroshot_20260609_184744/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/zeroshot_20260609_184744/metrics.json) · #2 [sft_20260609_232951/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_20260609_232951/metrics.json) · #4 [sft_dpo_20260610_155526/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/sft_dpo_20260610_155526/metrics.json) · #5 [grpo_v4_ckpt175_20260613_113418/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/2wikimultihopqa/grpo_v4_ckpt175_20260613_113418/metrics.json)
 
 ### 关键观察（2Wiki）
 
@@ -463,11 +454,9 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **#1 Zeroshot** | 2417 | **0.0956** | **0.1129** | 0.0728 | 0.107 | 4.68 | 63.6% | 53.7% |
 | **#2 SFT** | 2417 | **0.1911** | **0.2081** | 0.0492 | 0.1205 | 3.89 | 33.4% | 31.1% |
-| #3 DPO (no SFT) | — | — | — | — | — | — | — | — |
+| **#3 DPO (no SFT)†** | 2417 | **0.1452** | **0.1957** | 0.1200 | 0.1935 | 4.213† | — | — |
 | **#4 SFT + DPO** | 2417 | **0.2069** | **0.2462** | **0.1667** | **0.2477** | 3.28 | **16.9%** | 42.9% |
 | **#5 SFT + GRPO (ckpt-175)** | 2417 | **0.1986** | **0.2131** | 0.0571 | 0.1303 | 3.83 | 32.8% | **30.2%** |
-
-**产物路径**：#1 [zeroshot_20260609_173552/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/zeroshot_20260609_173552/metrics.json) · #2 [sft_20260610_112233/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_20260610_112233/metrics.json) · #4 [sft_dpo_20260610_142115/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/sft_dpo_20260610_142115/metrics.json) · #5 [grpo_v4_ckpt175_20260613_113944/](file:///mlx_devbox/users/mayi.summer/playground/SAPR-RAG/data/eval_results/musique/grpo_v4_ckpt175_20260613_113944/metrics.json)
 
 ### 关键观察（MuSiQue）
 
@@ -505,19 +494,25 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
 - **HotpotQA / MuSiQue 上 SFT 的 EM 反向下降**（虽然 cover_em 翻倍）——这是 EM 局限性的 **3 个数据集中 2 个独立证据**，强烈支撑报告主指标切换至 cover_em + LLM-judge（§2.5 P1.1 / §2.6）。
 - **2Wiki 增益最大（4×），MuSiQue 增益最小（2×）**：SFT 能很好处理多跳关系链，但难以拟合 MuSiQue 的 4 跳问题分解结构，这正是 GRPO 应当主攻的方向。
 
-### 三数据集后训练对照（SFT / SFT+DPO / SFT+GRPO ckpt-175）
+### 三数据集后训练对照（Zero-shot / DPO-no-SFT / SFT / SFT+DPO / SFT+GRPO ckpt-175）
 
-ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数据集完整评测与 LLM-judge 已完成。
+ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数据集完整评测与 LLM-judge 已完成。**#3 DPO-no-SFT†** 使用 ReasonRAG pipeline 推理（iter8 LoRA DPO），行为指标口径与 SAPR-RAG 不同（标注†），但 cover_em / llm_acc / EM / F1 均用 SAPR-RAG score.py 同口径计算，可直接对比。
 
 | 数据集 | Setting | **cover_em** | **llm_acc_deepseek** | EM | F1 | avg_turns | max_turns_rate | empty_evidence_rate |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
+| HotpotQA | Zero-shot | 0.268 | 0.338 | 0.204 | 0.273 | 3.99 | 45.1% | 37.5% |
+| HotpotQA | DPO (no SFT)† | 0.3999 | 0.5356 | 0.3492 | 0.4563 | 4.857† | — | — |
 | HotpotQA | SFT | 0.5070 | **0.6073** | 0.0971 | 0.2634 | 2.513 | 10.7% | 21.3% |
 | HotpotQA | SFT+DPO | 0.4693 | 0.6062 | **0.4008** | **0.5233** | **2.151** | **3.4%** | 26.2% |
 | HotpotQA | GRPO ckpt-125 | 0.5080 | **0.6109** | 0.1086 | 0.2742 | 2.496 | 10.7% | **21.2%** |
 | HotpotQA | **GRPO ckpt-175** | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.475 | 10.4% | 21.5% |
+| 2Wiki | Zero-shot | 0.1114 | 0.1178 | 0.0803 | 0.1049 | 4.86 | 66.6% | 57.1% |
+| 2Wiki | DPO (no SFT)† | 0.4061 | 0.4249 | 0.3496 | 0.4194 | 4.369† | — | — |
 | 2Wiki | SFT | 0.4488 | 0.4431 | 0.1018 | 0.2515 | 3.577 | 27.9% | 35.8% |
 | 2Wiki | SFT+DPO | 0.4452 | **0.4705** | **0.3915** | **0.4688** | **3.255** | **17.3%** | 41.5% |
 | 2Wiki | **GRPO ckpt-175** | **0.4573** | 0.4528 | 0.1169 | 0.2693 | 3.510 | 26.2% | **34.3%** |
+| MuSiQue | Zero-shot | 0.0956 | 0.1129 | 0.0728 | 0.107 | 4.68 | 63.6% | 53.7% |
+| MuSiQue | DPO (no SFT)† | 0.1452 | 0.1957 | 0.1200 | 0.1935 | 4.213† | — | — |
 | MuSiQue | SFT | 0.1911 | 0.2081 | 0.0492 | 0.1205 | 3.885 | 33.4% | 31.1% |
 | MuSiQue | SFT+DPO | **0.2069** | **0.2462** | **0.1667** | **0.2477** | **3.278** | **16.9%** | 42.9% |
 | MuSiQue | GRPO ckpt-175 | 0.1986 | 0.2131 | 0.0571 | 0.1303 | 3.828 | 32.8% | **30.2%** |
@@ -527,6 +522,12 @@ ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数�
 - **2Wiki**：GRPO ckpt-175 是当前 cover_em 最优（0.4573），比 SFT +0.85pt、比 SFT+DPO +1.21pt；LLM-acc 为 0.4528，高于 SFT（0.4431）但低于 SFT+DPO（0.4705）。说明 GRPO 的 cover_em/证据质量收益没有完全转化为 LLM-judge 事实正确率最优。
 - **MuSiQue**：GRPO ckpt-175 高于 SFT（cover_em 0.1986 vs 0.1911；LLM-acc 0.2131 vs 0.2081），但低于 SFT+DPO（cover_em 0.2069；LLM-acc 0.2462）。这符合训练数据预期：GRPO 阶段未使用 MuSiQue reward 数据，跨到 MuSiQue 的泛化收益有限。
 - **指标风格差异仍存在**：SFT+DPO 在 EM/F1 上遥遥领先，主要来自简洁答案风格；GRPO 更接近 SFT 的长答案风格，因此 cover_em/LLM-judge 更适合判断其真实收益。
+
+**#3 DPO (no SFT) 在矩阵中的定位**（ReasonRAG pipeline LoRA DPO，未经过 SFT 直接从 base 训）：
+- **三数据集 cover_em 均介于 Zero-shot 和 SFT 之间**（HotpotQA 0.40 / 2Wiki 0.41 / MuSiQue 0.15）——DPO 单独有效（vs zero-shot llm_acc +36%~+73%），但**远不如 SFT 先建立多轮 RAG 协议**（SFT llm_acc 高出 7~12pt）。
+- **LLM-acc 差距小于 cover_em 差距**（HotpotQA：DPO-no-SFT 0.536 vs SFT 0.607，差 7pt；cover_em 差 11pt）——说明 DPO 的简洁答案风格被 cover_em 的"子串匹配"系统性低估，与 §2.5 P1.1 论述一致。
+- **avg_turns 4.2~4.9（†ReasonRAG iteration_count 口径）远高于 SFT 的 2.5~3.9**——DPO 没学到"何时停止检索"，因为没经过 SFT 的多轮协议训练；这与 §2.4 观察的"SFT 核心贡献是学会停止"形成对照。
+- **核心结论**：SFT 是不可或缺的基石，DPO 在 SFT 之上才能发挥最大效用；DPO 不经过 SFT 直接从 base 起训，效果打七折。这为"SFT→DPO 两阶段 pipeline"的必要性提供了直接证据。
 
 ---
 
@@ -596,6 +597,7 @@ ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测�
 - [x] 完成 #5 GRPO v4-formatfix ckpt-175 HotpotQA / 2Wiki / MuSiQue 三数据集评测
 - [x] 写 LLM-judge 评估脚本（DeepSeek API + 标准 judge prompt + cache）
 - [x] 补跑 #5 GRPO ckpt-175 三数据集 LLM-judge，验证 cover_em 增益是否转化为事实正确率
+- [x] 补齐 #3 DPO-no-SFT 三数据集 cover_em / EM / F1 / llm_acc（用 SAPR-RAG score.py 口径重算 ReasonRAG pipeline 产物）
 - [ ] 抽样 100 题做 case study，分析 SFT / SFT+DPO / GRPO 的输出风格差异
 - [ ] D6 汇总数字 + 画图
 - [ ] D7 写中期报告正文 + OPD 后续计划

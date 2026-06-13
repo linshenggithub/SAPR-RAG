@@ -17,13 +17,16 @@ BASE_MODEL="$PROJ_ROOT/03_sapr_rag/models/Qwen2.5-7B-Instruct"
 SFT_LORA="$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/sft/checkpoint-1650"
 DATASET="${DATASET:-$PROJ_ROOT/data/grpo/hotpotqa_train.jsonl}"
 PLUGIN="$SCRIPT_DIR/plugin.py"
-OUTPUT_DIR="$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/grpo"
+OUTPUT_DIR="${OUTPUT_DIR:-$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/grpo}"
 VLLM_HOST="${VLLM_HOST:-127.0.0.1}"
 VLLM_PORT="${VLLM_PORT:-8000}"
+RESUME_FROM_CHECKPOINT="${RESUME_FROM_CHECKPOINT:-}"
 # DEEPSPEED=zero2 (默认) | none (首跑 sanity 可设 none 跳过，需 deepspeed 未安装时用)
 DEEPSPEED="${DEEPSPEED:-zero2}"
 DS_ARG=()
 [ "$DEEPSPEED" != "none" ] && DS_ARG=(--deepspeed "$DEEPSPEED")
+RESUME_ARG=()
+[ -n "$RESUME_FROM_CHECKPOINT" ] && RESUME_ARG=(--resume_from_checkpoint "$RESUME_FROM_CHECKPOINT")
 
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR" "$OUTPUT_DIR"
@@ -51,6 +54,11 @@ mkdir -p "$LOG_DIR" "$OUTPUT_DIR"
 
 # 进程 C：swift rlhf grpo 训练（本脚本主体）
 cd "$SWIFT_ROOT"
+
+echo "[run_grpo] dataset=$DATASET"
+echo "[run_grpo] output_dir=$OUTPUT_DIR"
+echo "[run_grpo] resume_from_checkpoint=${RESUME_FROM_CHECKPOINT:-<none>}"
+echo "[run_grpo] vllm=${VLLM_HOST}:${VLLM_PORT} deepspeed=$DEEPSPEED"
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
@@ -87,6 +95,7 @@ swift rlhf \
     --dataloader_num_workers 4 \
     --dataset_num_proc 4 \
     "${DS_ARG[@]}" \
+    "${RESUME_ARG[@]}" \
     --output_dir "$OUTPUT_DIR" \
     --log_completions true \
     --num_iterations 1 \

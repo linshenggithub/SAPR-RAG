@@ -48,6 +48,12 @@ def check_rewards():
             ]
         }],
     }
+    # mock：多轮轨迹允许前序 query，只要最后一个协议标签是 answer 即合法
+    mult_turn_completion = (
+        "Need retrieval. So the next query is <query>who founded Apple</query>"
+        " Reference: <reference>Steve Wozniak founded Apple.</reference>"
+        " So the answer is <answer>Steve Wozniak</answer>"
+    )
     # mock：检索全错 + answer 错 + 缺 answer 标签（格式非法）
     bad_completion = "So the next query is <query>foobar</query>"
     bad_kwargs = {
@@ -68,20 +74,22 @@ def check_rewards():
     rel_good = rel([good_completion], **good_kwargs)[0]
     rel_bad = rel([bad_completion], **bad_kwargs)[0]
     fmt_good = fmt([good_completion], **good_kwargs)[0]
+    fmt_multi_turn = fmt([mult_turn_completion], **good_kwargs)[0]
     fmt_bad = fmt([bad_completion], **bad_kwargs)[0]
 
     print(f"[sanity] f1:        good={f1_good:.3f}  bad={f1_bad:.3f}")
     print(f"[sanity] relevance: good={rel_good:.3f}  bad={rel_bad:.3f}")
-    print(f"[sanity] format:    good={fmt_good:.3f}  bad={fmt_bad:.3f}")
+    print(f"[sanity] format:    good={fmt_good:.3f}  multi_turn={fmt_multi_turn:.3f}  bad={fmt_bad:.3f}")
 
     for name, v in [("f1_good", f1_good), ("f1_bad", f1_bad),
                     ("rel_good", rel_good), ("rel_bad", rel_bad),
-                    ("fmt_good", fmt_good), ("fmt_bad", fmt_bad)]:
+                    ("fmt_good", fmt_good), ("fmt_multi_turn", fmt_multi_turn),
+                    ("fmt_bad", fmt_bad)]:
         assert 0.0 <= v <= 1.0, f"{name} out of range: {v}"
 
     assert f1_good > f1_bad, "f1 方向错：answer 正确应高于错误"
     assert rel_good > rel_bad, "relevance 方向错：检到 gold 应高于检错"
-    assert fmt_good == 1.0 and fmt_bad == 0.0, "format 方向错"
+    assert fmt_good == 1.0 and fmt_multi_turn == 1.0 and fmt_bad == 0.0, "format 方向错"
     print("[sanity] reward 值域 + 方向 全部通过 ✓")
 
 

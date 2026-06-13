@@ -231,15 +231,23 @@ orms["sapr_relevance"] = SaprRelevanceORM
 
 
 class SaprFormatORM(ORM):
-    """格式：末轮 completion 须含且仅含合法 <answer>，不含残留 <query>。1.0 / 0.0。"""
+    """格式：允许前序多轮 <query>，但最终协议标签必须是非空 <answer>。"""
 
     def __call__(self, completions, **kwargs) -> List[float]:
         rewards = []
         for comp in completions:
             comp = comp or ""
-            has_answer = bool(RE_ANSWER.search(comp))
-            has_query = bool(RE_QUERY.search(comp))
-            rewards.append(1.0 if (has_answer and not has_query) else 0.0)
+            events = []
+            events.extend((m.start(), "query", m.group(1).strip()) for m in RE_QUERY.finditer(comp))
+            events.extend((m.start(), "answer", m.group(1).strip()) for m in RE_ANSWER.finditer(comp))
+            events.sort(key=lambda x: x[0])
+
+            if not events:
+                rewards.append(0.0)
+                continue
+
+            _, last_kind, last_text = events[-1]
+            rewards.append(1.0 if last_kind == "answer" and bool(last_text) else 0.0)
         return rewards
 
 

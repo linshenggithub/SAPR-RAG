@@ -529,6 +529,23 @@ ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数�
 - **avg_turns 4.2~4.9（†ReasonRAG iteration_count 口径）远高于 SFT 的 2.5~3.9**——DPO 没学到"何时停止检索"，因为没经过 SFT 的多轮协议训练；这与 §2.4 观察的"SFT 核心贡献是学会停止"形成对照。
 - **核心结论**：SFT 是不可或缺的基石，DPO 在 SFT 之上才能发挥最大效用；DPO 不经过 SFT 直接从 base 起训，效果打七折。这为"SFT→DPO 两阶段 pipeline"的必要性提供了直接证据。
 
+### 推理效率与 ReasonRAG rebuttal 口径对比
+
+ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 queries** 的离线批量推理耗时。该数字从官方源码看更接近 `batch_size=1000` 的 **offline throughput-normalized latency**（整批 wall time / query 数），不是单请求在线 latency。为避免口径不一致，SAPR-RAG 也按同一类吞吐均摊口径，从现有 `run_dp8.sh` shard 日志的最终 `q/s` 回算。
+
+| Method | Dataset | Inference setting | Time / 1000 queries | Avg. time / query | Avg. retrievals | Notes |
+|---|---|---|---:|---:|---:|---|
+| ReasonRAG | 2WikiMultihopQA | vLLM, 4 GPUs, batch size 1000 | 110s | 0.11s | 3.8 | OpenReview rebuttal 报告值；更适合理解为离线吞吐均摊，不是单请求端到端 latency |
+| SAPR-RAG (ours, GRPO ckpt-175) | HotpotQA | vLLM, 8 data-parallel shards, cohort size 64 | ~520s | ~0.52s | 2.48 | 从本地 shard 日志按整批吞吐回算；`avg_retrievals ≈ avg_turns` |
+| SAPR-RAG (ours, GRPO ckpt-175) | 2WikiMultihopQA | vLLM, 8 data-parallel shards, cohort size 64 | ~700-740s | ~0.70-0.74s | 3.51 | 与 ReasonRAG 同数据集的最接近对比；检索轮数相近但吞吐更慢 |
+| SAPR-RAG (ours, GRPO ckpt-175) | MuSiQue | vLLM, 8 data-parallel shards, cohort size 64 | ~770-780s | ~0.77-0.78s | 3.83 | MuSiQue 平均轮数最高，因此推理成本最高 |
+
+**rebuttal 可用表述**：
+
+> We compare inference cost under an offline throughput-normalized protocol, i.e., total wall-clock inference time divided by the number of queries. ReasonRAG reports 110 seconds for 1,000 2WikiMultihopQA queries in its OpenReview rebuttal, corresponding to 0.11s/query with 3.8 average retrievals. Under our current SAPR-RAG implementation, the closest comparable 2WikiMultihopQA run takes approximately 0.70-0.74s/query with 3.51 average retrievals. Therefore, SAPR-RAG is currently slower than ReasonRAG under the reported throughput-normalized setting, despite using a comparable number of retrieval steps. The gap mainly comes from implementation-level overheads, including the explicit evidence extraction stage, data-parallel shard orchestration, and the current FAISS/corpus loading and retrieval configuration. Since these numbers are obtained under different hardware, batching, and retrieval-engine configurations, they should be interpreted as an indicative efficiency comparison rather than a strictly controlled latency benchmark.
+
+备注：原始 `merged.jsonl` / `metrics.json` / shard logs 位于 `data/eval_results/`，该目录被 `.gitignore` 忽略；本文档只保留可 push 的汇总结论。
+
 ---
 
 ## 5. GRPO 训练与评测（#5，v4-formatfix）

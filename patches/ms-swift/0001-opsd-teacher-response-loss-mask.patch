@@ -1,0 +1,17 @@
+diff --git a/swift/rl_core/data.py b/swift/rl_core/data.py
+index f859cba1d..d40294507 100644
+--- a/swift/rl_core/data.py
++++ b/swift/rl_core/data.py
+@@ -118,6 +118,12 @@ class OnPolicySample:
+             d['chat_template_kwargs'] = chat_template_kwargs
+         if self.response_token_ids:
+             d['response_token_ids'] = self.response_token_ids
++            # OPSD: pass the loss mask so the teacher view masks the same
++            # observation tokens as the student (encode_teacher_view reads
++            # 'response_loss_mask'); otherwise multi-turn teacher/student frames
++            # disagree on valid-token count and remap asserts fail.
++            if self.response_loss_mask:
++                d['response_loss_mask'] = self.response_loss_mask
+         d['add_eos'] = False
+         return d
+ 

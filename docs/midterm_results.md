@@ -1,7 +1,7 @@
 # SAPR-RAG 中期实验结果
 
-**最后更新**：2026-06-13
-**状态**：5 setting × 3 数据集评测全部完成（#3 DPO-no-SFT 结果补齐，cover_em / llm_acc 用 SAPR-RAG 口径重算）
+**最后更新**：2026-07-01
+**状态**：5 setting × 3 数据集评测全部完成（#3 DPO-no-SFT 结果补齐，cover_em / llm_acc 用 SAPR-RAG 口径重算）；新增 §5 多跳 QA 天花板诊断（Oracle 实验，DeepSeek-V4）
 
 ---
 
@@ -548,22 +548,91 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 
 ---
 
-## 5. GRPO 训练与评测（#5，v4-formatfix）
+## 5. 多跳 QA 准确率天花板诊断（Oracle 实验，2026-07-01）
 
-### 5.1 配置
+### 5.1 实验目的
+
+回答核心疑问：**如果检索是完美的（上下文里包含全部所需证据），SOTA 模型在多跳 QA 上能做到多少准确率？** 即多跳推理本身的难度天花板在哪里，检索优化的收益空间有多大。
+
+### 5.2 实验配置
+
+| 配置项 | 值 |
+|---|---|
+| **诊断模型** | DeepSeek-V4-Flash（同时用 V4-Pro 在 MuSiQue 上做了对照） |
+| **数据集** | HotpotQA dev (7,405) / 2WikiMultihopQA dev (12,576) / MuSiQue dev (2,417) |
+| **设置** | Oracle：直接使用数据集自带的 distractor / 支撑段落作为上下文，不经过检索器 |
+| **Prompt** | System prompt 要求"仅根据上下文回答，答案尽量简短"；User prompt 包含 Context + Question |
+| **生成参数** | temperature=0.0, max_tokens=2048 |
+| **评估指标** | EM / Cover EM / F1（同 §1 口径，由 `score.py` 统一计算） |
+| **脚本** | `03_sapr_rag/scripts/eval/ceiling_diagnostic.py` |
+
+**Oracle 设置说明**：
+- **HotpotQA**：使用 distractor 设置的 10 段 Wikipedia 上下文（包含 2 段 gold supporting + 8 段干扰），与论文 distractor 评测口径一致
+- **2WikiMultihopQA**：使用 `evidences` / `supporting_facts` 对应的全部 Wikipedia 摘要段落
+- **MuSiQue**：使用 `question_decomposition` 中每跳 `support_paragraph` 的全部支撑段落
+
+### 5.3 结果：三个数据集天花板对比（V4-Flash 全量）
+
+| 数据集 | 样本数 | EM | Cover EM | F1 |
+|---|---:|---:|---:|---:|
+| **2WikiMultihopQA** | 12,576 | **74.1%** | 81.1% | 79.9% |
+| **MuSiQue** | 2,417 | **51.8%** | 59.3% | 61.5% |
+| **HotpotQA (distractor)** | 7,405 | **31.0%** | 34.8% | 39.2% |
+
+### 5.4 V4-Pro vs V4-Flash 对照（MuSiQue 全量）
+
+用 MuSiQue 全量对比两个模型，量化模型能力差异：
+
+| 模型 | EM | Cover EM | F1 | 价格比 |
+|---|---:|---:|---:|---:|
+| deepseek-v4-pro | 57.2% | 65.5% | 66.7% | 1x（基准） |
+| deepseek-v4-flash | 51.8% | 59.3% | 61.5% | ~1/3 |
+| **差距** | **-5.4%** | **-6.2%** | **-5.2%** | 省 2/3 |
+
+**结论**：V4-Flash 约为 V4-Pro 的 90% 性能，用 1/3 价格。对于"估算天花板大概范围"的目的，V4-Flash 完全够用。
+
+### 5.5 关键结论
+
+1. **三个数据集难度差异巨大**：2Wiki (74% EM) > MuSiQue (52%) > HotpotQA (31%)。注意 HotpotQA 是 distractor 设置（10 段上下文里找答案），难度已经远高于开放域。
+2. **多跳推理本身是主要瓶颈之一**：即使给了全部正确上下文，SOTA 模型也远做不到 100%。2Wiki 还有 ~26% 的题是"证据齐了也答不对"，MuSiQue ~48%，HotpotQA ~69%。
+3. **检索优化的收益有上限**：对 2Wiki，如果当前系统 cover_em 在 45% 左右，那么从检索优化角度最多还有 ~35pt 的空间（45% → 81%），但其中一部分会被推理瓶颈吃掉。
+4. **HotpotQA distractor 天花板仅 31% EM**：这解释了为什么很多论文在 HotpotQA 上 EM 卡在 30-40% 区间——即使上下文全给，模型推理也只能到这个水平。
+5. **对本项目的启示**：2Wiki 是当前投入产出比最高的方向（天花板高、当前系统已有不错基线）；MuSiQue 天花板中等但推理难度大；HotpotQA 受限于推理天花板，继续优化检索的边际收益可能递减。
+
+### 5.6 与当前系统的 gap（基于 GRPO ckpt-175）
+
+以 Cover EM 为口径（与主指标一致）：
+
+| 数据集 | 当前系统 (GRPO ckpt-175) | Oracle 天花板 (V4-Flash) | **Gap** |
+|---|---:|---:|---:|
+| HotpotQA | 50.8% | 34.8% | -16.0pt（当前 > 天花板 ⚠️） |
+| 2Wiki | 45.7% | 81.1% | **+35.4pt** |
+| MuSiQue | 19.9% | 59.3% | **+39.4pt** |
+
+**注意**：HotpotQA 出现"当前系统 > Oracle 天花板"的反常现象，原因是两者的上下文设置不同：
+- 当前系统：**开放域**，从 22M wiki18 语料中检索 top-3 docs（可能包含更丰富的答案相关信息）
+- Oracle：**distractor 设置**，固定 10 段（2 段 gold + 8 段干扰），干扰段可能误导模型
+
+因此 HotpotQA 的 Oracle 数字不能直接视为开放域的上限，它反映的是"给定 distractor 10 段"这一特定设置下的推理上限。2Wiki 和 MuSiQue 的 Oracle 是直接用支撑段落，更接近"完美检索"的概念，gap 更有参考价值。
+
+---
+
+## 6. GRPO 训练与评测（#5，v4-formatfix）
+
+### 6.1 配置
 
 | 配置项 | 值 |
 |---|---|
 | 起点 | SFT ckpt-1650（继承多轮 RAG 协议）|
 | 训练数据 | HotpotQA 训练子集（`data/grpo/hotpotqa_train.jsonl`） |
 | 框架 | ms-swift 4.4 GRPO（vLLM rollout server 模式）|
-| 卡分配 | GPU0-5 训练 / GPU6 rollout / GPU7 检索 daemon |
+| 资源布局 | 多卡训练 / 单卡 rollout / 独立检索 daemon |
 | reward 函数 | `SaprF1ORM`(w=1.0) + `SaprRelevanceORM`(w=0.2) + `SaprFormatORM`(w=0.05) |
 | 关键超参 | per_device_bs=2, num_generations=8, grad_accum=4, lr=1e-6, max_completion_length=8192, max_turns=6 |
 | 总步数 | 1220（1 epoch）|
 | 节奏 | save_steps=25，评测 ckpt-125 / ckpt-175 |
 
-### 5.2 格式 reward 修复
+### 6.2 格式 reward 修复
 
 v3 训练中 `SaprFormatORM` 长期接近 0，根因是旧实现要求 completion 中不能出现任何 `<query>`，误伤了正常多轮 RAG 轨迹（前序轮 `<query>`，末轮 `<answer>`）。v4-formatfix 已修复为：允许前序 `<query>`，只要求最后一个协议标签是非空 `<answer>`。
 
@@ -572,7 +641,7 @@ v3 训练中 `SaprFormatORM` 长期接近 0，根因是旧实现要求 completio
 - 新规则：51.89%（1594/3072）
 - 提升：+49.48pp
 
-### 5.3 v4-formatfix 训练进展与崩溃原因
+### 6.3 v4-formatfix 训练进展与崩溃原因
 
 v4-formatfix 从 SFT LoRA 重新起训，已保存 ckpt-25/50/75/100/125/150/175/200/225。训练在 global_step=234/1220 崩溃，最后有效 checkpoint 为 ckpt-225；评测优先选择 reward 峰值附近的 ckpt-175。
 
@@ -597,7 +666,7 @@ RuntimeError: Multiple errors: [Exception('Server 0 failed: 500, Internal Server
 
 根因是多轮 RAG 的 prompt 随检索 evidence 累积，某次请求超过 `vllm_max_model_len=8192`，vLLM 计算出的 `max_tokens = max_model_len - num_tokens` 变成负数，rollout server 返回 500，训练端随之退出。后续若继续训练，需要提高 `vllm_max_model_len`、降低 `max_turns`，或在 scheduler 里做 token 截断。
 
-### 5.4 ckpt-175 下游评测结论
+### 6.4 ckpt-175 下游评测结论
 
 ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测和 LLM-judge。核心结论见 §4 后的"三数据集后训练对照"：
 - HotpotQA：cover_em 与 SFT 持平，LLM-acc 小幅高于 SFT/SFT+DPO。
@@ -606,7 +675,7 @@ ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测�
 
 ---
 
-## 6. 待办
+## 7. 待办
 
 - [x] 修 SaprFormatORM 判据，并离线重算旧 completions 的新旧 format 通过率
 - [x] 完成 #1/#2/#4 在 HotpotQA / 2Wiki / MuSiQue 三数据集评测

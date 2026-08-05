@@ -22,12 +22,13 @@ from pathlib import Path
 
 import faiss
 import numpy as np
+import requests
 import torch
 from transformers import AutoModel, AutoTokenizer
 
 
 # ─────────── 路径 ───────────
-PROJ_ROOT = Path("/mlx_devbox/users/mayi.summer/playground/SAPR-RAG")
+PROJ_ROOT = Path(os.environ.get("SAPR_RAG_ROOT", Path(__file__).resolve().parents[3]))
 
 BASE_MODEL = PROJ_ROOT / "03_sapr_rag/models/Qwen2.5-7B-Instruct"
 LORA_ADAPTER = PROJ_ROOT / "03_sapr_rag/saves/qwen2_5_7b/lora/sft/checkpoint-1650"
@@ -135,6 +136,32 @@ class BGEFaissRetriever:
         return docs
 
 
+class HTTPRetriever:
+    """Adapter for the persistent retrieval daemon used by GRPO rollout."""
+
+    def __init__(self, base_url, timeout=60):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.session = requests.Session()
+        r = self.session.get(f"{self.base_url}/health", timeout=self.timeout)
+        r.raise_for_status()
+        print(f"[retriever=http] health={r.json()}")
+
+    def search(self, query, top_k=3):
+        return self.search_batch([query], top_k=top_k)[0]
+
+    def search_batch(self, queries, top_k=3):
+        if not queries:
+            return []
+        r = self.session.post(
+            f"{self.base_url}/search_batch",
+            json={"queries": queries, "top_k": top_k},
+            timeout=self.timeout,
+        )
+        r.raise_for_status()
+        return r.json()["results"]
+
+
 # ─────────── prompt 拼装 ───────────
 def render_history(history):
     """history = [{query, evidence}, ...]"""
@@ -201,8 +228,10 @@ class VLLMBackend:
             max_lora_rank=max_lora_rank,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
-            dtype="bfloat16",
+            dtype="float16",
             enable_prefix_caching=True,
+            enforce_eager=True,
+            max_num_batched_tokens=2048,
         )
         if self.use_lora:
             from vllm.lora.request import LoRARequest
@@ -246,15 +275,96 @@ class VLLMBackend:
         return [o.outputs[0].text for o in outs]
 
 
+class RolloutHTTPBackend:
+    """Call a running `swift rollout` server through /infer/."""
+
+    def __init__(self, base_url, timeout=300):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.session = requests.Session()
+        r = self.session.get(f"{self.base_url}/health/", timeout=self.timeout)
+        r.raise_for_status()
+        print(f"[backend=rollout_http] health={r.json()}")
+
+    def chat(self, system, user, sampling, stop, max_tokens=None):
+        return self.chat_batch([(system, user)], sampling, stop, max_tokens=max_tokens)[0]
+
+    def chat_batch(self, convs, sampling, stop, max_tokens=None):
+        if not convs:
+            return []
+        infer_requests = [
+            {"messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ]}
+            for system, user in convs
+        ]
+        payload = {
+            "infer_requests": infer_requests,
+            "request_config": {
+                "max_tokens": max_tokens or sampling["max_tokens"],
+                "temperature": sampling["temperature"],
+                "top_p": sampling["top_p"],
+                "stop": stop,
+                "return_details": True,
+            },
+            "use_tqdm": False,
+        }
+        r = self.session.post(f"{self.base_url}/infer/", json=payload, timeout=self.timeout)
+        r.raise_for_status()
+        outputs = r.json()
+        texts = []
+        for out in outputs:
+            response = out.get("response", {})
+            choices = response.get("choices") or []
+            text = ""
+            if choices:
+                text = ((choices[0].get("message") or {}).get("content") or "")
+            # Multi-turn rollout may return the complete messages history; use final assistant if present.
+            messages = out.get("messages") or []
+            for msg in reversed(messages):
+                if msg.get("role") == "assistant":
+                    text = msg.get("content") or text
+                    break
+            texts.append(text)
+        return texts
+
+
 class TransformersBackend:
+    @staticmethod
+    def _patch_qwen2_rope():
+        """Avoid tiny RoPE matmul hitting CUBLAS_STATUS_INVALID_VALUE on some CUDA eval setups."""
+        try:
+            from transformers.models.qwen2.modeling_qwen2 import Qwen2RotaryEmbedding
+        except Exception:
+            return
+
+        if getattr(Qwen2RotaryEmbedding, "_sapr_rope_patched", False):
+            return
+
+        def forward(self, x, position_ids):
+            inv_freq = self.inv_freq[None, :, None].float().to(x.device)
+            pos = position_ids[:, None, :].float()
+            device_type = x.device.type if isinstance(x.device.type, str) and x.device.type != "mps" else "cpu"
+            with torch.autocast(device_type=device_type, enabled=False):
+                freqs = (inv_freq * pos).transpose(1, 2)
+                emb = torch.cat((freqs, freqs), dim=-1)
+                cos = emb.cos() * self.attention_scaling
+                sin = emb.sin() * self.attention_scaling
+            return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
+
+        Qwen2RotaryEmbedding.forward = forward
+        Qwen2RotaryEmbedding._sapr_rope_patched = True
+
     def __init__(self, base_model, lora_path, device="cuda:0",
                  dtype=torch.bfloat16):
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        self._patch_qwen2_rope()
         print(f"[backend=transformers] loading base {base_model} ...")
         self.tokenizer = AutoTokenizer.from_pretrained(str(base_model))
         base = AutoModelForCausalLM.from_pretrained(
-            str(base_model), torch_dtype=dtype,
+            str(base_model), torch_dtype=dtype, attn_implementation="eager",
         ).to(device).eval()
         if lora_path is not None:
             from peft import PeftModel
@@ -275,6 +385,14 @@ class TransformersBackend:
             messages, tokenize=False, add_generation_prompt=True,
         )
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        seq_len = inputs["input_ids"].shape[1]
+        pad_len = (-seq_len) % 8
+        if pad_len:
+            pad_id = self.tokenizer.pad_token_id or self.tokenizer.eos_token_id
+            pad_ids = torch.full((1, pad_len), pad_id, dtype=inputs["input_ids"].dtype, device=self.device)
+            pad_mask = torch.zeros((1, pad_len), dtype=inputs["attention_mask"].dtype, device=self.device)
+            inputs["input_ids"] = torch.cat([inputs["input_ids"], pad_ids], dim=1)
+            inputs["attention_mask"] = torch.cat([inputs["attention_mask"], pad_mask], dim=1)
         gen_kwargs = dict(
             max_new_tokens=max_tokens or sampling["max_tokens"],
             do_sample=sampling["temperature"] > 0,
@@ -430,12 +548,21 @@ def main():
                    help="evidence agent 单轮生成上限（只输出一句话，128 足够）")
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_p", type=float, default=1.0)
+    p.add_argument("--base_model", type=str, default=str(BASE_MODEL),
+                   help="基础模型路径；可传入已 merge LoRA 的完整模型目录")
     p.add_argument("--lora_path", type=str, default=str(LORA_ADAPTER))
+    p.add_argument("--retrieval_url", type=str, default=None,
+                   help="复用常驻检索 daemon，例如 http://127.0.0.1:<port>；为空则本进程加载 BGE+FAISS")
+    p.add_argument("--rollout_url", type=str, default=None,
+                   help="复用 swift rollout 服务，例如 http://127.0.0.1:<port>")
     p.add_argument("--no_lora", action="store_true",
                    help="zero-shot：不挂 LoRA，纯 backbone 推理（4-setting 对照基准）")
     p.add_argument("--backend", type=str, default="vllm",
-                   choices=["vllm", "transformers"],
+                   choices=["vllm", "transformers", "rollout_http"],
                    help="vllm: 快但环境苛刻; transformers: 慢但兼容性好")
+    p.add_argument("--torch_dtype", type=str, default="bfloat16",
+                   choices=["bfloat16", "float16", "float32"],
+                   help="仅 transformers: 模型加载 dtype")
     p.add_argument("--gpu_memory_utilization", type=float, default=0.5,
                    help="仅 vllm: 占多少显存，BGE encoder 还要 ~3G")
     p.add_argument("--max_model_len", type=int, default=8192,
@@ -455,21 +582,34 @@ def main():
           f"{'ZERO-SHOT (no LoRA)' if lora_path is None else 'lora='+str(lora_path)}")
     if args.backend == "vllm":
         backend = VLLMBackend(
-            base_model=BASE_MODEL,
+            base_model=Path(args.base_model),
             lora_path=lora_path,
             max_model_len=args.max_model_len,
             gpu_memory_utilization=args.gpu_memory_utilization,
         )
+    elif args.backend == "rollout_http":
+        if not args.rollout_url:
+            raise ValueError("--backend rollout_http requires --rollout_url")
+        backend = RolloutHTTPBackend(args.rollout_url)
     else:
+        dtype_map = {
+            "bfloat16": torch.bfloat16,
+            "float16": torch.float16,
+            "float32": torch.float32,
+        }
         backend = TransformersBackend(
-            base_model=BASE_MODEL,
+            base_model=Path(args.base_model),
             lora_path=lora_path,
             device="cuda:0",
+            dtype=dtype_map[args.torch_dtype],
         )
 
-    retriever = BGEFaissRetriever(
-        BGE_PATH, INDEX_PATH, CORPUS_PATH, device="cuda:0",
-    )
+    if args.retrieval_url:
+        retriever = HTTPRetriever(args.retrieval_url)
+    else:
+        retriever = BGEFaissRetriever(
+            BGE_PATH, INDEX_PATH, CORPUS_PATH, device="cuda:0",
+        )
 
     agent = SAPRAgent(
         backend=backend,

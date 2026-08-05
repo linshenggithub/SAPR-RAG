@@ -8,7 +8,8 @@
   swift rollout --multi_turn_scheduler sapr_rag_scheduler --external_plugins plugin.py ...
   swift rlhf   --reward_funcs sapr_f1 sapr_relevance sapr_format --external_plugins plugin.py ...
 
-设计见同目录 IMPLEMENTATION.md。方案 A：只训 reason，检索文档作 observation 以 loss_mask=0 注入。
+设计见同目录 IMPLEMENTATION.md。当前采用方案 B：检索文档作为下一轮 user observation 注入，
+对齐 ms-swift VisualToolBoxScheduler 的多轮工具返回协议。
 """
 import os
 import re
@@ -79,11 +80,11 @@ def parse_final_answer(text):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# §2 多轮调度器（方案 A：只训 reason）
+# §2 多轮调度器（方案 B：检索结果作为下一轮 user observation）
 # ═══════════════════════════════════════════════════════════════════
 class SaprRagScheduler(MultiTurnScheduler):
     """每个 turn 模型只生成 reasoning 段（<query>/<answer> 收尾）。
-    step() 解析 <query> → 检索 → 把 docs 作为 observation 以 loss_mask=0 注入下一轮。
+    step() 解析 <query> → 检索 → 把 docs 作为下一轮 user observation 注入。
     """
 
     def __init__(self, *args, **kwargs):
@@ -102,7 +103,14 @@ class SaprRagScheduler(MultiTurnScheduler):
     def _format_observation(self, docs) -> str:
         # 与 agent_infer.build_evidence_prompt 同款；doc.text 已在 daemon 截 [:500]
         ref = " ".join(f"{d.get('title','')}. {d.get('text','')}" for d in docs)
-        return f" Reference: <reference>{ref}</reference>"
+        return (
+            f"Reference: <reference>{ref}</reference>\n"
+            "Use the reference to continue answering the original question. "
+            "If the answer is supported, conclude with: "
+            "\"So the answer is <answer>answer</answer>\". "
+            "If more retrieval is needed, conclude with: "
+            "\"So the next query is <query>query</query>\"."
+        )
 
     def step(self, infer_request, response_choice, current_turn) -> Dict:
         text = response_choice.message.content or ""
@@ -119,12 +127,9 @@ class SaprRagScheduler(MultiTurnScheduler):
             except Exception:
                 docs = []
             obs = self._format_observation(docs)
-            # 注入到对话历史，供下一轮 reason 看到
-            infer_request.messages[-1]["content"] += obs
-            # 注入 token，loss_mask=0（环境部分不参与训练）
-            result_tokens = self.tokenizer.encode(obs, add_special_tokens=False)
-            token_ids.extend(result_tokens)
-            loss_mask.extend([0] * len(result_tokens))
+            # 参考 ms-swift VisualToolBoxScheduler：工具/环境返回作为下一轮 user message。
+            # 这样 reference 不再混入 assistant completion，也不需要 response_loss_mask=0。
+            infer_request.messages.append({"role": "user", "content": obs})
             steps.append({"turn": current_turn, "query": query, "docs": docs})
 
         # 覆盖语义：rollout_infos 同名 key 覆盖不追加，每次写完整列表

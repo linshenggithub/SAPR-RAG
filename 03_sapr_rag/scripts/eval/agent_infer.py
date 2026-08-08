@@ -20,11 +20,9 @@ import re
 import time
 from pathlib import Path
 
-import faiss
 import numpy as np
 import requests
 import torch
-from transformers import AutoModel, AutoTokenizer
 
 
 # ─────────── 路径 ───────────
@@ -68,6 +66,9 @@ BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 # ─────────── retriever ───────────
 class BGEFaissRetriever:
     def __init__(self, bge_path, index_path, corpus_path, device="cuda:0"):
+        import faiss
+        from transformers import AutoModel, AutoTokenizer
+
         print(f"[retriever] loading BGE on {device} ...")
         self.tokenizer = AutoTokenizer.from_pretrained(bge_path)
         self.model = AutoModel.from_pretrained(bge_path).to(device).eval()
@@ -216,23 +217,31 @@ def parse_evidence(text):
 # ─────────── 推理 backend ───────────
 class VLLMBackend:
     def __init__(self, base_model, lora_path, max_model_len, gpu_memory_utilization,
-                 max_lora_rank=16):
+                 max_lora_rank=16, dtype="float16", max_num_seqs=None,
+                 max_num_batched_tokens=2048, enforce_eager=True,
+                 disable_custom_all_reduce=False):
         from vllm import LLM, SamplingParams
 
         self._SamplingParams = SamplingParams
         # lora_path=None -> zero-shot，纯 backbone，不挂 LoRA
         self.use_lora = lora_path is not None
-        self.llm = LLM(
+        engine_kwargs = dict(
             model=str(base_model),
             enable_lora=self.use_lora,
             max_lora_rank=max_lora_rank,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
-            dtype="float16",
+            dtype=dtype,
             enable_prefix_caching=True,
-            enforce_eager=True,
-            max_num_batched_tokens=2048,
+            enforce_eager=enforce_eager,
+            max_num_batched_tokens=max_num_batched_tokens,
+            tensor_parallel_size=1,
+            disable_custom_all_reduce=disable_custom_all_reduce,
         )
+        if max_num_seqs is not None:
+            engine_kwargs["max_num_seqs"] = max_num_seqs
+        print(f"[backend=vllm] engine_kwargs={engine_kwargs}")
+        self.llm = LLM(**engine_kwargs)
         if self.use_lora:
             from vllm.lora.request import LoRARequest
             self.lora_request = LoRARequest("sapr_sft", 1, str(lora_path))
@@ -567,6 +576,17 @@ def main():
                    help="仅 vllm: 占多少显存，BGE encoder 还要 ~3G")
     p.add_argument("--max_model_len", type=int, default=8192,
                    help="仅 vllm: KV cache 上限；history 累积 + 长 evidence 时需要")
+    p.add_argument("--vllm_dtype", type=str, default="float16",
+                   choices=["bfloat16", "float16"],
+                   help="仅 vllm: 模型加载 dtype")
+    p.add_argument("--vllm_max_num_seqs", type=int, default=None,
+                   help="仅 vllm: scheduler 最大并发序列数")
+    p.add_argument("--vllm_max_num_batched_tokens", type=int, default=2048,
+                   help="仅 vllm: 单次 iteration 的最大 token 数")
+    p.add_argument("--vllm_cuda_graph", action="store_true",
+                   help="仅 vllm: 启用 CUDA Graph（即 enforce_eager=False）")
+    p.add_argument("--vllm_disable_custom_all_reduce", action="store_true",
+                   help="仅 vllm: 禁用 custom all-reduce")
     p.add_argument("--shard_id", type=int, default=0,
                    help="DP 切片 id (0..num_shards-1)，本进程只跑 i%%num_shards==shard_id 的题")
     p.add_argument("--num_shards", type=int, default=1,
@@ -586,6 +606,11 @@ def main():
             lora_path=lora_path,
             max_model_len=args.max_model_len,
             gpu_memory_utilization=args.gpu_memory_utilization,
+            dtype=args.vllm_dtype,
+            max_num_seqs=args.vllm_max_num_seqs,
+            max_num_batched_tokens=args.vllm_max_num_batched_tokens,
+            enforce_eager=not args.vllm_cuda_graph,
+            disable_custom_all_reduce=args.vllm_disable_custom_all_reduce,
         )
     elif args.backend == "rollout_http":
         if not args.rollout_url:

@@ -1,7 +1,7 @@
 # SAPR-RAG 中期实验结果
 
-**最后更新**：2026-07-01
-**状态**：5 setting × 3 数据集评测全部完成（#3 DPO-no-SFT 结果补齐，cover_em / llm_acc 用 SAPR-RAG 口径重算）；新增 §5 多跳 QA 天花板诊断（Oracle 实验，DeepSeek-V4）
+**最后更新**：2026-08-09
+**状态**：基础 5 setting × 3 数据集评测全部完成；新增严格 LoRA GRPO-control、OPSD full-dev 与全参数 GRPO 的 HotpotQA held-out 评测。**更正**：旧 #5 GRPO 的 HotpotQA 结果存在 dev-leakage，不能作为有效 held-out 结果。当前有效结论是：修正后的 LoRA GRPO 与 SFT 基本持平，OPSD 和全参数 GRPO 均未带来泛化提升。
 
 ---
 
@@ -15,7 +15,10 @@
 | 2 | SFT | Qwen2.5-7B-Instruct | LoRA SFT | R3-RAG cold-start (178k, HotpotQA+2Wiki+MuSiQue) | ✅ 三数据集 |
 | 3 | DPO (no SFT) | Qwen2.5-7B-Instruct | LoRA DPO | RAG-ProGuide (5k, HotpotQA+2Wiki) | ✅ 三数据集 |
 | 4 | SFT + DPO | SFT ckpt | DPO over SFT | RAG-ProGuide (5k) | ✅ 三数据集 |
-| 5 | SFT + GRPO | SFT ckpt | GRPO + 三 reward | HotpotQA 子集 2k + 在线 reward | ✅ ckpt-175 三数据集已评测 |
+| 5 | SFT + GRPO | SFT ckpt | GRPO + 三 reward | HotpotQA dev-derived 子集 + 在线 reward | ⚠️ HotpotQA dev 泄露，仅保留为诊断 |
+| 6 | SFT+DPO + OPSD | SFT+DPO ckpt | LoRA GRPO + privileged teacher | HotpotQA/2Wiki official train-derived，各 3660 | ✅ HotpotQA full-dev；无增益 |
+| 7 | SFT + GRPO-control | SFT ckpt | LoRA GRPO，无 teacher | 同 #6 | ✅ ckpt1000 HotpotQA full-dev；与 SFT 持平 |
+| 8 | SFT + Full GRPO | SFT LoRA merged | 全参数 GRPO，ZeRO-3 | 同 #6 | ✅ 1 epoch；ckpt2500/3000/3660 full-dev；退化 |
 
 **评估指标**：
 - **`cover_em`（主指标）**：归一化 gold 是否作为连续 token 子序列出现在预测里（对齐 ReasonRAG / R3-RAG / Search-R1 论文口径）
@@ -33,7 +36,10 @@
 | #2 SFT | R3-RAG cold-start | GPT-4o 在 HotpotQA + 2Wiki + MuSiQue 训练集上 MCTS 生成 | 178k 行（5k 题 × 平均 ~35 step） | HotpotQA + 2Wiki + MuSiQue 训练集 |
 | #3 DPO | RAG-ProGuide | ReasonRAG 官方，GPT-4o 在 **PopQA + HotpotQA + 2Wiki** 训练集上 MCTS 生成偏好对 | ~5k 题 → 13,289 偏好对 | **PopQA + HotpotQA + 2Wiki 训练集（无 MuSiQue）** |
 | #4 SFT + DPO | 同 #2 + 同 #3 | — | 178k + 13.3k | SFT 阶段含 MuSiQue，DPO 阶段不含 |
-| #5 SFT + GRPO | 同 #2 + HotpotQA/2Wiki 混合子集 7.3k 在线 reward | — | 178k + 7.3k | HotpotQA + 2Wiki（GRPO 不含 MuSiQue，因缺 supporting_facts）|
+| #5 SFT + GRPO | 同 #2 + `data/grpo/hotpotqa_train.jsonl` | `data/eval/hotpotqa/dev.jsonl` 派生，剔除 gold title 全不可达样本 | 178k + 7,321 | ⚠️ HotpotQA dev-derived，HotpotQA held-out 结果无效 |
+| #6/#7/#8 新 GRPO | HotpotQA + 2Wiki official train-derived | 各数据集原始 train 按固定 seed 各采样 3660 | 7,320 | 与 HotpotQA dev 严格隔离 |
+
+**重要更正（2026-08-07）**：旧 GRPO 的训练集 `data/grpo/hotpotqa_train.jsonl` 不是 HotpotQA official train，而是由 `data/eval/hotpotqa/dev.jsonl` 构造。证据见 `03_sapr_rag/scripts/grpo/build_grpo_dataset.py` 的默认参数与 `logs/build_dataset.log`：`in=7405 out=7321 skip_unreachable=84`。因此旧 GRPO 在 HotpotQA dev 上的结果存在 evaluation set leakage，不能再作为有效泛化指标；仅可作为 GRPO 路径、reward 和 scheduler 的早期 sanity 记录。
 
 **RAG-ProGuide 来源核实**（ReasonRAG README.md:41 / 80-85）："randomly data from PopQA, HotpotQA, 2WikimultihopQA"，用 GPT-4o + MCTS 生成 process-supervised 偏好对（节点 reward = F1 × 0.9^step）。**未含 MuSiQue**。
 
@@ -66,8 +72,15 @@
 | **#2 SFT** | 7405 | **0.507** | **0.607** | 0.097 | 0.263 | 2.51 | 10.7% | 21.3% |
 | **#3 DPO (no SFT)†** | 7405 | **0.3999** | **0.5356** | 0.3492 | 0.4563 | 4.857† | — | — |
 | **#4 SFT + DPO** | 7405 | **0.469** | **0.606** | **0.401** | **0.523** | **2.15** | **3.4%** | 26.2% |
-| **#5 SFT + GRPO (ckpt-125)** | 7405 | **0.5080** | **0.6109** | 0.1086 | 0.2742 | 2.50 | 10.7% | 21.2% |
-| **#5 SFT + GRPO (ckpt-175)** | 7405 | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.48 | 10.4% | 21.5% |
+| **#5 SFT + GRPO (ckpt-125, invalid†)** | 7405 | 0.5080 | 0.6109 | 0.1086 | 0.2742 | 2.50 | 10.7% | 21.2% |
+| **#5 SFT + GRPO (ckpt-175, invalid†)** | 7405 | 0.5082 | 0.6082 | 0.1155 | 0.2824 | 2.48 | 10.4% | 21.5% |
+| **#6 SFT+DPO + OPSD (ckpt-3000)** | 7405 | 0.3869 | — | 0.2895 | 0.4026 | 2.122 | —‡ | —‡ |
+| **#7 SFT + LoRA GRPO-control (ckpt-1000)** | 7405 | **0.5080** | — | 0.1048 | 0.2716 | 2.508 | 10.36% | 20.61% |
+| **#8 SFT + Full GRPO (ckpt-2500, best)** | 7405 | 0.4493 | — | 0.4003 | 0.5071 | 3.162 | 22.86% | 18.72% |
+
+† `invalid` 表示该 HotpotQA 数字不再作为 held-out 评测使用：旧 GRPO 训练集由同一份 HotpotQA dev 构造，训练时使用了 dev 样本的 gold answer / supporting facts 作为 reward 信号。
+
+‡ OPSD full-dev 使用 strict HTTP 评测产物，未显式保留 max-turn exception / empty-evidence 行为字段，因此不与 `agent_infer.py` 的对应指标横比。
 
 ### 关键观察（HotpotQA）
 
@@ -250,17 +263,24 @@ DPO 不是"让模型变差"，而是**用一种新的"输出风格偏好"换取�
   - 1.1% (78 题) 全部 gold 不可达 ← 已在 GRPO 训练集预过滤
 - 这意味着即使检索完美，SaprRelevanceORM 的理论上限也不是 1.0 而是约 0.91。中期讨论"GRPO 是否提升了检索"时，要把这个天花板放进对比里。
 
+**P1.2 旧 GRPO HotpotQA dev 泄露（已确认，影响主结论）**
+- `03_sapr_rag/scripts/grpo/build_grpo_dataset.py` 的默认输入是 `data/eval/hotpotqa/dev.jsonl`，默认输出是 `data/grpo/hotpotqa_train.jsonl`。
+- 构造日志 `03_sapr_rag/scripts/grpo/logs/build_dataset.log` 显示：`in=7405 out=7321 skip_unreachable=84`。
+- 题目集合核对显示：`data/grpo/hotpotqa_train.jsonl` 的 7,321 个问题全部是 HotpotQA dev 的子集。
+- 结论：旧 GRPO 的 HotpotQA dev 指标无效，不能作为 held-out 泛化结果，也不能用于证明 GRPO 相比 SFT 的 HotpotQA 提升。
+- 处理：旧 GRPO 仅保留为 dev-leakage sanity / 训练链路调试记录；当前已启动严格 control：SFT 起点 + raw train-derived mixed 数据 `data/grpo/hotpotqa_2wiki_train.jsonl` + `teacher_kl_coef=0`，完成后替代旧 #5 结果。
+
 **P2.3 #3 (DPO) 与 #5 (GRPO) 训练数据不同源**
 - #3 用 ReasonRAG 官方 RAG-ProGuide（5k 偏好对，源自 PopQA + HotpotQA + 2Wiki 混合）
-- #5 用 HotpotQA SFT-7321 子集 + gold supporting reward
+- #5 旧实验误用了 HotpotQA dev-derived 7321 子集 + gold supporting reward
 - 所以 **#4 vs #5 的差异既有"算法差异"也有"数据差异"**
-- 处理：HotpotQA 没有现成可在线评估的 reward signal，所以只能用各自最适合的数据。**评估口径统一为 HotpotQA dev cover_em**，下游公平；训练数据各取所长是现实约束。在报告里直接陈述这个 trade-off，不掩盖。
+- 处理：旧 #5 的 HotpotQA 结果作废；后续 GRPO 必须使用 `data/raw/*/train.jsonl` 派生数据训练，再用 HotpotQA dev 评测。
 
 **P2.4 GRPO 训练数据量与 SFT/DPO 不对等**
-- 当前 v4-formatfix 使用 HotpotQA GRPO 训练集 7321 条，从 SFT ckpt-1650 继续训练
+- 旧 v4-formatfix 使用 HotpotQA dev-derived GRPO 训练集 7321 条，从 SFT ckpt-1650 继续训练
 - 训练在 global_step=234/1220 因 rollout prompt 超长崩溃，尚未跑满 1 epoch
-- 风险：GRPO ckpt-175 是中间 checkpoint，数字偏保守，且与 #2 SFT / #4 SFT+DPO 的训练数据量和数据来源不完全对等
-- 处理：报告中明确标注"#5 是 GRPO 中间 checkpoint 的初步结果"，不与 #2/#4 画"训练数据完全对等"的等号
+- 风险：除中途崩溃外，该实验还存在 HotpotQA dev leakage。
+- 处理：报告中明确标注旧 #5 HotpotQA 数字无效；不再将其纳入正式 HotpotQA 主结论。
 
 **🟢 P3 轻度（实现层细节，不影响主结论）**
 
@@ -504,8 +524,8 @@ ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数�
 | HotpotQA | DPO (no SFT)† | 0.3999 | 0.5356 | 0.3492 | 0.4563 | 4.857† | — | — |
 | HotpotQA | SFT | 0.5070 | **0.6073** | 0.0971 | 0.2634 | 2.513 | 10.7% | 21.3% |
 | HotpotQA | SFT+DPO | 0.4693 | 0.6062 | **0.4008** | **0.5233** | **2.151** | **3.4%** | 26.2% |
-| HotpotQA | GRPO ckpt-125 | 0.5080 | **0.6109** | 0.1086 | 0.2742 | 2.496 | 10.7% | **21.2%** |
-| HotpotQA | **GRPO ckpt-175** | **0.5082** | **0.6082** | 0.1155 | 0.2824 | 2.475 | 10.4% | 21.5% |
+| HotpotQA | GRPO ckpt-125 (invalid†) | 0.5080 | 0.6109 | 0.1086 | 0.2742 | 2.496 | 10.7% | 21.2% |
+| HotpotQA | GRPO ckpt-175 (invalid†) | 0.5082 | 0.6082 | 0.1155 | 0.2824 | 2.475 | 10.4% | 21.5% |
 | 2Wiki | Zero-shot | 0.1114 | 0.1178 | 0.0803 | 0.1049 | 4.86 | 66.6% | 57.1% |
 | 2Wiki | DPO (no SFT)† | 0.4061 | 0.4249 | 0.3496 | 0.4194 | 4.369† | — | — |
 | 2Wiki | SFT | 0.4488 | 0.4431 | 0.1018 | 0.2515 | 3.577 | 27.9% | 35.8% |
@@ -517,8 +537,12 @@ ckpt-175 是 v4-formatfix 训练中 reward 峰值附近的 checkpoint。三数�
 | MuSiQue | SFT+DPO | **0.2069** | **0.2462** | **0.1667** | **0.2477** | **3.278** | **16.9%** | 42.9% |
 | MuSiQue | GRPO ckpt-175 | 0.1986 | 0.2131 | 0.0571 | 0.1303 | 3.828 | 32.8% | **30.2%** |
 
-**GRPO ckpt-175 初步结论**：
-- **HotpotQA**：ckpt-175 相比 SFT 的 cover_em 基本持平（0.5070→0.5082），LLM-acc 小幅领先 SFT/SFT+DPO（0.6082 vs 0.6073/0.6062），但略低于 ckpt-125（0.6109）。说明 GRPO 对 HotpotQA 有真实但很小的事实正确率收益，ckpt-125/175 差距在 0.3pt 内。
+**外部诊断基线说明**：DeepSeek-V4-Pro closed-book / zeroshot 不放入上表主体，因为它不是 SAPR-RAG / ReasonRAG pipeline 下的同口径模型评测，也没有 `avg_turns` / `empty_evidence_rate` 等多轮 RAG 行为指标。已完成的 MuSiQue 全量结果记录在 §5.4：EM 14.1% / Cover EM 16.3% / F1 19.6%。
+
+† HotpotQA GRPO 行不能作为 held-out 结果使用，因为旧 GRPO 训练数据由同一份 HotpotQA dev 构造。
+
+**GRPO ckpt-175 初步结论（更正后）**：
+- **HotpotQA**：旧 ckpt-125/175 数字存在 dev leakage，不能用于证明 GRPO 对 HotpotQA 的泛化提升。此前“GRPO 对 HotpotQA 有真实但很小收益”的说法作废。
 - **2Wiki**：GRPO ckpt-175 是当前 cover_em 最优（0.4573），比 SFT +0.85pt、比 SFT+DPO +1.21pt；LLM-acc 为 0.4528，高于 SFT（0.4431）但低于 SFT+DPO（0.4705）。说明 GRPO 的 cover_em/证据质量收益没有完全转化为 LLM-judge 事实正确率最优。
 - **MuSiQue**：GRPO ckpt-175 高于 SFT（cover_em 0.1986 vs 0.1911；LLM-acc 0.2131 vs 0.2081），但低于 SFT+DPO（cover_em 0.2069；LLM-acc 0.2462）。这符合训练数据预期：GRPO 阶段未使用 MuSiQue reward 数据，跨到 MuSiQue 的泛化收益有限。
 - **指标风格差异仍存在**：SFT+DPO 在 EM/F1 上遥遥领先，主要来自简洁答案风格；GRPO 更接近 SFT 的长答案风格，因此 cover_em/LLM-judge 更适合判断其真实收益。
@@ -579,7 +603,18 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 | **MuSiQue** | 2,417 | **51.8%** | 59.3% | 61.5% |
 | **HotpotQA (distractor)** | 7,405 | **31.0%** | 34.8% | 39.2% |
 
-### 5.4 V4-Pro vs V4-Flash 对照（MuSiQue 全量）
+### 5.4 DeepSeek 闭卷 Zeroshot 对照（MuSiQue，V4-Pro）
+
+当时还额外跑了 MuSiQue 的 closed-book / zeroshot 设置：只给问题，不给任何上下文，用来估计模型参数知识本身能解决多少样本。这个设置只在 MuSiQue 上完成了全量 V4-Pro 评测；HotpotQA / 2Wiki 未看到对应 closed-book metrics 文件。
+
+| 设置 | 模型 | 样本数 | EM | Cover EM | F1 | 结果文件 |
+|---|---|---:|---:|---:|---:|---|
+| Closed-book / Zeroshot | deepseek-v4-pro | 2,417 | 14.1% | 16.3% | 19.6% | `data/eval_results/ceiling/musique_closed_book_metrics.json` |
+| Oracle | deepseek-v4-pro | 2,417 | 57.2% | 65.5% | 66.7% | `data/eval_results/ceiling/musique_oracle_metrics.json` |
+
+**解读**：MuSiQue 上 V4-Pro 闭卷只有 14.1% EM，而给每跳支撑段落后提升到 57.2% EM，说明该 benchmark 对 SOTA 模型并非纯靠参数知识就能解决；RAG / 证据注入贡献约 +43.1 EM / +49.2 Cover EM。
+
+### 5.5 V4-Pro vs V4-Flash 对照（MuSiQue 全量）
 
 用 MuSiQue 全量对比两个模型，量化模型能力差异：
 
@@ -591,7 +626,7 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 
 **结论**：V4-Flash 约为 V4-Pro 的 90% 性能，用 1/3 价格。对于"估算天花板大概范围"的目的，V4-Flash 完全够用。
 
-### 5.5 关键结论
+### 5.6 关键结论
 
 1. **三个数据集难度差异巨大**：2Wiki (74% EM) > MuSiQue (52%) > HotpotQA (31%)。注意 HotpotQA 是 distractor 设置（10 段上下文里找答案），难度已经远高于开放域。
 2. **多跳推理本身是主要瓶颈之一**：即使给了全部正确上下文，SOTA 模型也远做不到 100%。2Wiki 还有 ~26% 的题是"证据齐了也答不对"，MuSiQue ~48%，HotpotQA ~69%。
@@ -599,7 +634,7 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 4. **HotpotQA distractor 天花板仅 31% EM**：这解释了为什么很多论文在 HotpotQA 上 EM 卡在 30-40% 区间——即使上下文全给，模型推理也只能到这个水平。
 5. **对本项目的启示**：2Wiki 是当前投入产出比最高的方向（天花板高、当前系统已有不错基线）；MuSiQue 天花板中等但推理难度大；HotpotQA 受限于推理天花板，继续优化检索的边际收益可能递减。
 
-### 5.6 与当前系统的 gap（基于 GRPO ckpt-175）
+### 5.7 与当前系统的 gap（基于 GRPO ckpt-175）
 
 以 Cover EM 为口径（与主指标一致）：
 
@@ -619,12 +654,14 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 
 ## 6. GRPO 训练与评测（#5，v4-formatfix）
 
+**有效性更正（2026-08-07）**：本节记录的旧 v4-formatfix GRPO 训练集 `data/grpo/hotpotqa_train.jsonl` 实际由 `data/eval/hotpotqa/dev.jsonl` 构造，而不是由 HotpotQA official train 构造。因此旧 GRPO 在 HotpotQA dev 上的评测存在 dev-leakage，HotpotQA 指标无效。2Wiki / MuSiQue 行可作为跨数据集诊断参考，但旧 #5 不再作为正式 HotpotQA held-out baseline。
+
 ### 6.1 配置
 
 | 配置项 | 值 |
 |---|---|
 | 起点 | SFT ckpt-1650（继承多轮 RAG 协议）|
-| 训练数据 | HotpotQA 训练子集（`data/grpo/hotpotqa_train.jsonl`） |
+| 训练数据 | `data/grpo/hotpotqa_train.jsonl`（实际由 `data/eval/hotpotqa/dev.jsonl` 派生，HotpotQA held-out 无效） |
 | 框架 | ms-swift 4.4 GRPO（vLLM rollout server 模式）|
 | 资源布局 | 多卡训练 / 单卡 rollout / 独立检索 daemon |
 | reward 函数 | `SaprF1ORM`(w=1.0) + `SaprRelevanceORM`(w=0.2) + `SaprFormatORM`(w=0.05) |
@@ -668,10 +705,130 @@ RuntimeError: Multiple errors: [Exception('Server 0 failed: 500, Internal Server
 
 ### 6.4 ckpt-175 下游评测结论
 
-ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测和 LLM-judge。核心结论见 §4 后的"三数据集后训练对照"：
-- HotpotQA：cover_em 与 SFT 持平，LLM-acc 小幅高于 SFT/SFT+DPO。
+ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测和 LLM-judge，但 HotpotQA 行因 dev-leakage 作废。核心结论见 §4 后的"三数据集后训练对照"：
+- HotpotQA：结果无效，不能用于 held-out 结论。
 - 2Wiki：cover_em 达到当前最优 0.4573，LLM-acc 高于 SFT 但低于 SFT+DPO。
 - MuSiQue：cover_em 与 LLM-acc 均高于 SFT，但低于 SFT+DPO，符合 GRPO 未在 MuSiQue 上训练的预期。
+
+### 6.5 OPSD full-run 训练与评测（2026-08-06）
+
+OPSD 是在 GRPO 基础上增加 privileged teacher view：student 仍按普通 RAG prompt 和在线检索轨迹 rollout，teacher 使用带 gold evidence / gold answer 的 `teacher_prompt` 对**同一串 student-sampled response tokens**逐 token 计算 logprob。当前实现不是额外加一个 standalone KL loss，而是把 teacher/student log-ratio 注入 token-level advantage：
+
+```text
+A_t = A_GRPO + alpha * (logp_teacher_t - logp_student_t)
+```
+
+ms-swift 官方支持 `GRPO + teacher` 的 OPD-RL 路径，也支持通过 `teacher_prompt` 做 OPSD；这是一条被框架支持的路径，但不是所有 GRPO 任务的默认推荐。本项目采用 OPSD 的原因是 RAG 训练数据天然包含 gold supporting facts / gold answers，可构造 privileged teacher prompt。
+
+**训练配置与运行信息**：
+
+| 配置项 | 值 |
+|---|---|
+| Run | `opsd_colocate_effect_pbs2_g7_manual` |
+| 起点 | SFT+DPO LoRA `checkpoint-395` |
+| 训练数据 | `data/grpo/hotpotqa_2wiki_train_opsd.jsonl` |
+| 数据规模 | 7320 条，HotpotQA / 2Wiki 各 3660 |
+| teacher prompt | `teacher_prompt_mode=gold`，包含 gold supporting facts + gold answer |
+| 资源布局 | GPU0: GPU FAISS retrieval daemon；GPU1-7: colocate GRPO/vLLM |
+| 全局有效 prompt batch | 2 prompts/update |
+| 关键超参 | `per_device_train_batch_size=2`, `num_generations=7`, `teacher_kl_coef=0.1`, `lr=1e-6` |
+| 总步数 | 3660 steps |
+| epoch | 1.0 |
+| runtime | 16h 22m 26s |
+| avg step time | 16.1s/it |
+| checkpoint 目录 | `03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_colocate_full/opsd_colocate_effect_pbs2_g7_manual/v0-20260805-203554/` |
+| 训练日志 | `03_sapr_rag/scripts/grpo/logs/opsd_colocate_effect_pbs2_g7_manual.log` |
+
+**训练曲线（250 step 平滑，online reward）**：
+
+| Step range | Reward | F1 reward | Relevance | Format | Avg turns | Mean length | `frac_reward_zero_std` |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1-250 | 0.796 | 0.599 | 0.754 | 0.920 | 3.18 | 290.6 | 0.316 |
+| 1001-1250 | 0.763 | 0.569 | 0.742 | 0.906 | 3.21 | 297.5 | 0.286 |
+| 2251-2500 | 0.779 | 0.582 | 0.759 | 0.900 | 3.22 | 294.6 | 0.278 |
+| 2501-2750 | 0.789 | 0.591 | 0.761 | 0.927 | 3.14 | 286.0 | 0.306 |
+| 2751-3000 | 0.811 | 0.612 | 0.770 | 0.912 | 3.17 | 292.8 | 0.300 |
+| 3001-3250 | 0.798 | 0.595 | 0.784 | 0.923 | 3.12 | 285.8 | 0.304 |
+| 3251-3500 | 0.800 | 0.601 | 0.770 | 0.909 | 3.20 | 294.6 | 0.316 |
+| 3501-3660 | 0.822 | 0.624 | 0.760 | 0.923 | 3.14 | 291.7 | 0.375 |
+
+**曲线解读**：
+
+| 现象 | 解释 |
+|---|---|
+| Online reward 不单调，长期在 0.76-0.82 区间震荡 | on-policy GRPO + 小有效 prompt batch 下属于预期现象 |
+| 2750-3000 与 final 附近 online reward 较高 | 说明训练未崩，但不能直接等价于固定验证集更优 |
+| `frac_reward_zero_std` 约 0.28-0.38 | group 内 reward 区分度仍偏弱，GRPO 信号较稀疏 |
+| `checkpoint-3000` 在 200 条固定评测上优于 final | checkpoint 选择必须看固定集 / full-dev，而不是只看在线 reward |
+
+**HotpotQA 200 strict 固定评测**：
+
+| Checkpoint | N | Answered | EM | Cover EM | F1 | Avg turns | Avg latency | 结论 |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| `checkpoint-250` | 200 | 173 | 0.320 | 0.390 | **0.4242** | 2.035 | 1.50s | 早期 baseline，注意可能来自前一轮 run，需谨慎横比 |
+| `checkpoint-3000` | 200 | 175 | **0.325** | **0.405** | 0.4237 | 2.070 | 0.55s | 200 条 strict 中当前最优 |
+| `checkpoint-3660` | 200 | 171 | 0.305 | 0.385 | 0.4070 | 2.105 | 0.55s | final 相比 3000 回落 |
+
+**推理吞吐 benchmark（checkpoint-3000，HotpotQA 前 200 条，`max_tokens=512`）**：
+
+| Batch size | N | Wall time | Throughput | Avg latency (`batch_dt / batch`) | Errors |
+|---:|---:|---:|---:|---:|---:|
+| 8 | 200 | 105s | 1.905/s | 0.523s | 0 |
+| 16 | 200 | 79s | 2.532/s | 0.382s | 0 |
+| 32 | 200 | 68s | 2.941/s | 0.325s | 0 |
+| 64 | 200 | 59s | **3.390/s** | **0.282s** | 0 |
+
+因此 full-dev checkpoint 评测默认使用 `batch_size=64`、`max_tokens=512`。
+
+**HotpotQA full-dev strict 评测（已完成）**：
+
+| Checkpoint | N | Answered | EM | Cover-EM | F1 | Avg turns |
+|---|---:|---:|---:|---:|---:|---:|
+| `checkpoint-3000` | 7405 | 6321 (85.36%) | 0.2895 | 0.3869 | 0.4026 | 2.122 |
+| `checkpoint-3660` | 7405 | 6311 (85.23%) | 0.2883 | 0.3860 | 0.4014 | 2.122 |
+
+full-dev 上 checkpoint-3000 与 final 基本持平，且都显著低于其 SFT+DPO 起点的 Cover-EM 0.4693。200 条固定子集上观察到的 checkpoint 排名差异没有转化为可用的全量增益。该 strict HTTP 产物没有显式保留 max-turn exception，故其中 `max_turns_rate=0` 不与 `agent_infer.py` 的行为指标横比。
+
+### 6.6 严格 LoRA GRPO-control（2026-08-07）
+
+为消除旧 GRPO 的 HotpotQA dev-leakage，并分离 OPSD teacher signal 的影响，重新构造了严格训练集：HotpotQA official train 与 2Wiki official train 各 3660 条，共 7320 条；从 SFT checkpoint-1650 出发，用 LoRA 运行 plain GRPO，关闭 OPSD。训练在 checkpoint-1000 提前停止并做完整 HotpotQA dev 评测。
+
+| Setting | N | Cover-EM | EM | F1 | 回答率 | Avg turns | Max-turn | 空证据率 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| SFT | 7405 | 0.5070 | 0.0971 | 0.2634 | 89.28% | 2.513 | 10.71% | 21.29% |
+| LoRA GRPO-control ckpt1000 | 7405 | 0.5080 | 0.1048 | 0.2716 | 89.60% | 2.508 | 10.36% | 20.61% |
+
+该结果与 SFT 基本持平：Cover-EM 仅 +0.10pt，行为指标也几乎不变。它证明修正后的 train-derived GRPO 链路有效，但没有证据表明 plain LoRA GRPO 带来实质 held-out 泛化收益。
+
+### 6.7 全参数 GRPO（2026-08-08）
+
+Policy 和 reference model 均初始化为 SFT LoRA 合并后的完整模型；使用 ZeRO-3 在 GPU1-7 上完成 1 epoch（3660 steps）。训练数据与严格 LoRA control 相同，配置为 `beta=0.04`、`lr=1e-6`、`per_device_train_batch_size=2`、`num_generations=7`、`max_turns=6`。
+
+| Setting | Cover-EM | EM | F1 | 回答率 | Avg turns | Max-turn | 空证据率 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| SFT | 0.5070 | 0.0971 | 0.2634 | 89.28% | 2.513 | 10.71% | 21.29% |
+| SFT+DPO | 0.4693 | 0.4008 | 0.5233 | 96.57% | 2.151 | 3.43% | 26.20% |
+| Full GRPO ckpt2500 | 0.4493 | 0.4003 | 0.5071 | 77.06% | 3.162 | 22.86% | 18.72% |
+| Full GRPO ckpt3000 | 0.4258 | 0.3824 | 0.4796 | 69.14% | 3.735 | 30.76% | 21.16% |
+| Full GRPO ckpt3660 | 0.4265 | 0.3854 | 0.4817 | 69.79% | 3.704 | 30.16% | 20.69% |
+
+同一 7405 个 ID 的 paired bootstrap（10000 次，seed=`20260808`）：
+
+| Checkpoint vs SFT | Cover-EM Δ (95% CI) | F1 Δ (95% CI) | Max-turn Δ (95% CI) | 回答率 Δ (95% CI) |
+|---|---:|---:|---:|---:|
+| ckpt2500 | -5.77pt [-6.83, -4.70] | +24.37pt [+23.38, +25.36] | +12.15pt [+11.21, +13.11] | -12.22pt [-13.18, -11.29] |
+| ckpt3000 | -8.12pt [-9.20, -7.02] | +21.62pt [+20.61, +22.61] | +20.05pt [+19.00, +21.08] | -20.14pt [-21.16, -19.08] |
+| ckpt3660 | -8.05pt [-9.12, -6.95] | +21.83pt [+20.82, +22.82] | +19.45pt [+18.41, +20.49] | -19.49pt [-20.53, -18.45] |
+
+ckpt2500 是三个全参数 checkpoint 中最优点，但相对 SFT+DPO 仍为 Cover-EM -2.00pt（95% CI `[-3.05, -0.96]`）、F1 -1.62pt（95% CI `[-2.60, -0.64]`）；EM 基本持平，置信区间跨 0。继续训练到 3000 后 Cover-EM 显著退化，3000 到 3660 没有可确认改善。
+
+### 6.8 当前 GRPO 结论
+
+全参数 GRPO 将平均答案长度从 SFT 的 13.29 词压缩到 2.35-2.55 词；在**已经回答**的样本上，conditional Cover-EM 从 SFT 的 56.78% 提升到 58.31%-61.58%。因此 EM/F1 上升主要来自更短、更贴近 gold 的答案，不代表端到端泛化改善。
+
+真正的退化来自终止行为：回答率降到 69%-77%，最大轮次率升到 23%-31%。当前 reward 中 relevance reward 会持续奖励检索，format 权重只有 0.05，且没有显式 termination reward、turn penalty 或 max-turn penalty。训练确实改变了模型，但优化方向与端到端 Cover-EM 错位。
+
+**最终判断**：严格 LoRA GRPO 与 SFT 持平；当前 OPSD 和全参数 GRPO 均无有效泛化收益。下一轮应优先增加终止奖励和轮次惩罚、降低 relevance 权重，并以固定 held-out Cover-EM、回答率和 max-turn rate 联合选 checkpoint。
 
 ---
 
@@ -684,6 +841,10 @@ ckpt-175 已在 HotpotQA / 2Wiki / MuSiQue 三个 dev 集上完成完整评测�
 - [x] 写 LLM-judge 评估脚本（DeepSeek API + 标准 judge prompt + cache）
 - [x] 补跑 #5 GRPO ckpt-175 三数据集 LLM-judge，验证 cover_em 增益是否转化为事实正确率
 - [x] 补齐 #3 DPO-no-SFT 三数据集 cover_em / EM / F1 / llm_acc（用 SAPR-RAG score.py 口径重算 ReasonRAG pipeline 产物）
+- [x] 完成 OPSD checkpoint-3000/3660 HotpotQA full-dev strict 评测
+- [x] 完成严格 train-derived LoRA GRPO-control checkpoint-1000 HotpotQA full-dev 评测
+- [x] 完成全参数 GRPO 1 epoch 训练及 checkpoint-2500/3000/3660 full-dev 评测
+- [x] 完成全参数 GRPO 相对 SFT/SFT+DPO 的 paired bootstrap 和行为诊断
 - [ ] 抽样 100 题做 case study，分析 SFT / SFT+DPO / GRPO 的输出风格差异
 - [ ] D6 汇总数字 + 画图
 - [ ] D7 写中期报告正文 + OPD 后续计划

@@ -10,6 +10,46 @@ output/
 outputs/
 runs/
 wandb/
+*.tmp.py
+*.tmp.sh
+**/_tmp_*
+docs/analysis_tmp_*.md
+docs/rollout_gpu_residual_incident_*.md
+docs/worker_gpu_zombie_context_note_*.md
+
+# One-off experiment orchestration and local conversation exports
+03_sapr_rag/scripts/grpo/start_*.sh
+03_sapr_rag/scripts/grpo/wait_*.sh
+03_sapr_rag/scripts/grpo/kill_*.sh
+03_sapr_rag/scripts/grpo/stop_*.sh
+03_sapr_rag/scripts/grpo/status_*.sh
+03_sapr_rag/scripts/grpo/watch_*.sh
+03_sapr_rag/scripts/grpo/monitor_*.sh
+03_sapr_rag/scripts/grpo/probe_*.sh
+03_sapr_rag/scripts/grpo/smoke_*.sh
+03_sapr_rag/scripts/grpo/_*.sh
+03_sapr_rag/scripts/grpo/*_worker.sh
+03_sapr_rag/scripts/grpo/precheck_worker*.sh
+03_sapr_rag/scripts/grpo/launch_opsd_worker*.sh
+03_sapr_rag/scripts/grpo/launch_opsd_on_worker.sh
+03_sapr_rag/scripts/grpo/run_opsd_worker.sh
+03_sapr_rag/scripts/grpo/run_opsd_pilot_*_[0-9]*.sh
+03_sapr_rag/scripts/grpo/check_assets.sh
+03_sapr_rag/scripts/grpo/check_patch_loaded.sh
+03_sapr_rag/scripts/grpo/check_ports.sh
+03_sapr_rag/scripts/grpo/gpu_check.sh
+03_sapr_rag/scripts/grpo/grep_rollout.sh
+03_sapr_rag/scripts/grpo/inspect_*.sh
+03_sapr_rag/scripts/grpo/install_deepspeed.sh
+03_sapr_rag/scripts/grpo/locate_base_model.sh
+03_sapr_rag/scripts/grpo/opsd_error.sh
+03_sapr_rag/scripts/grpo/opsd_progress.sh
+03_sapr_rag/scripts/grpo/recheck_env.sh
+03_sapr_rag/scripts/grpo/upgrade_vllm.sh
+03_sapr_rag/scripts/grpo/分析 ReasonRAG 项目及论文.md
+03_sapr_rag/scripts/eval/debug_*.py
+03_sapr_rag/scripts/eval/run_opsd_ckpt*.sh
+03_sapr_rag/scripts/eval/start_*rollout*.sh
 
 # Local ARIS / Claude Code installation state
 .claude/skills/

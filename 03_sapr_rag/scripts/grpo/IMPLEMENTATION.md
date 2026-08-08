@@ -19,7 +19,7 @@
 3. `run_grpo.sh` — 三进程启动（daemon / rollout / train）。
 4. `sanity_check.py` — 不启真训练，验证三个 ORM 值域与方向。
 
-**ms-swift 版本**：`/mlx_devbox/users/mayi.summer/playground/ms-swift`，v4.4.0.dev0。
+**ms-swift 版本**：仓库同级目录 `../ms-swift`，v4.4.0.dev0。
 
 ---
 
@@ -219,7 +219,49 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 swift rlhf \
 
 ---
 
-## §7 文件清单与依赖顺序
+## §7 全量推理评测配置（HotpotQA dev）
+
+当前 full-dev checkpoint 评测采用 `swift rollout` 单卡服务 + HTTP batch 客户端：
+
+```text
+retrieval:  复用 127.0.0.1:8100 常驻检索服务
+rollout:    单 checkpoint 单 vLLM server，1 张 GPU
+dataset:    data/eval/hotpotqa/dev.jsonl，7405 条
+batch_size: 64
+max_tokens: 512
+temperature: 0.0
+top_p:      1.0
+max_turns:  6
+```
+
+`batch_size=8/16/32/64` 的 200 条吞吐 benchmark 显示 `64` 当前最高：
+
+```text
+batch_size  wall_s  throughput
+8           105s    1.905 samples/s
+16          79s     2.532 samples/s
+32          68s     2.941 samples/s
+64          59s     3.390 samples/s
+```
+
+因此全量 HotpotQA dev 推理默认使用：
+
+```bash
+python 03_sapr_rag/scripts/eval/run_direct_rollout_eval.py \
+  --input_jsonl data/eval/hotpotqa/dev.jsonl \
+  --batch_size 64 \
+  --max_tokens 512 \
+  --rollout_url http://127.0.0.1:${PORT}
+```
+
+注意事项：
+- `avg_latency_s` 是 `batch_duration / batch_size`，不是单请求端到端 latency。
+- 原始临时客户端没有严格处理缺失 `<answer>` 的输出；正式统计前需要从最终 assistant message 中严格提取 `<answer>...</answer>`，生成 `results.strict.jsonl` 后再调用 `score.py`。
+- 同一 rollout server 内做多组 batch benchmark 时，避免复用相同 uuid 统计 `history`；正式单 checkpoint 全量评测不受该 benchmark 统计问题影响。
+
+---
+
+## §8 文件清单与依赖顺序
 
 | 文件 | 对接 ms-swift | 复用源 | 依赖 |
 |---|---|---|---|
@@ -232,9 +274,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 swift rlhf \
 
 ---
 
-## §8 已知问题与踩坑记录
+## §9 已知问题与踩坑记录
 
-### 8.1 vLLM rollout 500 错误：多轮 RAG prompt 超长导致 max_tokens 为负数
+### 9.1 vLLM rollout 500 错误：多轮 RAG prompt 超长导致 max_tokens 为负数
 
 **现象**（v4-formatfix, step 234/1220, 训练 35h 后崩）：
 
@@ -268,13 +310,13 @@ vllm_engine.py:874 infer_async()
 - 限制 `max_turns` 更小（当前 6），减少上下文累积
 - 在 scheduler 中对 prompt 做 token 截断（保留 system + 最近 N 轮）
 
-### 8.2 SaprFormatORM 原始实现 bug
+### 9.2 SaprFormatORM 原始实现 bug
 
 原实现检查整个 completion 中**不能有任何** `<query>` 标签，导致正常多轮 RAG 轨迹（前序轮有 `<query>`，末轮以 `<answer>` 结束）被误判为格式非法。修复为：只要求最后一个协议标签是非空 `<answer>`。详见 v4-formatfix 的 plugin.py 改动。
 
 ---
 
-## §9 开放项与风险
+## §10 开放项与风险
 
 - **evidence 是否单独受训**：首版方案 A 不训（对齐评估口径风险最低），sanity 后视效果升方案 B。
 - **vllm 版本**：当前 0.10.0，ms-swift 4.4 推荐更高 → 1A 决策"先试跑踩坑再升"。

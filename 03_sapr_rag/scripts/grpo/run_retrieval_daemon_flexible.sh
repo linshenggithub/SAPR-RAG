@@ -23,6 +23,9 @@ RETRIEVAL_DEVICES="${RETRIEVAL_DEVICES:-$DEFAULT_RETRIEVAL_DEVICES}"
 PORT="${PORT:-8100}"
 HOST="${HOST:-127.0.0.1}"
 TEXT_TRUNCATE="${TEXT_TRUNCATE:-500}"
+FAISS_DEVICE="${FAISS_DEVICE:-cpu}"
+FAISS_GPU_ID="${FAISS_GPU_ID:-0}"
+FAISS_GPU_FP16="${FAISS_GPU_FP16:-false}"
 DRY_RUN="${DRY_RUN:-false}"
 
 case "$DEVICE_BACKEND" in
@@ -45,12 +48,21 @@ case "$DEVICE_BACKEND" in
 esac
 
 if [ -n "$VISIBLE_DEVICES_ENV" ]; then
-    echo "[run_retrieval_daemon_flexible] backend=$DEVICE_BACKEND ${VISIBLE_DEVICES_ENV}=$RETRIEVAL_DEVICES device=$RETRIEVAL_DEVICE port=$PORT"
+    echo "[run_retrieval_daemon_flexible] backend=$DEVICE_BACKEND ${VISIBLE_DEVICES_ENV}=$RETRIEVAL_DEVICES device=$RETRIEVAL_DEVICE port=$PORT faiss_device=$FAISS_DEVICE"
 else
-    echo "[run_retrieval_daemon_flexible] backend=$DEVICE_BACKEND device=$RETRIEVAL_DEVICE port=$PORT"
+    echo "[run_retrieval_daemon_flexible] backend=$DEVICE_BACKEND device=$RETRIEVAL_DEVICE port=$PORT faiss_device=$FAISS_DEVICE"
 fi
 
-CMD=(python "$SCRIPT_DIR/retrieval_daemon.py" --host "$HOST" --port "$PORT" --device "$RETRIEVAL_DEVICE" --text_truncate "$TEXT_TRUNCATE")
+CMD=(
+    python "$SCRIPT_DIR/retrieval_daemon.py"
+    --host "$HOST"
+    --port "$PORT"
+    --device "$RETRIEVAL_DEVICE"
+    --text_truncate "$TEXT_TRUNCATE"
+    --faiss_device "$FAISS_DEVICE"
+    --faiss_gpu_id "$FAISS_GPU_ID"
+)
+[ "$FAISS_GPU_FP16" = "true" ] && CMD+=(--faiss_gpu_fp16)
 
 if [ "$DRY_RUN" = "true" ]; then
     if [ -n "$VISIBLE_DEVICES_ENV" ]; then

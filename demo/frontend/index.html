@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="SAPR-RAG multi-hop question answering research demo"
+    />
+    <title>SAPR-RAG Demo</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div>
+            <strong>SAPR-RAG</strong>
+            <p>Research Demo</p>
+          </div>
+        </div>
+
+        <button id="newChat" class="new-chat" type="button">
+          <span aria-hidden="true">+</span>
+          新建对话
+        </button>
+
+        <div class="sidebar-section">
+          <p class="section-label">系统</p>
+          <div class="service-row">
+            <span id="serviceDot" class="service-dot checking"></span>
+            <span id="serviceText">正在检查服务</span>
+          </div>
+        </div>
+
+        <div class="sidebar-note">
+          <p class="section-label">研究原型</p>
+          <p>
+            面向复杂问答的多步检索推理。系统将问题分解为子查询，检索候选文档并逐步汇聚证据。
+          </p>
+        </div>
+
+        <a
+          class="repository-link"
+          href="https://github.com/linshenggithub/SAPR-RAG"
+          target="_blank"
+          rel="noreferrer"
+        >
+          查看研究仓库
+          <span aria-hidden="true">↗</span>
+        </a>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <h1>多跳问答</h1>
+            <p>Qwen2.5-7B · BGE · FAISS</p>
+          </div>
+          <button id="traceToggle" class="trace-toggle" type="button" aria-expanded="false">
+            推理过程
+          </button>
+        </header>
+
+        <div class="content-grid">
+          <section class="conversation" aria-live="polite">
+            <div id="emptyState" class="empty-state">
+              <div class="process-visual" aria-hidden="true">
+                <span class="process-node question-node">Q</span>
+                <span class="process-line"></span>
+                <span class="process-node search-node">R</span>
+                <span class="process-line"></span>
+                <span class="process-node answer-node">A</span>
+              </div>
+              <h2>从一个需要多步检索的问题开始</h2>
+              <p>系统会展示子查询、候选文档与证据汇聚过程。</p>
+              <div class="suggestions">
+                <button type="button" class="suggestion">
+                  Are the directors of Move (1970) and Méditerranée (1963) from the same country?
+                </button>
+                <button type="button" class="suggestion">
+                  Which university did the founder of the company that created Linux attend?
+                </button>
+                <button type="button" class="suggestion">
+                  Was the author of The Hobbit born before the inventor of the World Wide Web?
+                </button>
+              </div>
+            </div>
+            <div id="messages" class="messages"></div>
+          </section>
+
+          <aside id="tracePanel" class="trace-panel" aria-label="检索推理过程">
+            <div class="trace-heading">
+              <div>
+                <p class="section-label">TRAJECTORY</p>
+                <h2>检索推理过程</h2>
+              </div>
+              <span id="turnCount" class="turn-count">0 轮</span>
+            </div>
+            <div id="traceEmpty" class="trace-empty">
+              提问后，这里会按时间顺序展示检索与证据选择。
+            </div>
+            <div id="traceList" class="trace-list"></div>
+          </aside>
+        </div>
+
+        <footer class="composer-wrap">
+          <form id="composer" class="composer">
+            <label class="sr-only" for="questionInput">输入问题</label>
+            <textarea
+              id="questionInput"
+              rows="1"
+              maxlength="500"
+              placeholder="输入一个需要多步检索的问题"
+              autocomplete="off"
+            ></textarea>
+            <button id="sendButton" class="send-button" type="submit" title="发送问题">
+              <span aria-hidden="true">↑</span>
+              <span class="sr-only">发送</span>
+            </button>
+          </form>
+          <p class="composer-note">研究原型可能产生不准确结果，请结合检索证据判断。</p>
+        </footer>
+      </main>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

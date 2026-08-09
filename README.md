@@ -68,3 +68,8 @@ This repository does not vendor full external baseline code by default. Local wo
 3. Freeze ReasonRAG baseline configurations and trajectory format.
 4. Build HotpotQA step-level evidence preference data.
 5. Implement SAPR-RAG V0 on small samples.
+
+## Online Demo
+
+An isolated streaming demo gateway and browser interface are available under [`demo/`](demo/README.md).
+The demo reuses the existing vLLM and retrieval assets without changing the offline evaluation pipeline.

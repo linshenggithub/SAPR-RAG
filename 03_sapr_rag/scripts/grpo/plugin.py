@@ -106,6 +106,8 @@ class SaprRagScheduler(MultiTurnScheduler):
         return (
             f"Reference: <reference>{ref}</reference>\n"
             "Use the reference to continue answering the original question. "
+            "Do not repeat any previous query because it will return the same documents. "
+            "If more evidence is needed, query a different entity, relation, or missing fact. "
             "If the answer is supported, conclude with: "
             "\"So the answer is <answer>answer</answer>\". "
             "If more retrieval is needed, conclude with: "
@@ -156,6 +158,23 @@ def _as_list(x):
     return [x]
 
 
+def _support_sentence_variants(value):
+    variants = []
+    for item in _as_list(value):
+        if isinstance(item, (list, tuple)):
+            variants.extend(_support_sentence_variants(item))
+        else:
+            variants.extend(part.strip() for part in str(item).splitlines() if part.strip())
+    return variants
+
+
+def _extract_steps(info):
+    if not isinstance(info, dict):
+        return []
+    steps = info.get("retrieved_steps", info.get("steps", [])) or []
+    return steps if isinstance(steps, list) else []
+
+
 class SaprF1ORM(ORM):
     """主信号：末轮 answer 对 golden_answers 的 token 级 F1。值域 [0,1]。"""
 
@@ -173,7 +192,7 @@ orms["sapr_f1"] = SaprF1ORM
 
 
 class SaprRelevanceORM(ORM):
-    """检索相关性：检索 doc 对 gold supporting 的三级 OR 连续命中比例。值域 [0,1]。"""
+    """检索相关性：首次覆盖的 unique gold evidence 比例。值域 [0,1]。"""
 
     def _collect_docs(self, steps):
         """跨 turn 去重收集 (title, text)。"""
@@ -193,39 +212,37 @@ class SaprRelevanceORM(ORM):
         rollout_infos = kwargs.get("rollout_infos")
         gold_titles = kwargs.get("gold_titles")
         gold_sup_sents = kwargs.get("gold_sup_sents")
-        golden_answers = kwargs.get("golden_answers")
 
         rewards = []
         for i in range(len(completions)):
             info = rollout_infos[i] if rollout_infos else {}
-            steps = (info or {}).get("retrieved_steps", []) if isinstance(info, dict) else []
+            steps = _extract_steps(info)
             docs = self._collect_docs(steps)
             rtitles = set(norm_title(t) for t, _ in docs)
             rtexts = [norm_text(tx) for _, tx in docs]
 
             gtitles = _as_list(gold_titles[i]) if gold_titles else []
             gsents = _as_list(gold_sup_sents[i]) if gold_sup_sents else []
-            ganswers = _as_list(golden_answers[i]) if golden_answers else []
 
             num_gold = len(gtitles)
             if num_gold == 0:
                 rewards.append(0.0)  # 兜底（已在 build_grpo_dataset 预过滤）
                 continue
 
-            # 逐 gold 三级 OR 命中
+            # 每个 gold title 只计一次。supporting sentence 只作为 title 的
+            # 对齐补充，不再用 gold answer 文本代替缺失 evidence。
             hits = 0
             for j, gt in enumerate(gtitles):
                 hit = norm_title(gt) in rtitles
                 if not hit and j < len(gsents):
-                    gsn = norm_text(gsents[j])
-                    hit = bool(gsn) and any(gsn in tx for tx in rtexts)
-                if not hit:
-                    # 第三级：gold answer 文本出现在任一 doc 正文
-                    for ga in ganswers:
-                        gan = norm_text(ga)
-                        if gan and any(gan in tx for tx in rtexts):
-                            hit = True
-                            break
+                    normalized_sentences = [
+                        norm_text(sentence)
+                        for sentence in _support_sentence_variants(gsents[j])
+                    ]
+                    hit = any(
+                        sentence and any(sentence in text for text in rtexts)
+                        for sentence in normalized_sentences
+                    )
                 hits += 1 if hit else 0
 
             rewards.append(hits / num_gold)
@@ -233,6 +250,73 @@ class SaprRelevanceORM(ORM):
 
 
 orms["sapr_relevance"] = SaprRelevanceORM
+
+
+class SaprTurnCostORM(ORM):
+    """第一轮检索免费，之后每轮返回一个负奖励单位。"""
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        rollout_infos = kwargs.get("rollout_infos")
+        rewards = []
+        for i in range(len(completions)):
+            info = rollout_infos[i] if rollout_infos else {}
+            query_count = len(_extract_steps(info))
+            rewards.append(float(-max(0, query_count - 1)))
+        return rewards
+
+
+orms["sapr_turn_cost"] = SaprTurnCostORM
+
+
+class SaprRepeatQueryORM(ORM):
+    """惩罚规范化后完全重复的 query，默认最多扣三个单位。"""
+
+    @staticmethod
+    def _normalize_query(query):
+        query = re.sub(r"[^\w]+", " ", str(query).lower(), flags=re.UNICODE)
+        return re.sub(r"\s+", " ", query).strip()
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        rollout_infos = kwargs.get("rollout_infos")
+        cap = max(0, int(os.environ.get("SAPR_REPEAT_QUERY_CAP", "3")))
+        rewards = []
+        for i in range(len(completions)):
+            info = rollout_infos[i] if rollout_infos else {}
+            queries = [
+                self._normalize_query(step.get("query", ""))
+                for step in _extract_steps(info)
+            ]
+            queries = [query for query in queries if query]
+            repeat_count = len(queries) - len(set(queries))
+            rewards.append(float(-min(repeat_count, cap)))
+        return rewards
+
+
+orms["sapr_repeat_query"] = SaprRepeatQueryORM
+
+
+class SaprMaxTurnORM(ORM):
+    """惩罚耗尽 query 预算后仍没有有效 answer 的轨迹。"""
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        rollout_infos = kwargs.get("rollout_infos")
+        max_turns = max(1, int(os.environ.get("SAPR_MAX_TURNS", "6")))
+        rewards = []
+        for i, completion in enumerate(completions):
+            info = rollout_infos[i] if rollout_infos else {}
+            num_turns = info.get("num_turns") if isinstance(info, dict) else None
+            if num_turns is not None:
+                exhausted = int(num_turns) >= max_turns
+            else:
+                # Compatibility fallback: the final assistant turn stops before
+                # step(), so at most max_turns - 1 retrievals are recorded.
+                exhausted = len(_extract_steps(info)) >= max(0, max_turns - 1)
+            answered = bool(parse_final_answer(completion))
+            rewards.append(-1.0 if exhausted and not answered else 0.0)
+        return rewards
+
+
+orms["sapr_max_turn"] = SaprMaxTurnORM
 
 
 class SaprFormatORM(ORM):

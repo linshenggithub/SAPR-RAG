@@ -35,6 +35,10 @@ REASONING_SYSTEM = (
     "- Pinpoint parts that require additional information or verification through retrieval tools.\n"
     "* Conciseness: Ensure both queries and answers are concise, using nouns or short "
     "phrases whenever possible.\n"
+    "* Retrieval Discipline: The retrieval system is deterministic; do not repeat a "
+    "previous query because the same query returns the same documents. If a query did "
+    "not provide enough evidence, ask a new query targeting a different entity, "
+    "relation, or missing fact; otherwise answer with the available evidence.\n"
     "* Respond Format:\n"
     "If your knowledge is sufficient to answer the question, conclude with:\n"
     '"So the answer is <answer>answer</answer>"\n'

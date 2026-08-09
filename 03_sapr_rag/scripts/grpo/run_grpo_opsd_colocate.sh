@@ -23,6 +23,7 @@ MODEL_TYPE="${MODEL_TYPE:-}"
 TEMPLATE_TYPE="${TEMPLATE_TYPE:-}"
 INIT_ADAPTER="${INIT_ADAPTER:-sft_dpo}"
 case "$INIT_ADAPTER" in
+    none|"") RESOLVED_INIT_ADAPTER="" ;;
     sft) RESOLVED_INIT_ADAPTER="$SFT_LORA" ;;
     sft_dpo) RESOLVED_INIT_ADAPTER="$SFT_DPO_LORA" ;;
     *) RESOLVED_INIT_ADAPTER="$INIT_ADAPTER" ;;
@@ -69,6 +70,9 @@ SAVE_STEPS="${SAVE_STEPS:-250}"
 SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-30}"
 MAX_STEPS="${MAX_STEPS:-}"
 RESUME_FROM_CHECKPOINT="${RESUME_FROM_CHECKPOINT:-}"
+REWARD_FUNCS="${REWARD_FUNCS:-sapr_f1 sapr_relevance sapr_format}"
+REWARD_WEIGHTS="${REWARD_WEIGHTS:-1.0 0.2 0.05}"
+REPEAT_QUERY_CAP="${REPEAT_QUERY_CAP:-3}"
 DRY_RUN="${DRY_RUN:-false}"
 
 RUN_NAME="${RUN_NAME:-opsd_colocate_effect_pbs${PER_DEVICE_BATCH_SIZE}_g${NUM_GENERATIONS}_$(date +%Y%m%d_%H%M%S)}"
@@ -77,7 +81,10 @@ LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/${RUN_NAME}.log"
 
 case "$TUNER_TYPE" in
-    lora) REQUIRED_MODEL_PATHS=("$BASE_MODEL" "$ADAPTER_PATH") ;;
+    lora)
+        REQUIRED_MODEL_PATHS=("$BASE_MODEL")
+        [ -z "$ADAPTER_PATH" ] || REQUIRED_MODEL_PATHS+=("$ADAPTER_PATH")
+        ;;
     full)
         REQUIRED_MODEL_PATHS=("$BASE_MODEL" "$REF_MODEL")
         if [ "$DEEPSPEED" = "none" ]; then
@@ -122,6 +129,13 @@ if [ $((GLOBAL_COMPLETION_BATCH % NUM_GENERATIONS)) -ne 0 ]; then
 fi
 PROMPTS_PER_STEP=$((GLOBAL_COMPLETION_BATCH / NUM_GENERATIONS))
 
+read -r -a REWARD_FUNC_ARGS <<< "$REWARD_FUNCS"
+read -r -a REWARD_WEIGHT_ARGS <<< "$REWARD_WEIGHTS"
+if [ "${#REWARD_FUNC_ARGS[@]}" -eq 0 ] || [ "${#REWARD_FUNC_ARGS[@]}" -ne "${#REWARD_WEIGHT_ARGS[@]}" ]; then
+    echo "[run_grpo_opsd_colocate] ERROR: reward func/weight count mismatch: funcs='$REWARD_FUNCS' weights='$REWARD_WEIGHTS'" >&2
+    exit 2
+fi
+
 MAX_STEPS_ARG=()
 [ -n "$MAX_STEPS" ] && MAX_STEPS_ARG=(--max_steps "$MAX_STEPS")
 RESUME_ARG=()
@@ -138,6 +152,7 @@ echo "[run_grpo_opsd_colocate] train_devices=$TRAIN_DEVICES nproc=$NPROC_PER_NOD
 echo "[run_grpo_opsd_colocate] retrieval_url=$RETRIEVAL_URL"
 echo "[run_grpo_opsd_colocate] per_device_batch_size=$PER_DEVICE_BATCH_SIZE num_generations=$NUM_GENERATIONS prompts_per_step=$PROMPTS_PER_STEP grad_accum=$GRADIENT_ACCUMULATION_STEPS"
 echo "[run_grpo_opsd_colocate] opsd=$ENABLE_OPSD teacher_kl_coef=$([ "$ENABLE_OPSD" = "true" ] && echo "$TEACHER_KL_COEF" || echo 0) beta=$BETA lr=$LEARNING_RATE deepspeed=$DEEPSPEED"
+echo "[run_grpo_opsd_colocate] reward_funcs=$REWARD_FUNCS reward_weights=$REWARD_WEIGHTS repeat_query_cap=$REPEAT_QUERY_CAP"
 
 OPD_ARG=(--teacher_kl_coef 0)
 [ "$ENABLE_OPSD" = "true" ] && OPD_ARG=(--teacher_kl_coef "$TEACHER_KL_COEF")
@@ -148,7 +163,8 @@ DEEPSPEED_ARGS=()
 [ -n "$MODEL_TYPE" ] && MODEL_ARGS+=(--model_type "$MODEL_TYPE")
 [ -n "$TEMPLATE_TYPE" ] && MODEL_ARGS+=(--template "$TEMPLATE_TYPE")
 if [ "$TUNER_TYPE" = "lora" ]; then
-    MODEL_ARGS+=(--adapters "$ADAPTER_PATH" --lora_rank "$LORA_RANK")
+    [ -z "$ADAPTER_PATH" ] || MODEL_ARGS+=(--adapters "$ADAPTER_PATH")
+    MODEL_ARGS+=(--lora_rank "$LORA_RANK")
     VLLM_TUNER_ARGS=(--vllm_enable_lora true --vllm_max_lora_rank "$LORA_RANK")
 else
     MODEL_ARGS+=(--ref_model "$REF_MODEL")
@@ -161,8 +177,8 @@ CMD=(
     --rlhf_type grpo
     "${MODEL_ARGS[@]}"
     --external_plugins "$PLUGIN"
-    --reward_funcs sapr_f1 sapr_relevance sapr_format
-    --reward_weights 1.0 0.2 0.05
+    --reward_funcs "${REWARD_FUNC_ARGS[@]}"
+    --reward_weights "${REWARD_WEIGHT_ARGS[@]}"
     --beta "$BETA"
     --use_vllm true
     --vllm_mode colocate
@@ -213,6 +229,8 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 SAPR_RETRIEVAL_URL="$RETRIEVAL_URL" \
+SAPR_MAX_TURNS="$MAX_TURNS" \
+SAPR_REPEAT_QUERY_CAP="$REPEAT_QUERY_CAP" \
 CUDA_VISIBLE_DEVICES="$TRAIN_DEVICES" \
 NPROC_PER_NODE="$NPROC_PER_NODE" \
 MASTER_PORT="$MASTER_PORT" \

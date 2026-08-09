@@ -2,7 +2,7 @@
 """GRPO plugin sanity 验证（不启真训练）。
 
 step 1: 检索 daemon /health + 单查询（需 daemon 已起；可 --skip_daemon 跳过）。
-step 2: mock 一条 rollout_infos + dataset 行，调三个 ORM，断言值域 [0,1] 且方向合理。
+step 2: mock rollout_infos + dataset 行，验证 Reward-v2 各 ORM 的值域和方向。
 
 用法：
   python sanity_check.py                 # 跑全部
@@ -13,7 +13,14 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plugin import SaprF1ORM, SaprRelevanceORM, SaprFormatORM
+from plugin import (
+    SaprF1ORM,
+    SaprFormatORM,
+    SaprMaxTurnORM,
+    SaprRelevanceORM,
+    SaprRepeatQueryORM,
+    SaprTurnCostORM,
+)
 from retrieval_client import RetrievalClient
 
 
@@ -30,6 +37,9 @@ def check_rewards():
     f1 = SaprF1ORM()
     rel = SaprRelevanceORM()
     fmt = SaprFormatORM()
+    turn_cost = SaprTurnCostORM()
+    repeat_query = SaprRepeatQueryORM()
+    max_turn = SaprMaxTurnORM()
 
     # mock：检到 gold title + answer 正确 + 格式合法
     good_completion = "So the answer is <answer>Steve Wozniak</answer>"
@@ -68,18 +78,61 @@ def check_rewards():
             ]
         }],
     }
+    answer_shortcut_kwargs = {
+        **bad_kwargs,
+        "rollout_infos": [{
+            "retrieved_steps": [{
+                "turn": 1,
+                "query": "unrelated",
+                "docs": [{
+                    "title": "Unrelated page",
+                    "text": "The page happens to mention Steve Wozniak.",
+                }],
+            }],
+        }],
+    }
+    repeated_kwargs = {
+        **good_kwargs,
+        "rollout_infos": [{
+            "retrieved_steps": [
+                {
+                    "turn": turn,
+                    "query": "Who founded Apple?" if turn % 2 else "who founded apple",
+                    "docs": good_kwargs["rollout_infos"][0]["retrieved_steps"][0]["docs"],
+                }
+                for turn in range(1, 7)
+            ],
+        }],
+    }
+    exhausted_kwargs = {
+        **repeated_kwargs,
+        "rollout_infos": [{
+            "retrieved_steps": repeated_kwargs["rollout_infos"][0]["retrieved_steps"][:5],
+            "num_turns": 6,
+        }],
+    }
 
     f1_good = f1([good_completion], **good_kwargs)[0]
     f1_bad = f1([bad_completion], **bad_kwargs)[0]
     rel_good = rel([good_completion], **good_kwargs)[0]
     rel_bad = rel([bad_completion], **bad_kwargs)[0]
+    rel_shortcut = rel([bad_completion], **answer_shortcut_kwargs)[0]
     fmt_good = fmt([good_completion], **good_kwargs)[0]
     fmt_multi_turn = fmt([mult_turn_completion], **good_kwargs)[0]
     fmt_bad = fmt([bad_completion], **bad_kwargs)[0]
+    turn_good = turn_cost([good_completion], **good_kwargs)[0]
+    turn_repeated = turn_cost([bad_completion], **repeated_kwargs)[0]
+    repeat_good = repeat_query([good_completion], **good_kwargs)[0]
+    repeat_repeated = repeat_query([bad_completion], **repeated_kwargs)[0]
+    max_turn_good = max_turn([good_completion], **exhausted_kwargs)[0]
+    max_turn_bad = max_turn([bad_completion], **exhausted_kwargs)[0]
 
     print(f"[sanity] f1:        good={f1_good:.3f}  bad={f1_bad:.3f}")
-    print(f"[sanity] relevance: good={rel_good:.3f}  bad={rel_bad:.3f}")
+    print(f"[sanity] relevance: good={rel_good:.3f}  bad={rel_bad:.3f}  answer_shortcut={rel_shortcut:.3f}")
     print(f"[sanity] format:    good={fmt_good:.3f}  multi_turn={fmt_multi_turn:.3f}  bad={fmt_bad:.3f}")
+    print(f"[sanity] turn_cost: good={turn_good:.3f}  repeated={turn_repeated:.3f}")
+    print(f"[sanity] repeat:    good={repeat_good:.3f}  repeated={repeat_repeated:.3f}")
+    print(f"[sanity] max_turn:  answered={max_turn_good:.3f}  unanswered={max_turn_bad:.3f}")
 
     for name, v in [("f1_good", f1_good), ("f1_bad", f1_bad),
                     ("rel_good", rel_good), ("rel_bad", rel_bad),
@@ -89,7 +142,11 @@ def check_rewards():
 
     assert f1_good > f1_bad, "f1 方向错：answer 正确应高于错误"
     assert rel_good > rel_bad, "relevance 方向错：检到 gold 应高于检错"
+    assert rel_shortcut == 0.0, "relevance 不应再用 gold answer 文本作为命中捷径"
     assert fmt_good == 1.0 and fmt_multi_turn == 1.0 and fmt_bad == 0.0, "format 方向错"
+    assert turn_good == 0.0 and turn_repeated == -5.0, "turn cost 方向或免费首轮错误"
+    assert repeat_good == 0.0 and repeat_repeated == -3.0, "重复 query 惩罚或 cap 错误"
+    assert max_turn_good == 0.0 and max_turn_bad == -1.0, "max-turn 未回答惩罚错误"
     print("[sanity] reward 值域 + 方向 全部通过 ✓")
 
 

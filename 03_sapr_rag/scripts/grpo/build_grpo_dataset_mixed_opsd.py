@@ -50,6 +50,10 @@ REASONING_SYSTEM = (
     "- Pinpoint parts that require additional information or verification through retrieval tools.\n"
     "* Conciseness: Ensure both queries and answers are concise, using nouns or short "
     "phrases whenever possible.\n"
+    "* Retrieval Discipline: The retrieval system is deterministic; do not repeat a "
+    "previous query because the same query returns the same documents. If a query did "
+    "not provide enough evidence, ask a new query targeting a different entity, "
+    "relation, or missing fact; otherwise answer with the available evidence.\n"
     "* Respond Format:\n"
     "If your knowledge is sufficient to answer the question, conclude with:\n"
     '"So the answer is <answer>answer</answer>"\n'
@@ -68,26 +72,16 @@ def norm_title(s: str) -> str:
 
 
 def extract_gold(d):
-    """从一条 FlashRAG 风格记录抽 gold_titles 与 gold_sup_sents。"""
-    sf = (d.get("metadata") or {}).get("supporting_facts", {}) or {}
-    titles = sf.get("title", []) or []
-    sent_ids = sf.get("sent_id", []) or []
-    ctx = (d.get("metadata") or {}).get("context", {}) or {}
-    ctx_titles = ctx.get("title", []) or []
-    ctx_sents = ctx.get("sentences", ctx.get("text", [])) or []
-    title2sents = {t: s for t, s in zip(ctx_titles, ctx_sents)}
-    sup_sents = []
-    for t, sid in zip(titles, sent_ids):
-        sents = title2sents.get(t)
-        if isinstance(sents, list) and 0 <= sid < len(sents):
-            sup_sents.append(sents[sid])
-    seen = set()
-    uniq_titles = []
-    for t in titles:
-        if t not in seen:
-            seen.add(t)
-            uniq_titles.append(t)
-    return uniq_titles, sup_sents
+    """提取按 unique title 对齐的 gold evidence。
+
+    同一 title 的多条 supporting sentence 用换行连接，保留一项 title 对应
+    一项 sentence evidence 的不变量。
+    """
+    evidence, _ = extract_teacher_evidence(d)
+    return (
+        [item["title"] for item in evidence],
+        ["\n".join(item["sentences"]) for item in evidence],
+    )
 
 
 def extract_teacher_evidence(d):
@@ -98,7 +92,7 @@ def extract_teacher_evidence(d):
     ctx = (d.get("metadata") or {}).get("context", {}) or {}
     ctx_titles = ctx.get("title", []) or []
     ctx_sents = ctx.get("sentences", ctx.get("text", ctx.get("content", []))) or []
-    title2sents = {t: s for t, s in zip(ctx_titles, ctx_sents)}
+    title2sents = {norm_title(str(t)): s for t, s in zip(ctx_titles, ctx_sents)}
 
     evidence = []
     title_to_item = {}
@@ -115,7 +109,7 @@ def extract_teacher_evidence(d):
             evidence.append(item)
 
         sentence = ""
-        sentences = title2sents.get(title)
+        sentences = title2sents.get(title_key)
         if isinstance(sentences, list) and isinstance(sent_id, int) and 0 <= sent_id < len(sentences):
             sentence = str(sentences[sent_id]).strip()
         if sentence:

@@ -27,7 +27,7 @@ import random
 import re
 from pathlib import Path
 
-PROJ_ROOT = Path("/mlx_devbox/users/mayi.summer/playground/SAPR-RAG")
+PROJ_ROOT = Path(os.environ.get("SAPR_RAG_ROOT", Path(__file__).resolve().parents[3]))
 
 REASONING_SYSTEM = (
     "You are an assistant for question answering with access to a retrieval tool. "
@@ -39,6 +39,10 @@ REASONING_SYSTEM = (
     "- Pinpoint parts that require additional information or verification through retrieval tools.\n"
     "* Conciseness: Ensure both queries and answers are concise, using nouns or short "
     "phrases whenever possible.\n"
+    "* Retrieval Discipline: The retrieval system is deterministic; do not repeat a "
+    "previous query because the same query returns the same documents. If a query did "
+    "not provide enough evidence, ask a new query targeting a different entity, "
+    "relation, or missing fact; otherwise answer with the available evidence.\n"
     "* Respond Format:\n"
     "If your knowledge is sufficient to answer the question, conclude with:\n"
     '"So the answer is <answer>answer</answer>"\n'
@@ -57,26 +61,41 @@ def norm_title(s: str) -> str:
 
 
 def extract_gold(d):
-    """从一条 FlashRAG 风格记录抽 gold_titles 与 gold_sup_sents。"""
+    """提取按 unique title 对齐的 gold evidence。"""
     sf = (d.get("metadata") or {}).get("supporting_facts", {}) or {}
     titles = sf.get("title", []) or []
     sent_ids = sf.get("sent_id", []) or []
     ctx = (d.get("metadata") or {}).get("context", {}) or {}
     ctx_titles = ctx.get("title", []) or []
-    ctx_sents = ctx.get("sentences", ctx.get("text", [])) or []
-    title2sents = {t: s for t, s in zip(ctx_titles, ctx_sents)}
-    sup_sents = []
-    for t, sid in zip(titles, sent_ids):
-        sents = title2sents.get(t)
-        if isinstance(sents, list) and 0 <= sid < len(sents):
-            sup_sents.append(sents[sid])
-    seen = set()
-    uniq_titles = []
-    for t in titles:
-        if t not in seen:
-            seen.add(t)
-            uniq_titles.append(t)
-    return uniq_titles, sup_sents
+    ctx_sents = ctx.get("sentences", ctx.get("text", ctx.get("content", []))) or []
+    title2sents = {
+        norm_title(str(title)): sentences
+        for title, sentences in zip(ctx_titles, ctx_sents)
+    }
+
+    evidence = []
+    title_to_item = {}
+    for title, sent_id in zip(titles, sent_ids):
+        title = str(title).strip()
+        if not title:
+            continue
+        title_key = norm_title(title)
+        item = title_to_item.get(title_key)
+        if item is None:
+            item = {"title": title, "sentences": []}
+            title_to_item[title_key] = item
+            evidence.append(item)
+
+        sentences = title2sents.get(title_key)
+        if isinstance(sentences, list) and isinstance(sent_id, int) and 0 <= sent_id < len(sentences):
+            sentence = str(sentences[sent_id]).strip()
+            if sentence and sentence not in item["sentences"]:
+                item["sentences"].append(sentence)
+
+    return (
+        [item["title"] for item in evidence],
+        ["\n".join(item["sentences"]) for item in evidence],
+    )
 
 
 def load_corpus_titles(corpus_path):

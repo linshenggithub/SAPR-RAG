@@ -89,6 +89,10 @@ Then open `http://127.0.0.1:8200`. Do not expose ports 8001 or 8100 publicly.
   public traffic comes through Cloudflare Tunnel.
 - Never commit `demo/.env`, credentials, tunnel tokens, model files, indexes, corpora, or logs.
 
+For the named Cloudflare Tunnel, privacy hardening, and user-level `systemd` services, follow
+[`DEPLOYMENT.md`](./DEPLOYMENT.md). Quick Tunnels are not suitable because the demo uses SSE and
+requires a stable hostname.
+
 ## Tests
 
 The state-machine tests use in-memory fakes and do not load a model or FAISS index:

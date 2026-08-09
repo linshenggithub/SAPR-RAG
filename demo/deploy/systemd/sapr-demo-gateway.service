@@ -1,0 +1,16 @@
+[Unit]
+Description=SAPR-RAG public demo gateway
+Wants=sapr-demo-model.service sapr-demo-retriever.service
+After=sapr-demo-model.service sapr-demo-retriever.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/sapr-rag/service.env
+ExecStart=/usr/bin/env bash -lc 'exec "$SAPR_RAG_ROOT/demo/scripts/launch_demo_gateway.sh"'
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

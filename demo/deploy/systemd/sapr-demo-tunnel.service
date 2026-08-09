@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Tunnel for SAPR-RAG demo
+Wants=network-online.target sapr-demo-gateway.service
+After=network-online.target sapr-demo-gateway.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/sapr-rag/tunnel.env
+ExecStart=%h/.local/bin/cloudflared tunnel --no-autoupdate run
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

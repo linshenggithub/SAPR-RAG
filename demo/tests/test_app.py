@@ -27,8 +27,12 @@ def test_settings():
         request_timeout_seconds=10.0,
         max_concurrent_requests=1,
         cooldown_seconds=0.0,
+        requests_per_window=20,
+        rate_window_seconds=3600.0,
+        max_request_bytes=4096,
         trust_cloudflare_ip=False,
         allowed_origins=(),
+        allowed_hosts=(),
     )
 
 
@@ -40,7 +44,31 @@ class DemoAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("SAPR-RAG", response.text)
         self.assertEqual(response.headers["x-frame-options"], "DENY")
+        self.assertEqual(response.headers["x-robots-tag"], "noindex, nofollow, noarchive")
         self.assertIn("default-src 'self'", response.headers["content-security-policy"])
+
+    def test_public_metadata_is_minimal(self):
+        with TestClient(create_app(test_settings())) as client:
+            openapi = client.get("/openapi.json")
+            robots = client.get("/robots.txt")
+            health = client.get("/api/health")
+
+        self.assertEqual(openapi.status_code, 404)
+        self.assertEqual(robots.status_code, 200)
+        self.assertIn("Disallow: /", robots.text)
+        self.assertNotIn("n_vectors", health.text)
+        self.assertNotIn("n_docs", health.text)
+
+    def test_trusted_host_and_forwarded_https(self):
+        settings = test_settings()
+        settings = Settings(**{**settings.__dict__, "allowed_hosts": ("rag.example.com",)})
+        with TestClient(create_app(settings), base_url="https://rag.example.com") as client:
+            accepted = client.get("/", headers={"X-Forwarded-Proto": "https"})
+            rejected = client.get("/", headers={"Host": "attacker.example"})
+
+        self.assertEqual(accepted.status_code, 200)
+        self.assertIn("max-age=31536000", accepted.headers["strict-transport-security"])
+        self.assertEqual(rejected.status_code, 400)
 
     def test_stream_endpoint_emits_sse_without_reasoning_text(self):
         app = create_app(test_settings())
@@ -64,6 +92,46 @@ class DemoAppTests(unittest.TestCase):
             response = client.post("/api/chat/stream", json={"question": "x" * 101})
 
         self.assertEqual(response.status_code, 422)
+
+    def test_rejects_oversized_request_body(self):
+        settings = test_settings()
+        settings = Settings(**{**settings.__dict__, "max_request_bytes": 32})
+        with TestClient(create_app(settings)) as client:
+            response = client.post(
+                "/api/chat/stream",
+                content=b"x" * 33,
+                headers={"Content-Type": "application/json"},
+            )
+
+        self.assertEqual(response.status_code, 413)
+
+    def test_rate_limit_does_not_store_raw_client_address(self):
+        settings = test_settings()
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "requests_per_window": 1,
+                "trust_cloudflare_ip": True,
+            }
+        )
+        app = create_app(settings)
+        with TestClient(app) as client:
+            app.state.agent = FakeAgent()
+            first = client.post(
+                "/api/chat/stream",
+                json={"question": "Question?"},
+                headers={"CF-Connecting-IP": "203.0.113.25"},
+            )
+            second = client.post(
+                "/api/chat/stream",
+                json={"question": "Question?"},
+                headers={"CF-Connecting-IP": "203.0.113.25"},
+            )
+            stored_keys = tuple(app.state.limiter.requests)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertNotIn("203.0.113.25", stored_keys)
 
 
 if __name__ == "__main__":

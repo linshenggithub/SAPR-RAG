@@ -39,14 +39,23 @@ class Settings:
     request_timeout_seconds: float
     max_concurrent_requests: int
     cooldown_seconds: float
+    requests_per_window: int
+    rate_window_seconds: float
+    max_request_bytes: int
     trust_cloudflare_ip: bool
     allowed_origins: tuple[str, ...]
+    allowed_hosts: tuple[str, ...]
 
     @classmethod
     def from_env(cls) -> "Settings":
         origins = tuple(
             item.strip()
             for item in os.getenv("SAPR_DEMO_ALLOWED_ORIGINS", "").split(",")
+            if item.strip()
+        )
+        hosts = tuple(
+            item.strip()
+            for item in os.getenv("SAPR_DEMO_ALLOWED_HOSTS", "").split(",")
             if item.strip()
         )
         return cls(
@@ -71,6 +80,16 @@ class Settings:
                 "SAPR_DEMO_MAX_CONCURRENT_REQUESTS", 1, 1, 8
             ),
             cooldown_seconds=_env_float("SAPR_DEMO_COOLDOWN_SECONDS", 5.0, 0.0),
+            requests_per_window=_env_int(
+                "SAPR_DEMO_REQUESTS_PER_WINDOW", 20, 1, 1000
+            ),
+            rate_window_seconds=_env_float(
+                "SAPR_DEMO_RATE_WINDOW_SECONDS", 3600.0, 60.0
+            ),
+            max_request_bytes=_env_int(
+                "SAPR_DEMO_MAX_REQUEST_BYTES", 4096, 512, 65536
+            ),
             trust_cloudflare_ip=os.getenv("SAPR_DEMO_TRUST_CLOUDFLARE_IP", "0") == "1",
             allowed_origins=origins,
+            allowed_hosts=hosts,
         )

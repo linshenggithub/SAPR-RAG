@@ -20,4 +20,5 @@ exec "$PYTHON_BIN" -m uvicorn demo.backend.app:app \
   --port 8200 \
   --workers 1 \
   --proxy-headers \
-  --forwarded-allow-ips=127.0.0.1
+  --forwarded-allow-ips=127.0.0.1 \
+  --no-access-log

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import secrets
 import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -28,21 +32,54 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1)
 
 
-class CooldownLimiter:
-    def __init__(self, cooldown_seconds: float):
+class ClientLimiter:
+    MAX_TRACKED_CLIENTS = 10000
+
+    def __init__(
+        self,
+        cooldown_seconds: float,
+        requests_per_window: int,
+        window_seconds: float,
+    ):
         self.cooldown_seconds = cooldown_seconds
-        self.last_request: dict[str, float] = {}
+        self.requests_per_window = requests_per_window
+        self.window_seconds = window_seconds
+        self.requests: dict[str, deque[float]] = {}
+        self.salt = secrets.token_bytes(16)
+        self.last_cleanup = 0.0
         self.lock = asyncio.Lock()
 
     async def check(self, key: str) -> float:
-        if self.cooldown_seconds <= 0:
-            return 0.0
+        digest = hashlib.blake2b(
+            key[:256].encode("utf-8", errors="replace"),
+            key=self.salt,
+            digest_size=16,
+        ).hexdigest()
         async with self.lock:
             now = time.monotonic()
-            retry_after = self.cooldown_seconds - (now - self.last_request.get(key, 0.0))
-            if retry_after > 0:
-                return retry_after
-            self.last_request[key] = now
+            cutoff = now - self.window_seconds
+            cleanup_interval = min(60.0, self.window_seconds)
+            if now - self.last_cleanup >= cleanup_interval:
+                for client, timestamps in list(self.requests.items()):
+                    while timestamps and timestamps[0] <= cutoff:
+                        timestamps.popleft()
+                    if not timestamps:
+                        del self.requests[client]
+                self.last_cleanup = now
+
+            if digest not in self.requests and len(self.requests) >= self.MAX_TRACKED_CLIENTS:
+                return cleanup_interval
+            history = self.requests.setdefault(digest, deque())
+
+            if history and self.cooldown_seconds > 0:
+                retry_after = self.cooldown_seconds - (now - history[-1])
+                if retry_after > 0:
+                    return retry_after
+
+            if len(history) >= self.requests_per_window:
+                return max(1.0, history[0] + self.window_seconds - now)
+
+            history.append(now)
             return 0.0
 
 
@@ -72,7 +109,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             evidence_max_tokens=settings.evidence_max_tokens,
         )
         app.state.semaphore = asyncio.Semaphore(settings.max_concurrent_requests)
-        app.state.limiter = CooldownLimiter(settings.cooldown_seconds)
+        app.state.limiter = ClientLimiter(
+            settings.cooldown_seconds,
+            settings.requests_per_window,
+            settings.rate_window_seconds,
+        )
         yield
         await model.close()
         await retriever.close()
@@ -82,8 +123,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         docs_url=None,
         redoc_url=None,
+        openapi_url=None,
         lifespan=lifespan,
     )
+
+    if settings.allowed_hosts:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=list(settings.allowed_hosts),
+        )
 
     if settings.allowed_origins:
         app.add_middleware(
@@ -95,15 +143,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        if request.method in {"POST", "PUT", "PATCH"}:
+            raw_length = request.headers.get("content-length")
+            try:
+                content_length = int(raw_length) if raw_length is not None else 0
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header."},
+                )
+            if content_length > settings.max_request_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body is too large."},
+                )
+
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; connect-src 'self'; img-src 'self' data:; "
             "style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'"
         )
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        if request.url.scheme == "https" or forwarded_proto == "https":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.get("/api/health")
@@ -114,12 +187,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "status": "ok" if model_health["ok"] and retrieval_health["ok"] else "degraded",
             "model": {"ok": model_health["ok"]},
-            "retriever": {
-                "ok": retrieval_health["ok"],
-                "n_vectors": retrieval_health.get("n_vectors"),
-                "n_docs": retrieval_health.get("n_docs"),
-            },
+            "retriever": {"ok": retrieval_health["ok"]},
         }
+
+    @app.get("/robots.txt", include_in_schema=False)
+    async def robots():
+        return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
     @app.post("/api/chat/stream")
     async def chat_stream(body: ChatRequest, request: Request):

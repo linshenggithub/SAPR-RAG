@@ -805,6 +805,19 @@ prompt。仅 8 条 MuSiQue 样本的 Answer evidence 因 token budget 截断。
 
 以上是训练健康度，不代表离线 EM/F1/Cover-EM 已提升。
 
+实时审计侧录：
+
+- 详细现场日志与 checkpoint 审计记录在
+  `docs/e11_action_opsd_live_audit.md`。
+- 截至 `2026-08-12 15:43 +0800`，训练推进到 `1124/3000`，
+  已保存 `checkpoint-500` 与 `checkpoint-1000`。
+- step 1039 出现 `7494` token 长输出，step 1040/1046 出现局部
+  loss/gradient 峰值；随后训练恢复，step 1124 loss 为 `0.0398`、
+  grad norm 为 `0.508`。
+- 日志显存高水位已升至 `84.57 GiB`，实时 GPU2 显存约
+  `90161/97871 MiB`。当前未见 NaN、OOM、Traceback 或进程退出，
+  但 checkpoint-1500 前需重点监控长输出和显存余量。
+
 #### 未完成项
 
 1. 继续训练至 step 3000，并审计 checkpoint-500/1000/1500/2000/2500/3000。

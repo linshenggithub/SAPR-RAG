@@ -13,10 +13,13 @@ SWIFT_ROOT="${SWIFT_ROOT:-$(cd "$PROJ_ROOT/../ms-swift" 2>/dev/null && pwd || tr
 }
 
 BASE_MODEL="${BASE_MODEL:-$PROJ_ROOT/03_sapr_rag/models/Qwen2.5-7B-Instruct}"
+MODEL_TYPE="${MODEL_TYPE:-}"
+TEMPLATE_TYPE="${TEMPLATE_TYPE:-}"
 SFT_LORA="$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/sft/checkpoint-1650"
 SFT_DPO_LORA="$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/sft_dpo/checkpoint-395"
 INIT_ADAPTER="${INIT_ADAPTER:-sft_dpo}"
 case "$INIT_ADAPTER" in
+    none|"") RESOLVED_INIT_ADAPTER="" ;;
     sft) RESOLVED_INIT_ADAPTER="$SFT_LORA" ;;
     sft_dpo) RESOLVED_INIT_ADAPTER="$SFT_DPO_LORA" ;;
     *) RESOLVED_INIT_ADAPTER="$INIT_ADAPTER" ;;
@@ -41,6 +44,8 @@ VLLM_MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-8192}"
 # 可注入：与常驻检索共卡时调低，给检索留余量（默认保持原 0.85）。
 VLLM_GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.85}"
 VLLM_ENABLE_LORA="${VLLM_ENABLE_LORA:-true}"
+ROLLOUT_DTYPE="${ROLLOUT_DTYPE:-bfloat16}"
+MULTI_TURN_SCHEDULER="${MULTI_TURN_SCHEDULER:-sapr_rag_scheduler}"
 DRY_RUN="${DRY_RUN:-false}"
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
@@ -59,7 +64,11 @@ case "$DEVICE_BACKEND" in
         exit 2
         ;;
 esac
-for path in "$BASE_MODEL" "$ADAPTER_PATH"; do
+REQUIRED_PATHS=("$BASE_MODEL")
+if [ -n "$ADAPTER_PATH" ]; then
+    REQUIRED_PATHS+=("$ADAPTER_PATH")
+fi
+for path in "${REQUIRED_PATHS[@]}"; do
     [ -d "$path" ] || { echo "[run_rollout_opsd] ERROR: path not found: $path" >&2; exit 2; }
 done
 
@@ -69,16 +78,30 @@ echo "[run_rollout_opsd] backend=$DEVICE_BACKEND ${VISIBLE_DEVICES_ENV}=$ROLLOUT
 echo "[run_rollout_opsd] init_adapter=$INIT_ADAPTER resolved_adapter=$ADAPTER_PATH"
 echo "[run_rollout_opsd] layout=rollout:${DEVICE_LABEL}${ROLLOUT_DEVICES}"
 echo "[run_rollout_opsd] vllm_enable_lora=$VLLM_ENABLE_LORA"
+echo "[run_rollout_opsd] dtype=$ROLLOUT_DTYPE"
+echo "[run_rollout_opsd] scheduler=$MULTI_TURN_SCHEDULER"
+
+ADAPTER_ARGS=()
+if [ -n "$ADAPTER_PATH" ]; then
+    ADAPTER_ARGS=(--adapters "$ADAPTER_PATH")
+fi
+MODEL_ARGS=()
+[ -n "$MODEL_TYPE" ] && MODEL_ARGS+=(--model_type "$MODEL_TYPE")
+[ -n "$TEMPLATE_TYPE" ] && MODEL_ARGS+=(--template "$TEMPLATE_TYPE")
+SCHEDULER_ARGS=()
+[ "$MULTI_TURN_SCHEDULER" != "none" ] && SCHEDULER_ARGS=(--multi_turn_scheduler "$MULTI_TURN_SCHEDULER")
 
 CMD=(
     swift rollout
     --model "$BASE_MODEL"
-    --adapters "$ADAPTER_PATH"
+    "${MODEL_ARGS[@]}"
+    "${ADAPTER_ARGS[@]}"
     --vllm_enable_lora "$VLLM_ENABLE_LORA"
     --vllm_use_async_engine true
-    --multi_turn_scheduler sapr_rag_scheduler
+    "${SCHEDULER_ARGS[@]}"
     --external_plugins "$PLUGIN"
     --max_turns 6
+    --torch_dtype "$ROLLOUT_DTYPE"
     --vllm_max_model_len "$VLLM_MAX_MODEL_LEN"
     --vllm_gpu_memory_utilization "$VLLM_GPU_MEM_UTIL"
     --host 127.0.0.1

@@ -52,6 +52,7 @@ DEEPSPEED="${DEEPSPEED:-zero2}"
 DRY_RUN="${DRY_RUN:-true}"
 TARGET="${TARGET:-all}"  # data | retrieval | rollout | control | opsd | all
 TEACHER_KL_COEFS="${TEACHER_KL_COEFS:-0.05 0.10 0.20}"
+TEACHER_ACTION_SCOPE="${TEACHER_ACTION_SCOPE:-all}"
 
 PLAIN_DATASET="${PLAIN_DATASET:-$PROJ_ROOT/data/grpo/hotpotqa_2wiki_train_pilot.jsonl}"
 OPSD_DATASET="${OPSD_DATASET:-$PROJ_ROOT/data/grpo/hotpotqa_2wiki_train_pilot_opsd.jsonl}"
@@ -168,8 +169,9 @@ run_opsd() {
         INIT_ADAPTER="$INIT_ADAPTER" \
         ENABLE_OPSD=true \
         TEACHER_KL_COEF="$coef" \
+        TEACHER_ACTION_SCOPE="$TEACHER_ACTION_SCOPE" \
         DATASET="$OPSD_DATASET" \
-        OUTPUT_DIR="$OPSD_OUTPUT_ROOT/alpha_${tag}" \
+        OUTPUT_DIR="$OPSD_OUTPUT_ROOT/scope_${TEACHER_ACTION_SCOPE}_alpha_${tag}" \
         VLLM_PORT="$PORT" \
         MAX_STEPS="$MAX_STEPS" \
         PER_DEVICE_BATCH_SIZE="$PER_DEVICE_BATCH_SIZE" \
@@ -185,7 +187,7 @@ run_opsd() {
 echo "[pilot] target=$TARGET backend=$DEVICE_BACKEND dry_run=$DRY_RUN init_adapter=$INIT_ADAPTER"
 echo "[pilot] plain_dataset=$PLAIN_DATASET"
 echo "[pilot] opsd_dataset=$OPSD_DATASET"
-echo "[pilot] max_steps=$MAX_STEPS teacher_kl_coefs=$TEACHER_KL_COEFS"
+echo "[pilot] max_steps=$MAX_STEPS teacher_kl_coefs=$TEACHER_KL_COEFS teacher_action_scope=$TEACHER_ACTION_SCOPE"
 
 case "$TARGET" in
     data) build_data ;;

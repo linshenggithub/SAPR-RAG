@@ -15,10 +15,12 @@ import os
 import re
 import string
 import sys
+from copy import deepcopy
 from collections import Counter
 from typing import Dict, List
 
 from swift.rewards import ORM, orms
+from swift.infer_engine.protocol import RolloutOutput
 from swift.rollout.multi_turn import MultiTurnScheduler, multi_turns
 
 # RetrievalClient 与本文件同目录
@@ -28,6 +30,36 @@ from retrieval_client import RetrievalClient
 # ─────────── 协议正则 / prompt（内联复制 agent_infer，避免 import faiss/torch 重依赖）───────────
 RE_QUERY = re.compile(r"<query>(.*?)</query>", re.DOTALL)
 RE_ANSWER = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
+RE_EVIDENCE = re.compile(r"<evidence>(.*?)</evidence>", re.DOTALL)
+
+EVIDENCE_SYSTEM = (
+    "You are an information retrieval assistant. Given a query and a reference document, "
+    "extract a concise piece of evidence that directly answers the query. "
+    "If no relevant evidence is found, output <evidence>None</evidence>. "
+    "Otherwise, output the evidence in the format: "
+    "Based on the query, the relevant evidence is <evidence>evidence_text</evidence>."
+)
+
+REASONING_SYSTEM = (
+    "You are an assistant for question answering with access to a retrieval tool. "
+    "Upon receiving a question, your task is to:\n"
+    "* Analyze and Decompose the Question: Break the question into smaller, manageable "
+    "sub-questions to ensure all aspects are addressed.\n"
+    "* Evaluate Your Knowledge: Assess each sub-question or component:\n"
+    "- Identify parts you can confidently answer based on your existing knowledge.\n"
+    "- Pinpoint parts that require additional information or verification through retrieval tools.\n"
+    "* Conciseness: Ensure both queries and answers are concise, using nouns or short "
+    "phrases whenever possible.\n"
+    "* Retrieval Discipline: The retrieval system is deterministic; do not repeat a "
+    "previous query because the same query returns the same documents. If a query did "
+    "not provide enough evidence, ask a new query targeting a different entity, "
+    "relation, or missing fact; otherwise answer with the available evidence.\n"
+    "* Respond Format:\n"
+    "If your knowledge is sufficient to answer the question, conclude with:\n"
+    '"So the answer is <answer>answer</answer>"\n'
+    "If retrieval is necessary to provide a complete answer, conclude with:\n"
+    '"So the next query is <query>query</query>"\n'
+)
 
 RETRIEVAL_DAEMON_URL = os.environ.get("SAPR_RETRIEVAL_URL", "http://127.0.0.1:8100")
 
@@ -74,6 +106,19 @@ def norm_text(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def normalize_query(query):
+    query = re.sub(r"[^\w]+", " ", str(query).lower(), flags=re.UNICODE)
+    return re.sub(r"\s+", " ", query).strip()
+
+
+def ensure_protocol_close(text, tag):
+    closing = f"</{tag}>"
+    if closing in text or f"<{tag}>" not in text:
+        return text
+    text = re.sub(rf"</{tag}[^>]*$", "", text.rstrip())
+    return text + closing
+
+
 def parse_final_answer(text):
     m = RE_ANSWER.search(text or "")
     return m.group(1).strip() if m else ""
@@ -92,7 +137,19 @@ class SaprRagScheduler(MultiTurnScheduler):
         self.client = RetrievalClient(base_url=RETRIEVAL_DAEMON_URL)
         self.client.wait_until_ready()
         self.top_k = int(os.environ.get("SAPR_TOP_K", "3"))
+        self.use_evidence_agent = os.environ.get("SAPR_ENABLE_EVIDENCE_AGENT", "false").lower() == "true"
+        self.evidence_max_tokens = int(os.environ.get("SAPR_EVIDENCE_MAX_TOKENS", "128"))
         self._traj: Dict[str, List[Dict]] = {}  # uuid -> [{turn, query, docs}]
+        self._request_configs = {}
+
+    async def run(self, infer_request, request_config, **kwargs):
+        uuid = infer_request.uuid or "default"
+        self._request_configs[uuid] = deepcopy(request_config)
+        try:
+            return await super().run(infer_request, request_config, **kwargs)
+        finally:
+            self._traj.pop(uuid, None)
+            self._request_configs.pop(uuid, None)
 
     # 出现 <answer> 即停；否则交母类判 max_turns / length
     def check_finished(self, infer_request, response_choice, current_turn) -> bool:
@@ -100,12 +157,11 @@ class SaprRagScheduler(MultiTurnScheduler):
             return True
         return super().check_finished(infer_request, response_choice, current_turn)
 
-    def _format_observation(self, docs) -> str:
-        # 与 agent_infer.build_evidence_prompt 同款；doc.text 已在 daemon 截 [:500]
-        ref = " ".join(f"{d.get('title','')}. {d.get('text','')}" for d in docs)
+    @staticmethod
+    def _format_evidence_observation(evidence) -> str:
         return (
-            f"Reference: <reference>{ref}</reference>\n"
-            "Use the reference to continue answering the original question. "
+            f"Based on the query, the relevant evidence is <evidence>{evidence}</evidence>.\n"
+            "Use this extracted evidence to continue answering the original question. "
             "Do not repeat any previous query because it will return the same documents. "
             "If more evidence is needed, query a different entity, relation, or missing fact. "
             "If the answer is supported, conclude with: "
@@ -114,6 +170,105 @@ class SaprRagScheduler(MultiTurnScheduler):
             "\"So the next query is <query>query</query>\"."
         )
 
+    @staticmethod
+    def _format_document_observation(docs) -> str:
+        reference = " ".join(
+            f"{doc.get('title', '')}. {doc.get('text', '')}"
+            for doc in docs
+        )
+        return (
+            f"Reference: <reference>{reference}</reference>\n"
+            "Use the reference to continue answering the original question. "
+            "Do not repeat any previous query because it will return the same documents. "
+            "If more evidence is needed, query a different entity, relation, or missing fact. "
+            "If the answer is supported, conclude with: "
+            "\"So the answer is <answer>answer</answer>\". "
+            "Otherwise conclude with: "
+            "\"So the next query is <query>query</query>\"."
+        )
+
+    @staticmethod
+    def _build_evidence_messages(query, docs):
+        reference = " ".join(f"{d.get('title', '')}. {d.get('text', '')}" for d in docs)
+        return [
+            {"role": "system", "content": EVIDENCE_SYSTEM},
+            {
+                "role": "user",
+                "content": f"Question: {query}. Reference: <reference>{reference}</reference>",
+            },
+        ]
+
+    @staticmethod
+    def _format_duplicate_observation(query) -> str:
+        return (
+            "This query duplicates a previous query and would return the same documents.\n"
+            f"Repeated query: <query>{query}</query>\n"
+            "Use a different entity, relation, or missing fact. "
+            "If the existing evidence is sufficient, conclude with: "
+            "\"So the answer is <answer>answer</answer>\". "
+            "If more retrieval is needed, conclude with a different query: "
+            "\"So the next query is <query>query</query>\"."
+        )
+
+    async def on_turn_end(self, infer_request, response_choice, current_turn) -> Dict:
+        if not self.use_evidence_agent:
+            return {}
+
+        text = response_choice.message.content or ""
+        match = RE_QUERY.search(text)
+        if not match:
+            return {}
+
+        query = match.group(1).strip()
+        normalized_query = normalize_query(query)
+        uuid = infer_request.uuid or "default"
+        steps = self._traj.setdefault(uuid, [])
+        seen_queries = {
+            step.get("normalized_query")
+            for step in steps
+            if step.get("normalized_query")
+        }
+        exact_duplicate = bool(normalized_query and normalized_query in seen_queries)
+        if exact_duplicate:
+            docs = []
+            search_executed = False
+        else:
+            try:
+                docs = self.client.search(query, top_k=self.top_k)
+            except Exception:
+                docs = []
+            search_executed = True
+
+        evidence_request = deepcopy(infer_request)
+        evidence_request.uuid = f"{uuid}:evidence:{current_turn}"
+        evidence_request.messages = self._build_evidence_messages(query, docs)
+        evidence_config = deepcopy(self._request_configs[uuid])
+        evidence_config.max_tokens = self.evidence_max_tokens
+        evidence_config.temperature = 0.0
+        evidence_config.top_p = 1.0
+        evidence_response = await self.infer_engine.infer_async(evidence_request, evidence_config)
+        evidence_choice = evidence_response.choices[0]
+        evidence_text = evidence_choice.message.content or "<evidence>None</evidence>"
+        evidence_match = RE_EVIDENCE.search(evidence_text)
+        evidence = evidence_match.group(1).strip() if evidence_match else "None"
+
+        infer_request.messages.append({
+            "role": "user",
+            "content": self._format_evidence_observation(evidence),
+        })
+
+        steps.append({
+            "turn": current_turn,
+            "query": query,
+            "normalized_query": normalized_query,
+            "docs": docs,
+            "evidence": evidence,
+            "evidence_raw": evidence_text,
+            "exact_duplicate": exact_duplicate,
+            "search_executed": search_executed,
+        })
+        return {"rollout_infos": {"retrieved_steps": list(steps), "uuid": uuid}}
+
     def step(self, infer_request, response_choice, current_turn) -> Dict:
         text = response_choice.message.content or ""
         token_ids = list(response_choice.token_ids)
@@ -121,18 +276,45 @@ class SaprRagScheduler(MultiTurnScheduler):
         uuid = infer_request.uuid or "default"
         steps = self._traj.setdefault(uuid, [])
 
+        if self.use_evidence_agent:
+            return {
+                "infer_request": infer_request,
+                "response_token_ids": token_ids,
+                "response_loss_mask": loss_mask,
+            }
+
         m = RE_QUERY.search(text)
         if m:
             query = m.group(1).strip()
-            try:
-                docs = self.client.search(query, top_k=self.top_k)
-            except Exception:
+            normalized_query = normalize_query(query)
+            seen_queries = {
+                step.get("normalized_query")
+                for step in steps
+                if step.get("normalized_query")
+            }
+            exact_duplicate = bool(normalized_query and normalized_query in seen_queries)
+            if exact_duplicate:
                 docs = []
-            obs = self._format_observation(docs)
+                obs = self._format_duplicate_observation(query)
+                search_executed = False
+            else:
+                try:
+                    docs = self.client.search(query, top_k=self.top_k)
+                except Exception:
+                    docs = []
+                obs = self._format_document_observation(docs)
+                search_executed = True
             # 参考 ms-swift VisualToolBoxScheduler：工具/环境返回作为下一轮 user message。
             # 这样 reference 不再混入 assistant completion，也不需要 response_loss_mask=0。
             infer_request.messages.append({"role": "user", "content": obs})
-            steps.append({"turn": current_turn, "query": query, "docs": docs})
+            steps.append({
+                "turn": current_turn,
+                "query": query,
+                "normalized_query": normalized_query,
+                "docs": docs,
+                "exact_duplicate": exact_duplicate,
+                "search_executed": search_executed,
+            })
 
         # 覆盖语义：rollout_infos 同名 key 覆盖不追加，每次写完整列表
         return {
@@ -144,6 +326,126 @@ class SaprRagScheduler(MultiTurnScheduler):
 
 
 multi_turns["sapr_rag_scheduler"] = SaprRagScheduler
+
+
+class SaprCanonicalScheduler(SaprRagScheduler):
+    """Canonical ReasonRAG-style context with final-turn-only training.
+
+    Retrieval decisions remain on-policy and determine the trajectory reward.
+    Each reasoning call receives only the original question plus compressed
+    query/evidence history. The trainer receives the final canonical call as
+    its completion, avoiding a mismatch between linear chat history and the
+    deployment-time reconstructed prompt.
+    """
+
+    @staticmethod
+    def _render_history(history):
+        return "\n\n".join(
+            f"So the next query is <query>{item['query']}</query> "
+            f"Based on the query, the relevant evidence is <evidence>{item['evidence']}</evidence>."
+            for item in history
+        )
+
+    @classmethod
+    def _reasoning_messages(cls, question, history):
+        instruction = f"Question: {question}"
+        if history:
+            instruction += "\nPrevious Thoughts: " + cls._render_history(history)
+        return [
+            {"role": "system", "content": REASONING_SYSTEM},
+            {"role": "user", "content": instruction},
+        ]
+
+    async def run(self, infer_request, request_config, **kwargs):
+        uuid = infer_request.uuid or "default"
+        original_user = next(
+            (str(message.get("content") or "") for message in infer_request.messages if message.get("role") == "user"),
+            "",
+        )
+        question = original_user
+        if question.lower().startswith("question:"):
+            question = question.split(":", 1)[1].strip()
+
+        history = []
+        steps = []
+        seen_queries = set()
+        max_turns = self.max_turns or 6
+        response = None
+        final_messages = None
+
+        for current_turn in range(1, max_turns + 1):
+            reasoning_request = deepcopy(infer_request)
+            reasoning_request.messages = self._reasoning_messages(question, history)
+            reasoning_config = deepcopy(request_config)
+            reasoning_config.stop = ["</query>", "</answer>"]
+            response = await self.infer_engine.infer_async(reasoning_request, reasoning_config, **kwargs)
+            choice = response.choices[0]
+            text = choice.message.content or ""
+            text = ensure_protocol_close(text, "query")
+            text = ensure_protocol_close(text, "answer")
+            choice.message.content = text
+            final_messages = reasoning_request.messages + [{"role": "assistant", "content": text}]
+
+            answer_match = RE_ANSWER.search(text)
+            query_match = RE_QUERY.search(text)
+            if answer_match or choice.finish_reason == "length" or not query_match:
+                break
+            if current_turn >= max_turns:
+                break
+
+            query = query_match.group(1).strip()
+            normalized_query = normalize_query(query)
+            exact_duplicate = bool(normalized_query and normalized_query in seen_queries)
+            seen_queries.add(normalized_query)
+            try:
+                docs = self.client.search(query, top_k=self.top_k)
+            except Exception:
+                docs = []
+            search_executed = True
+
+            evidence_request = deepcopy(infer_request)
+            evidence_request.uuid = f"{uuid}:evidence:{current_turn}"
+            evidence_request.messages = self._build_evidence_messages(query, docs)
+            evidence_config = deepcopy(request_config)
+            evidence_config.max_tokens = self.evidence_max_tokens
+            evidence_config.temperature = 0.0
+            evidence_config.top_p = 1.0
+            evidence_config.stop = ["</evidence>"]
+            evidence_response = await self.infer_engine.infer_async(evidence_request, evidence_config, **kwargs)
+            evidence_text = evidence_response.choices[0].message.content or "<evidence>None</evidence>"
+            evidence_text = ensure_protocol_close(evidence_text, "evidence")
+            evidence_match = RE_EVIDENCE.search(evidence_text)
+            evidence = evidence_match.group(1).strip() if evidence_match else "None"
+
+            history.append({"query": query, "evidence": evidence})
+            steps.append({
+                "turn": current_turn,
+                "query": query,
+                "normalized_query": normalized_query,
+                "docs": docs,
+                "evidence": evidence,
+                "evidence_raw": evidence_text,
+                "exact_duplicate": exact_duplicate,
+                "search_executed": search_executed,
+            })
+
+        choice = response.choices[0]
+        token_ids = list(choice.token_ids or [])
+        return RolloutOutput(
+            response=response,
+            messages=final_messages,
+            response_token_ids=[token_ids] if token_ids else [],
+            response_loss_mask=[[1] * len(token_ids)] if token_ids else [],
+            rollout_infos={
+                "retrieved_steps": steps,
+                "uuid": uuid,
+                "num_turns": current_turn,
+                "canonical_final_turn_only": True,
+            },
+        )
+
+
+multi_turns["sapr_rag_canonical_scheduler"] = SaprCanonicalScheduler
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -173,6 +475,26 @@ def _extract_steps(info):
         return []
     steps = info.get("retrieved_steps", info.get("steps", [])) or []
     return steps if isinstance(steps, list) else []
+
+
+def _gold_hits_for_docs(docs, gold_titles, gold_sup_sents):
+    rtitles = set(norm_title(d.get("title", "")) for d in docs or [])
+    rtexts = [norm_text(d.get("text", "")) for d in docs or []]
+    hits = set()
+    for j, gt in enumerate(gold_titles):
+        hit = norm_title(gt) in rtitles
+        if not hit and j < len(gold_sup_sents):
+            normalized_sentences = [
+                norm_text(sentence)
+                for sentence in _support_sentence_variants(gold_sup_sents[j])
+            ]
+            hit = any(
+                sentence and any(sentence in text for text in rtexts)
+                for sentence in normalized_sentences
+            )
+        if hit:
+            hits.add(j)
+    return hits
 
 
 class SaprF1ORM(ORM):
@@ -218,8 +540,7 @@ class SaprRelevanceORM(ORM):
             info = rollout_infos[i] if rollout_infos else {}
             steps = _extract_steps(info)
             docs = self._collect_docs(steps)
-            rtitles = set(norm_title(t) for t, _ in docs)
-            rtexts = [norm_text(tx) for _, tx in docs]
+            docs = [{"title": title, "text": text} for title, text in docs]
 
             gtitles = _as_list(gold_titles[i]) if gold_titles else []
             gsents = _as_list(gold_sup_sents[i]) if gold_sup_sents else []
@@ -229,27 +550,52 @@ class SaprRelevanceORM(ORM):
                 rewards.append(0.0)  # 兜底（已在 build_grpo_dataset 预过滤）
                 continue
 
-            # 每个 gold title 只计一次。supporting sentence 只作为 title 的
-            # 对齐补充，不再用 gold answer 文本代替缺失 evidence。
-            hits = 0
-            for j, gt in enumerate(gtitles):
-                hit = norm_title(gt) in rtitles
-                if not hit and j < len(gsents):
-                    normalized_sentences = [
-                        norm_text(sentence)
-                        for sentence in _support_sentence_variants(gsents[j])
-                    ]
-                    hit = any(
-                        sentence and any(sentence in text for text in rtexts)
-                        for sentence in normalized_sentences
-                    )
-                hits += 1 if hit else 0
+            hits = _gold_hits_for_docs(docs, gtitles, gsents)
 
-            rewards.append(hits / num_gold)
+            rewards.append(len(hits) / num_gold)
         return rewards
 
 
 orms["sapr_relevance"] = SaprRelevanceORM
+
+
+class SaprMarginalRelevanceORM(ORM):
+    """只奖励每轮新增 gold evidence；重复出现的证据不重复加分。"""
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        rollout_infos = kwargs.get("rollout_infos")
+        gold_titles = kwargs.get("gold_titles")
+        gold_sup_sents = kwargs.get("gold_sup_sents")
+        gamma = float(os.environ.get("SAPR_MARGINAL_GAMMA", "0.9"))
+        after_full_penalty = float(os.environ.get("SAPR_AFTER_FULL_COVERAGE_PENALTY", "0.10"))
+
+        rewards = []
+        for i in range(len(completions)):
+            info = rollout_infos[i] if rollout_infos else {}
+            steps = _extract_steps(info)
+            gtitles = _as_list(gold_titles[i]) if gold_titles else []
+            gsents = _as_list(gold_sup_sents[i]) if gold_sup_sents else []
+            num_gold = len(gtitles)
+            if num_gold == 0:
+                rewards.append(0.0)
+                continue
+
+            covered = set()
+            reward = 0.0
+            queries_after_full = 0
+            for turn_index, step in enumerate(steps, start=1):
+                if len(covered) == num_gold:
+                    queries_after_full += 1
+                hits = _gold_hits_for_docs(step.get("docs", []) or [], gtitles, gsents)
+                new_hits = hits - covered
+                reward += (gamma ** (turn_index - 1)) * (len(new_hits) / num_gold)
+                covered |= hits
+            reward -= after_full_penalty * queries_after_full
+            rewards.append(float(reward))
+        return rewards
+
+
+orms["sapr_marginal_relevance"] = SaprMarginalRelevanceORM
 
 
 class SaprTurnCostORM(ORM):
@@ -273,8 +619,7 @@ class SaprRepeatQueryORM(ORM):
 
     @staticmethod
     def _normalize_query(query):
-        query = re.sub(r"[^\w]+", " ", str(query).lower(), flags=re.UNICODE)
-        return re.sub(r"\s+", " ", query).strip()
+        return normalize_query(query)
 
     def __call__(self, completions, **kwargs) -> List[float]:
         rollout_infos = kwargs.get("rollout_infos")

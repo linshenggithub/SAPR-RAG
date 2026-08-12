@@ -17,6 +17,8 @@ from plugin import (
     SaprF1ORM,
     SaprFormatORM,
     SaprMaxTurnORM,
+    SaprMarginalRelevanceORM,
+    SaprRagScheduler,
     SaprRelevanceORM,
     SaprRepeatQueryORM,
     SaprTurnCostORM,
@@ -36,6 +38,7 @@ def check_daemon(url):
 def check_rewards():
     f1 = SaprF1ORM()
     rel = SaprRelevanceORM()
+    marginal_rel = SaprMarginalRelevanceORM()
     fmt = SaprFormatORM()
     turn_cost = SaprTurnCostORM()
     repeat_query = SaprRepeatQueryORM()
@@ -117,6 +120,9 @@ def check_rewards():
     rel_good = rel([good_completion], **good_kwargs)[0]
     rel_bad = rel([bad_completion], **bad_kwargs)[0]
     rel_shortcut = rel([bad_completion], **answer_shortcut_kwargs)[0]
+    marginal_good = marginal_rel([good_completion], **good_kwargs)[0]
+    marginal_bad = marginal_rel([bad_completion], **bad_kwargs)[0]
+    marginal_repeated = marginal_rel([bad_completion], **repeated_kwargs)[0]
     fmt_good = fmt([good_completion], **good_kwargs)[0]
     fmt_multi_turn = fmt([mult_turn_completion], **good_kwargs)[0]
     fmt_bad = fmt([bad_completion], **bad_kwargs)[0]
@@ -129,6 +135,7 @@ def check_rewards():
 
     print(f"[sanity] f1:        good={f1_good:.3f}  bad={f1_bad:.3f}")
     print(f"[sanity] relevance: good={rel_good:.3f}  bad={rel_bad:.3f}  answer_shortcut={rel_shortcut:.3f}")
+    print(f"[sanity] marginal:  good={marginal_good:.3f}  bad={marginal_bad:.3f}  repeated={marginal_repeated:.3f}")
     print(f"[sanity] format:    good={fmt_good:.3f}  multi_turn={fmt_multi_turn:.3f}  bad={fmt_bad:.3f}")
     print(f"[sanity] turn_cost: good={turn_good:.3f}  repeated={turn_repeated:.3f}")
     print(f"[sanity] repeat:    good={repeat_good:.3f}  repeated={repeat_repeated:.3f}")
@@ -143,11 +150,59 @@ def check_rewards():
     assert f1_good > f1_bad, "f1 方向错：answer 正确应高于错误"
     assert rel_good > rel_bad, "relevance 方向错：检到 gold 应高于检错"
     assert rel_shortcut == 0.0, "relevance 不应再用 gold answer 文本作为命中捷径"
+    assert marginal_good == 1.0 and marginal_bad == 0.0, "新增证据奖励基础方向错误"
+    assert marginal_good > marginal_repeated, "重复检索同一证据后，新增证据奖励应低于及时回答"
     assert fmt_good == 1.0 and fmt_multi_turn == 1.0 and fmt_bad == 0.0, "format 方向错"
     assert turn_good == 0.0 and turn_repeated == -5.0, "turn cost 方向或免费首轮错误"
     assert repeat_good == 0.0 and repeat_repeated == -3.0, "重复 query 惩罚或 cap 错误"
     assert max_turn_good == 0.0 and max_turn_bad == -1.0, "max-turn 未回答惩罚错误"
     print("[sanity] reward 值域 + 方向 全部通过 ✓")
+
+
+class _FakeClient:
+    def __init__(self):
+        self.calls = []
+
+    def search(self, query, top_k=3):
+        self.calls.append((query, top_k))
+        return [{"title": "Apple Inc.", "text": "Apple Inc. was founded by Steve Wozniak."}]
+
+
+class _FakeRequest:
+    def __init__(self, uuid="traj-1"):
+        self.uuid = uuid
+        self.messages = [{"role": "user", "content": "Question: who founded Apple?"}]
+
+
+class _FakeMessage:
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content):
+        self.message = _FakeMessage(content)
+        self.token_ids = [1, 2, 3]
+
+
+def check_duplicate_query_intercept():
+    scheduler = SaprRagScheduler.__new__(SaprRagScheduler)
+    scheduler.client = _FakeClient()
+    scheduler.top_k = 3
+    scheduler.use_evidence_agent = False
+    scheduler._traj = {}
+
+    req = _FakeRequest()
+    first = scheduler.step(req, _FakeChoice("So the next query is <query>Who founded Apple?</query>"), 1)
+    second = scheduler.step(req, _FakeChoice("So the next query is <query>who founded apple</query>"), 2)
+
+    steps = second["rollout_infos"]["retrieved_steps"]
+    assert len(scheduler.client.calls) == 1, "完全重复 query 不应再次调用检索服务"
+    assert steps[0]["search_executed"] is True and steps[0]["exact_duplicate"] is False
+    assert steps[1]["search_executed"] is False and steps[1]["exact_duplicate"] is True
+    assert steps[1]["docs"] == [], "重复 query 的 docs 应为空，避免伪造新增证据"
+    assert "duplicates a previous query" in req.messages[-1]["content"]
+    print("[sanity] duplicate query runtime intercept 通过 ✓")
 
 
 def main():
@@ -159,6 +214,7 @@ def main():
     if not args.skip_daemon:
         check_daemon(args.url)
     check_rewards()
+    check_duplicate_query_intercept()
     print("[sanity] ALL PASS")
 
 

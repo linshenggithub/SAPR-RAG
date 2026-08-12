@@ -37,9 +37,18 @@ VLLM_GROUP_PORT="${VLLM_GROUP_PORT:-51299}"
 RESUME_FROM_CHECKPOINT="${RESUME_FROM_CHECKPOINT:-}"
 ENABLE_OPSD="${ENABLE_OPSD:-true}"
 TEACHER_KL_COEF="${TEACHER_KL_COEF:-0.1}"
+TEACHER_ACTION_SCOPE="${TEACHER_ACTION_SCOPE:-all}"
+TEACHER_QUERY_KL_COEF="${TEACHER_QUERY_KL_COEF:-0.01}"
+TEACHER_EVIDENCE_KL_COEF="${TEACHER_EVIDENCE_KL_COEF:-0.0}"
+TEACHER_ANSWER_KL_COEF="${TEACHER_ANSWER_KL_COEF:-0.03}"
 MAX_LENGTH="${MAX_LENGTH:-2048}"
 MAX_COMPLETION_LENGTH="${MAX_COMPLETION_LENGTH:-4096}"
 PER_DEVICE_BATCH_SIZE="${PER_DEVICE_BATCH_SIZE:-1}"
+GRADIENT_ACCUMULATION_STEPS="${GRADIENT_ACCUMULATION_STEPS:-4}"
+STEPS_PER_GENERATION="${STEPS_PER_GENERATION:-8}"
+NUM_GENERATIONS="${NUM_GENERATIONS:-8}"
+SAVE_STEPS="${SAVE_STEPS:-25}"
+SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-60}"
 MAX_STEPS="${MAX_STEPS:-}"
 DRY_RUN="${DRY_RUN:-false}"
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
@@ -62,6 +71,10 @@ case "$ENABLE_OPSD" in
     true|false) ;;
     *) echo "[run_grpo_opsd] ERROR: ENABLE_OPSD must be true or false, got: $ENABLE_OPSD" >&2; exit 2 ;;
 esac
+case "$TEACHER_ACTION_SCOPE" in
+    all|query|evidence|answer|multi) ;;
+    *) echo "[run_grpo_opsd] ERROR: invalid TEACHER_ACTION_SCOPE=$TEACHER_ACTION_SCOPE" >&2; exit 2 ;;
+esac
 case "$DEVICE_BACKEND" in
     cuda)
         VISIBLE_DEVICES_ENV="CUDA_VISIBLE_DEVICES"
@@ -82,21 +95,40 @@ for path in "$BASE_MODEL" "$ADAPTER_PATH"; do
 done
 [ -f "$DATASET" ] || { echo "[run_grpo_opsd] ERROR: dataset not found: $DATASET" >&2; exit 2; }
 
-DATASET_HAS_TEACHER_PROMPT="$(
+DATASET_TEACHER_FIELDS="$(
     python - "$DATASET" <<'PY'
 import json
 import sys
 with open(sys.argv[1]) as f:
     for line in f:
         if line.strip():
-            print("true" if json.loads(line).get("teacher_prompt") else "false")
+            row = json.loads(line)
+            fields = [
+                key for key in (
+                    "teacher_prompt",
+                    "teacher_query_prompt",
+                    "teacher_evidence_prompt",
+                    "teacher_answer_prompt",
+                )
+                if row.get(key)
+            ]
+            print(",".join(fields) if fields else "none")
             break
     else:
         raise SystemExit("dataset is empty")
 PY
 )"
-if [ "$ENABLE_OPSD" != "$DATASET_HAS_TEACHER_PROMPT" ]; then
-    echo "[run_grpo_opsd] ERROR: ENABLE_OPSD=$ENABLE_OPSD but dataset teacher_prompt=$DATASET_HAS_TEACHER_PROMPT" >&2
+if [ "$ENABLE_OPSD" = "true" ] && [ "$DATASET_TEACHER_FIELDS" = "none" ]; then
+    echo "[run_grpo_opsd] ERROR: ENABLE_OPSD=true but dataset has no teacher prompt fields" >&2
+    exit 2
+fi
+if [ "$ENABLE_OPSD" = "false" ] && [ "$DATASET_TEACHER_FIELDS" != "none" ]; then
+    echo "[run_grpo_opsd] ERROR: ENABLE_OPSD=false but dataset has $DATASET_TEACHER_FIELDS" >&2
+    exit 2
+fi
+if [ "$ENABLE_OPSD" = "true" ] && [ "$TEACHER_ACTION_SCOPE" != "multi" ] \
+        && [[ ",$DATASET_TEACHER_FIELDS," != *",teacher_prompt,"* ]]; then
+    echo "[run_grpo_opsd] ERROR: single-scope mode requires legacy teacher_prompt; use TEACHER_ACTION_SCOPE=multi for scoped fields" >&2
     exit 2
 fi
 
@@ -106,8 +138,21 @@ RESUME_ARG=()
 [ -n "$RESUME_FROM_CHECKPOINT" ] && RESUME_ARG=(--resume_from_checkpoint "$RESUME_FROM_CHECKPOINT")
 MAX_STEPS_ARG=()
 [ -n "$MAX_STEPS" ] && MAX_STEPS_ARG=(--max_steps "$MAX_STEPS")
-OPD_ARG=(--teacher_kl_coef 0)
-[ "$ENABLE_OPSD" = "true" ] && OPD_ARG=(--teacher_kl_coef "$TEACHER_KL_COEF")
+OPD_ARG=(--teacher_kl_coef 0 --teacher_action_scope all)
+if [ "$ENABLE_OPSD" = "true" ] && [ "$TEACHER_ACTION_SCOPE" = "multi" ]; then
+    OPD_ARG=(
+        --teacher_kl_coef 0
+        --teacher_action_scope multi
+        --teacher_query_kl_coef "$TEACHER_QUERY_KL_COEF"
+        --teacher_evidence_kl_coef "$TEACHER_EVIDENCE_KL_COEF"
+        --teacher_answer_kl_coef "$TEACHER_ANSWER_KL_COEF"
+    )
+elif [ "$ENABLE_OPSD" = "true" ]; then
+    OPD_ARG=(
+        --teacher_kl_coef "$TEACHER_KL_COEF"
+        --teacher_action_scope "$TEACHER_ACTION_SCOPE"
+    )
+fi
 
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR" "$OUTPUT_DIR"
@@ -119,7 +164,8 @@ echo "[run_grpo_opsd] output_dir=$OUTPUT_DIR"
 echo "[run_grpo_opsd] backend=$DEVICE_BACKEND visible_env=$VISIBLE_DEVICES_ENV train_devices=$TRAIN_DEVICES nproc=$NPROC_PER_NODE"
 echo "[run_grpo_opsd] layout=train:${DEVICE_LABEL}${TRAIN_DEVICES}"
 echo "[run_grpo_opsd] vllm_server=${VLLM_HOST}:${VLLM_PORT} group_port=${VLLM_GROUP_PORT}"
-echo "[run_grpo_opsd] opsd=$ENABLE_OPSD teacher_kl_coef=$([ "$ENABLE_OPSD" = "true" ] && echo "$TEACHER_KL_COEF" || echo 0)"
+echo "[run_grpo_opsd] opsd=$ENABLE_OPSD teacher_fields=$DATASET_TEACHER_FIELDS action_scope=$TEACHER_ACTION_SCOPE"
+echo "[run_grpo_opsd] teacher_coefs=global:$TEACHER_KL_COEF query:$TEACHER_QUERY_KL_COEF evidence:$TEACHER_EVIDENCE_KL_COEF answer:$TEACHER_ANSWER_KL_COEF"
 
 CMD=(
     swift rlhf
@@ -143,14 +189,14 @@ CMD=(
     --max_completion_length "$MAX_COMPLETION_LENGTH"
     --num_train_epochs 1
     --per_device_train_batch_size "$PER_DEVICE_BATCH_SIZE"
-    --gradient_accumulation_steps 4
-    --steps_per_generation 8
-    --num_generations 8
+    --gradient_accumulation_steps "$GRADIENT_ACCUMULATION_STEPS"
+    --steps_per_generation "$STEPS_PER_GENERATION"
+    --num_generations "$NUM_GENERATIONS"
     --learning_rate 1e-6
     --temperature 1.0
     --gradient_checkpointing_kwargs '{"use_reentrant": false}'
-    --save_total_limit 60
-    --save_steps 25
+    --save_total_limit "$SAVE_TOTAL_LIMIT"
+    --save_steps "$SAVE_STEPS"
     --save_only_model true
     --logging_steps 1
     --warmup_ratio 0.05

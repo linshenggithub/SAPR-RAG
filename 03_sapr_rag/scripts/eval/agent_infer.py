@@ -318,6 +318,8 @@ class RolloutHTTPBackend:
                 "max_tokens": max_tokens or sampling["max_tokens"],
                 "temperature": sampling["temperature"],
                 "top_p": sampling["top_p"],
+                "top_k": -1,
+                "repetition_penalty": 1.0,
                 "stop": stop,
                 "return_details": True,
             },

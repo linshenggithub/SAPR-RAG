@@ -18,12 +18,18 @@ from agent_infer import REASONING_SYSTEM
 RE_ANSWER = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
 
 
+def normalize_query(query: str) -> str:
+    query = re.sub(r"[^\w]+", " ", str(query).lower(), flags=re.UNICODE)
+    return re.sub(r"\s+", " ", query).strip()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input_jsonl", required=True)
     parser.add_argument("--output_jsonl", required=True)
     parser.add_argument("--rollout_url", default="http://127.0.0.1:8001")
     parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--max_turns", type=int, default=6)
     parser.add_argument("--max_tokens", type=int, default=512)
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--resume", action="store_true")
@@ -48,18 +54,53 @@ def output_text(item: dict[str, Any]) -> str:
     return ""
 
 
-def history_from_infos(info: dict[str, Any]) -> list[dict[str, str]]:
+def history_from_infos(info: dict[str, Any]) -> list[dict[str, Any]]:
     history = []
     for step in info.get("retrieved_steps", []) or []:
         docs = step.get("docs") or []
-        evidence = " ".join(
-            f"{doc.get('title', '')}. {doc.get('text', '')}" for doc in docs[:1]
-        ).strip()
+        if "evidence" in step:
+            evidence = str(step.get("evidence") or "None").strip()
+        else:
+            evidence = " ".join(
+                f"{doc.get('title', '')}. {doc.get('text', '')}" for doc in docs[:1]
+            ).strip()
         history.append({
             "query": str(step.get("query", "")),
             "evidence": evidence,
+            "exact_duplicate": bool(step.get("exact_duplicate")),
+            "search_executed": bool(step.get("search_executed", True)),
         })
     return history
+
+
+def behavior_from_infos(info: dict[str, Any], max_turns: int = 6) -> dict[str, Any]:
+    steps = info.get("retrieved_steps", []) or []
+    queries = [normalize_query(step.get("query", "")) for step in steps]
+    queries = [query for query in queries if query]
+    exact_duplicate_count = sum(1 for step in steps if step.get("exact_duplicate"))
+    intercepted_repeat_count = sum(
+        1
+        for step in steps
+        if step.get("exact_duplicate") and not step.get("search_executed", True)
+    )
+    actual_search_count = sum(1 for step in steps if step.get("search_executed", True))
+    repeat_count_from_text = len(queries) - len(set(queries))
+    recorded_turns = info.get("num_turns")
+    num_turns = int(recorded_turns or len(steps) or 0)
+    if recorded_turns is None:
+        exhausted = len(steps) >= max(0, max_turns - 1)
+    else:
+        exhausted = num_turns >= max_turns
+    return {
+        "num_turns": num_turns,
+        "num_queries": len(steps),
+        "actual_search_count": actual_search_count,
+        "exact_duplicate_count": exact_duplicate_count,
+        "intercepted_repeat_count": intercepted_repeat_count,
+        "repeat_count_from_text": repeat_count_from_text,
+        "has_exact_duplicate": exact_duplicate_count > 0 or repeat_count_from_text > 0,
+        "finish_reason": "max_turns_exceeded" if exhausted else "stopped",
+    }
 
 
 def load_rows(path: Path) -> list[dict[str, Any]]:
@@ -172,13 +213,18 @@ def main() -> int:
                 text = output_text(item)
                 info = item.get("rollout_infos") or {}
                 error = item.get("error")
+                behavior = behavior_from_infos(info, max_turns=args.max_turns)
+                answer = None if error else parse_answer(text)
+                if not error and answer is None and behavior["finish_reason"] == "max_turns_exceeded":
+                    error = "max_turns_exceeded"
                 record = {
                     "id": row.get("id", index),
                     "question": row["question"],
                     "gold": row.get("answer") or row.get("golden_answers"),
-                    "answer": None if error else parse_answer(text),
+                    "answer": None if error else answer,
                     "raw_output": text,
                     "history": history_from_infos(info),
+                    "behavior": behavior,
                     "trace": [{
                         "messages": item.get("messages"),
                         "rollout_infos": info,

@@ -26,6 +26,8 @@ TEXT_TRUNCATE="${TEXT_TRUNCATE:-500}"
 FAISS_DEVICE="${FAISS_DEVICE:-cpu}"
 FAISS_GPU_ID="${FAISS_GPU_ID:-0}"
 FAISS_GPU_FP16="${FAISS_GPU_FP16:-false}"
+FAISS_PYTHON_SITE="${FAISS_PYTHON_SITE:-}"
+PYTHON_EXECUTABLE="${PYTHON_EXECUTABLE:-python}"
 DRY_RUN="${DRY_RUN:-false}"
 
 case "$DEVICE_BACKEND" in
@@ -53,8 +55,7 @@ else
     echo "[run_retrieval_daemon_flexible] backend=$DEVICE_BACKEND device=$RETRIEVAL_DEVICE port=$PORT faiss_device=$FAISS_DEVICE"
 fi
 
-CMD=(
-    python "$SCRIPT_DIR/retrieval_daemon.py"
+DAEMON_ARGS=(
     --host "$HOST"
     --port "$PORT"
     --device "$RETRIEVAL_DEVICE"
@@ -62,7 +63,28 @@ CMD=(
     --faiss_device "$FAISS_DEVICE"
     --faiss_gpu_id "$FAISS_GPU_ID"
 )
-[ "$FAISS_GPU_FP16" = "true" ] && CMD+=(--faiss_gpu_fp16)
+[ "$FAISS_GPU_FP16" = "true" ] && DAEMON_ARGS+=(--faiss_gpu_fp16)
+
+if [ -n "$FAISS_PYTHON_SITE" ]; then
+    PYTHON_BOOTSTRAP='
+import runpy
+import sys
+
+faiss_site, script, *args = sys.argv[1:]
+sys.path.insert(0, faiss_site)
+import faiss  # noqa: F401
+sys.path.remove(faiss_site)
+sys.argv = [script, *args]
+runpy.run_path(script, run_name="__main__")
+'
+    CMD=(
+        "$PYTHON_EXECUTABLE" -c "$PYTHON_BOOTSTRAP"
+        "$FAISS_PYTHON_SITE" "$SCRIPT_DIR/retrieval_daemon.py"
+        "${DAEMON_ARGS[@]}"
+    )
+else
+    CMD=("$PYTHON_EXECUTABLE" "$SCRIPT_DIR/retrieval_daemon.py" "${DAEMON_ARGS[@]}")
+fi
 
 if [ "$DRY_RUN" = "true" ]; then
     if [ -n "$VISIBLE_DEVICES_ENV" ]; then

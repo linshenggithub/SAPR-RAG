@@ -122,6 +122,54 @@ R3 SFT 数据包含三个数据集的训练集；RAG-ProGuide DPO 数据包含 P
 
 主要指标为 EM、token 级 F1、Cover-EM、DeepSeek-V3 LLM-acc，以及回答率、最大轮次率、平均轮数、空证据率。EM/F1 对答案风格敏感，必须结合 Cover-EM、LLM-acc 和行为指标解释。
 
+### 1.6 三个问答数据集的原始字段及含义
+
+本节说明当前使用的三个多跳问答数据集**下载后的原始字段**，即训练/评测数据构造脚本读取的输入字段。本项目再把这些原始字段转换成统一的训练字段（`messages`、`golden_answers`、`gold_titles`、`gold_sup_sents` 等），转换逻辑见第 4.1 节和第 5.2 节；本节只解释原始输入本身。
+
+三个数据集的原始存储格式不同：HotpotQA 使用 FlashRAG 预处理后的 JSONL；2Wiki 从 `xanhho/2WikiMultihopQA` 的 `train.parquet` 逐行转成 JSONL，其中 `context`、`supporting_facts`、`evidences` 是 **JSON 字符串**，需要再次解码；MuSiQue 使用 `bdsaglam/musique` 官方 `musique_ans_v1.0_train.jsonl`。数据准备见 `03_sapr_rag/scripts/grpo/prepare_action_opsd_train_data.py`。
+
+**HotpotQA**（`data/raw/hotpotqa/train.jsonl`，FlashRAG 预处理版）
+
+| 原始字段 | 类型 | 含义 |
+|---|---|---|
+| `id` | str | 样本编号，如 `train_0` |
+| `question` | str | 多跳问题 |
+| `golden_answers` | list[str] | 标准答案，已预处理为列表 |
+| `metadata.type` | str | 问题类型，如 `comparison`（比较型）、`bridge`（桥接型） |
+| `metadata.level` | str | 难度，`easy` / `medium` / `hard` |
+| `metadata.supporting_facts` | dict | 标准支持句定位，结构为 `{title:[...], sent_id:[...]}`，即支持句所在文档标题与句子下标 |
+| `metadata.context` | dict | 候选文档，结构为 `{title:[...], sentences:[[...]]}`，每个标题对应一个句子列表 |
+
+**2WikiMultihopQA**（`data/raw/2wikimultihopqa_full/train.jsonl`）
+
+| 原始字段 | 类型 | 含义 |
+|---|---|---|
+| `_id` | str | 样本编号（32 位十六进制） |
+| `type` | str | 问题类型，如 `compositional`、`comparison`、`bridge_comparison`、`inference` |
+| `question` | str | 多跳问题 |
+| `context` | JSON 字符串 | 解码后为 `list[[title, [sentences...]]]`，候选文档标题与句子列表 |
+| `supporting_facts` | JSON 字符串 | 解码后为 `list[[title, sent_id]]`，标准支持句的标题与句子下标 |
+| `evidences` | JSON 字符串 | 解码后为 `list[[主语, 关系, 宾语]]`，标准证据三元组（知识图谱式关系标注） |
+| `answer` | str | 标准答案，单个字符串（无别名字段） |
+
+**MuSiQue**（`data/raw/musique/train.jsonl`，`musique_ans_v1.0` 版）
+
+| 原始字段 | 类型 | 含义 |
+|---|---|---|
+| `id` | str | 样本编号，前缀标明跳数，如 `2hop__482757_12019` |
+| `question` | str | 组合式多跳问题 |
+| `paragraphs` | list[dict] | 候选段落，每个含 `idx`（段落下标）、`title`（标题）、`paragraph_text`（正文）、`is_supporting`（是否为支持段落） |
+| `question_decomposition` | list[dict] | 子问题分解，每个含 `id`、`question`（子问题）、`answer`（子答案）、`paragraph_support_idx`（对应支持段落的 `idx`） |
+| `answer` | str | 最终标准答案 |
+| `answer_aliases` | list[str] | 标准答案的别名列表，可能为空 |
+| `answerable` | bool | 该问题是否可答 |
+
+**辅助数据：R3-RAG 冷启动**（`data/raw/r3_coldstart.parquet`）
+
+R3-RAG 冷启动数据不是问答评测集，而是用于 SFT 与 E11 查询教师的轨迹数据（来源见第 1.1、2.1、5.6 节）。本项目只读取其中的 `instruction` 与 `output` 两列，并用正则从 `instruction` 中抽取 `The question:` 后的问题、从 `output` 中抽取 `The retrieval query:` 后的检索查询，按问题聚合成有序参考查询计划。
+
+> 字段对齐说明：`answer` / `answer_aliases`（2Wiki、MuSiQue）与 `golden_answers`（HotpotQA）在本项目内统一映射为 `golden_answers`；`supporting_facts` / `context`（HotpotQA、2Wiki）与 `paragraphs` / `question_decomposition`（MuSiQue）用于恢复 `gold_titles`、`gold_sup_sents`。具体转换与信息隔离规则见第 4.1 节。
+
 ## 2. SFT：先学会多轮 RAG 协议
 
 ### 2.1 数据来源与改造

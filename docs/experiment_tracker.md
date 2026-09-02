@@ -2,9 +2,9 @@
 
 **首次建立**：2026-05-30
 
-**最后更新**：2026-08-12
+**最后更新**：2026-09-02
 
-**当前主线**：SFT+DPO 起点上的分动作 OPSD
+**当前主线**：比较 SFT 与 SFT+DPO 起点上的 Query/Answer 分动作 OPSD
 
 **用途**：统一记录实验动机、实现方法、控制变量、结果、可信度和产物位置，供复现、论文写作与后续交接使用。
 
@@ -32,11 +32,14 @@
 
 ### 当前总判断
 
-1. HotpotQA 上超过 ReasonRAG 的主要贡献来自 SFT+DPO，不是当前 Answer-only OPSD。
+1. SFT→Query/Answer 分动作 OPSD ckpt1000 在 HotpotQA 全量 dev 上同时超过
+   SFT+DPO 与 ReasonRAG；相对 SFT+DPO 的 F1、Cover-EM 增益显著，
+   EM 仅呈正向趋势。
 2. 严格 LoRA GRPO-control 与 SFT 基本持平；全参数 GRPO 会增加检索但破坏终止行为。
 3. Reward-v2/v3 没有稳定提升 EM/F1/Cover-EM；D1b 证明 Query 生成质量与 Top-3 召回是主要瓶颈。
 4. 修复 LoRA rollout 后，Answer-only OPSD 在 25 step 有轻微正向趋势，但相对 SFT+DPO 不显著；扩到 100 step 后回落。
-5. 当前下一步是 Query/Answer 分动作 OPSD；Evidence OPSD 在独立 auxiliary batch 完成前保持关闭。
+5. 当前正在运行 SFT→Query/Answer 分动作 OPSD 对照；Evidence OPSD
+   在独立 auxiliary batch 完成前保持关闭。
 
 ### 实验总表
 
@@ -55,7 +58,52 @@
 | E08 | D1b 检索上限诊断 | SFT 轨迹 + HotpotQA 前 200 | 对比原问题、模型 query、gold title 在不同 Top-k 的召回 | Top-3 完全召回：模型 query 20.5%，gold title 50.0% | B | `data/eval_results/hotpotqa/d1b_retriever_ceiling_200_20260811.json` |
 | E09 | LoRA 修复后 Answer-only OPSD 25 step | SFT+DPO；100 条 pilot；LoRA | Evidence Agent 对齐；teacher 只作用 Answer；β=0.03 | HotpotQA：EM 0.4054 / F1 0.5264 / Cover 0.4690；相对 E01 增量不显著 | A | 下文“第一轮” |
 | E10 | Answer-only OPSD 100 step | 与 E09 完全相同，仅训练延长至 100 step | 检验增益能否随 step 稳定扩大 | HotpotQA：EM 0.4032 / F1 0.5243 / Cover 0.4675；较 ckpt25 回落 | A | 下文“第二轮” |
-| E11 | Query/Answer 分动作 OPSD | SFT+DPO；HotpotQA+完整 2Wiki+MuSiQue 共 277,839 条；LoRA | Query 看 R3 搜索计划；Answer 看 gold；独立动作系数 | 3000-step 正式训练进行中；训练与全量评测尚未完成，不能下效果结论 | P | 下文“分动作新方案” |
+| E11 | Query/Answer 分动作 OPSD | SFT+DPO；HotpotQA+完整 2Wiki+MuSiQue 共 277,839 条；LoRA | Query 看 R3 搜索计划；Answer 看 gold；独立动作系数 | 旧 worker 回收前运行至约 step1624，仅保存到 ckpt1500；未完成全量评测 | P | 下文“分动作新方案” |
+| E12 | SFT→Query/Answer 分动作 OPSD | SFT ckpt1650；与 E11 相同的 277,839 条三源数据；LoRA | 跳过 DPO，只改变初始 adapter | ckpt1000 HotpotQA 7405：EM 0.4086 / F1 0.5379 / Cover 0.4984；F1、Cover 显著超过 SFT+DPO | A | 下文“HotpotQA 全量结果总表” |
+
+### HotpotQA 全量结果总表
+
+以下主表统一使用 HotpotQA 完整 dev 7,405 条。固定 200 条 checkpoint
+筛选结果不混入主表；ReasonRAG 为论文报告值，未报告 Cover-EM。
+
+| 方法 | 起点 | EM | F1 | Cover-EM | 可信度与说明 |
+|---|---|---:|---:|---:|---|
+| ReasonRAG 论文基线 | 论文模型 | 0.3840 | 0.4890 | 未报告 | 外部基线 |
+| Zero-shot | Qwen2.5-7B | 0.2040 | 0.2730 | 0.2680 | A |
+| SFT | Base | 0.0971 | 0.2634 | **0.5070** | A |
+| DPO-only | Base | 0.3492 | 0.4563 | 0.3999 | A；推理流程略有差异 |
+| SFT+DPO | SFT | 0.4008 | 0.5233 | 0.4693 | A；主要本地基线 |
+| 旧 GRPO ckpt125 | SFT | 0.1086 | 0.2742 | 0.5080 | C；训练集泄露 |
+| 旧 GRPO ckpt175 | SFT | 0.1155 | 0.2824 | 0.5082 | C；训练集泄露 |
+| 严格 LoRA GRPO-control ckpt1000 | SFT | 0.1048 | 0.2716 | 0.5080 | A；基本等于 SFT |
+| 全参数 GRPO ckpt2500 | SFT | 0.4003 | 0.5071 | 0.4493 | A；最佳全参数 checkpoint |
+| 全参数 GRPO ckpt3000 | SFT | 0.3824 | 0.4796 | 0.4258 | A；后期退化 |
+| 全参数 GRPO ckpt3660 | SFT | 0.3854 | 0.4817 | 0.4265 | A；后期退化 |
+| Reward-v2 ckpt300 | SFT | 0.1086 | 0.2761 | 0.5121 | B；raw-document 流程 |
+| 旧全动作 OPSD ckpt3000 | SFT+DPO | 0.2895 | 0.4026 | 0.3869 | C；动作与流程错误 |
+| 旧全动作 OPSD ckpt3660 | SFT+DPO | 0.2883 | 0.4014 | 0.3860 | C；动作与流程错误 |
+| Answer-only OPSD ckpt25 | SFT+DPO | 0.4054 | 0.5264 | 0.4690 | A；增量不显著 |
+| Answer-only OPSD ckpt100 | SFT+DPO | 0.4032 | 0.5243 | 0.4675 | A；增益回落 |
+| **SFT→分动作 OPSD ckpt1000** | **SFT，不经过 DPO** | **0.4086** | **0.5379** | **0.4984** | **A；EM/F1 最高，Cover 显著高于 SFT+DPO** |
+
+E12 ckpt1000 相对本地 SFT+DPO，在同一 7,405 个 ID 上进行 20,000 次
+配对 bootstrap：
+
+| 指标 | E12 | SFT+DPO | 差值 | 95% CI | 双侧 p 值 |
+|---|---:|---:|---:|---:|---:|
+| EM | 0.4088 | 0.4008 | +0.80pt | [-0.14, +1.72]pt | 0.0929 |
+| F1 | 0.5380 | 0.5233 | +1.47pt | [+0.61, +2.33]pt | 0.0015 |
+| Cover-EM | 0.4984 | 0.4693 | +2.92pt | [+1.99, +3.85]pt | 0.0001 |
+
+因此，E12 是当前第一个在 HotpotQA 全量 dev 上同时提高 EM、F1 和
+Cover-EM 的 OPSD 方案，其中 F1 与 Cover-EM 达到统计显著，EM 尚未
+通过双侧 0.05 显著性阈值。该结果证明不经过 DPO 时，Query/Answer
+分动作 OPSD 仍能产生独立收益；2Wiki 与 MuSiQue 全量结果尚未完成。
+
+权威产物：
+
+- `data/eval_results/hotpotqa/sft_opsd_ckpt1000_full7405_20260902/full/checkpoint-1000/hotpotqa/metrics.json`
+- `data/eval_results/hotpotqa/sft_opsd_ckpt1000_full7405_20260902/full/checkpoint-1000/hotpotqa/paired_bootstrap_vs_sft_dpo.json`
 
 ### 三数据集基础实验矩阵
 
@@ -809,11 +857,12 @@ prompt。仅 8 条 MuSiQue 样本的 Answer evidence 因 token budget 截断。
 
 - 详细现场日志与 checkpoint 审计记录在
   `docs/e11_action_opsd_live_audit.md`。
-- 截至 `2026-08-12 15:43 +0800`，训练推进到 `1124/3000`，
+- 截至 `2026-08-12 15:47 +0800`，训练推进到 `1126/3000`，
   已保存 `checkpoint-500` 与 `checkpoint-1000`。
 - step 1039 出现 `7494` token 长输出，step 1040/1046 出现局部
-  loss/gradient 峰值；随后训练恢复，step 1124 loss 为 `0.0398`、
-  grad norm 为 `0.508`。
+  loss/gradient 峰值；随后训练恢复，step 1047-1126 窗口 loss 最大
+  `0.0478`、grad norm p95 为 `3.04`，step 1126 loss 为 `0.0409`、
+  grad norm 为 `0.603`。
 - 日志显存高水位已升至 `84.57 GiB`，实时 GPU2 显存约
   `90161/97871 MiB`。当前未见 NaN、OOM、Traceback 或进程退出，
   但 checkpoint-1500 前需重点监控长输出和显存余量。

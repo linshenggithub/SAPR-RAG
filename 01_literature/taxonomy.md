@@ -69,9 +69,47 @@ Outcome reward
 - 局限：路径级 reward 能缓解稀疏反馈，但仍需要进一步回答每一步 query 是否对准缺口、每篇证据是否支撑当前推理、当前是否应该停止。
 - 对本课题作用：作为 trajectory-level reward 对照；本课题可将 path reward 拆解为 Query Reward、Evidence Reward、Stop Reward。
 
-## 8. 当前归纳出的两类问题
+## 8. On-Policy Distillation 与 Agentic RAG
 
-### 8.1 多步推理过程控制能力不足
+### GKD
+
+- 类别：通用 On-Policy Distillation 基础。
+- 贡献：让 student 在自身生成序列上学习 teacher 的 token distribution，缓解离线 KD 的 train-inference mismatch。
+- 局限：ICLR 2024 原论文不研究 Agentic RAG；直接迁移到弱搜索 Agent 时，低质量 student trajectory 仍会污染训练上下文。
+- 对本课题作用：提供 OPD 的标准定义、on-policy 数据来源和 divergence 选择依据。
+
+### DGPO
+
+- 类别：Selective On-Policy Distillation for Agentic RAG。
+- 贡献：先以正确教师轨迹做 KD 冷启动，再让 student 在线检索；正确轨迹使用 RL reward，错误轨迹才接受外部 teacher KL。
+- 结果：ACL 2026 主会长文；Qwen2.5-3B→0.5B 设置下 HotpotQA EM 0.342，七个 QA 数据集平均 EM 0.329，优于 PPO 0.238、GKD 0.240 和普通 KD 0.298。
+- 局限：只报告 EM，主要验证 0.5B/1B student，teacher KL gate 是整轨迹级。
+- 对本课题作用：从当前 privileged self-distillation 转向外部强 teacher OPD 时的首要复现基线。
+
+### EOPD
+
+- 类别：Entropy-Aware On-Policy Distillation。
+- 贡献：在 teacher 高熵 token 上加入 top-k forward KL，缓解纯 reverse KL 的 mode collapse 和训练不稳定。
+- 局限：ICML 2026 实验集中于数学推理，没有 Agentic RAG 证据。
+- 对本课题作用：可用于 `<query>/<answer>` 行为分叉位置的 teacher entropy 审计和 KL 目标改进。
+
+### SCoRe
+
+- 类别：Student-Centered Agent Distillation。
+- 贡献：teacher 只修 student 轨迹的最早错误，再从 verified prefix 做短程 RL，缩短长轨迹 credit assignment。
+- 局限：不是严格 token-level OPD，teacher 标注和修正成本较高。
+- 对本课题作用：可把 DGPO 的“失败轨迹选择性纠偏”进一步细化为首错 query/stop 后的局部纠偏。
+
+完整证据边界与复现建议见：
+
+```text
+01_literature/related_work_drafts/opd_agentic_rag_survey.md
+01_literature/paper_notes/2026_DGPO.md
+```
+
+## 9. 当前归纳出的两类问题
+
+### 9.1 多步推理过程控制能力不足
 
 核心表现：
 
@@ -88,7 +126,7 @@ Outcome reward
 - DecEx-RAG、ProRAG、Search-P1 都从不同角度试图缓解过程反馈和 credit assignment 问题；
 - HiPRAG 明确关注 over-search / under-search。
 
-### 8.2 状态感知证据利用不足
+### 9.2 状态感知证据利用不足
 
 核心表现：
 
@@ -104,7 +142,7 @@ Outcome reward
 - ProRAG 和 Search-P1 强调过程/路径奖励，但 evidence utility 仍容易被整体 reward 吸收；
 - DecEx-RAG 提供 MDP 视角，但没有直接展开 state-aware evidence utility。
 
-## 9. 本课题定位
+## 10. 本课题定位
 
 本课题拟在 ReasonRAG 类 process-supervised Agentic RAG 基础上，进一步提出状态感知过程优化机制：
 

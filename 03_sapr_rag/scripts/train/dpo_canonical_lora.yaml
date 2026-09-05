@@ -1,0 +1,49 @@
+### model
+model_name_or_path: /mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/models/Qwen2.5-7B-Instruct
+trust_remote_code: true
+adapter_name_or_path: /mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft_canonical_fp16/checkpoint-4150
+
+### method
+stage: dpo
+do_train: true
+finetuning_type: lora
+lora_target: all
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+pref_beta: 0.2
+pref_loss: sigmoid
+
+### dataset
+dataset_dir: /mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/data/sft_build
+dataset: sapr_proguide_dpo
+template: qwen
+cutoff_len: 2560
+overwrite_cache: false
+preprocessing_num_workers: 16
+
+### output
+output_dir: /mlx_devbox/users/mayi.summer/playground/SAPR-RAG/03_sapr_rag/saves/qwen2_5_7b/lora/sft_canonical_dpo
+logging_steps: 10
+save_steps: 100
+save_total_limit: 10
+plot_loss: true
+overwrite_output_dir: false
+report_to: tensorboard
+
+### train
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 1
+learning_rate: 5.0e-6
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+gradient_checkpointing: true
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.05
+per_device_eval_batch_size: 4
+eval_strategy: steps
+eval_steps: 100

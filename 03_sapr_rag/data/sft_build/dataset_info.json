@@ -19,6 +19,26 @@
       "system": "system"
     }
   },
+  "sapr_reasoning_canonical": {
+    "file_name": "out/sft_v2_reasoning_canonical.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "sapr_evidence_canonical": {
+    "file_name": "out/sft_v2_evidence_canonical.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
   "sapr_proguide_dpo": {
     "file_name": "out/sapr_proguide_dpo.jsonl",
     "formatting": "alpaca",

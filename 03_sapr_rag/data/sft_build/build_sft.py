@@ -20,6 +20,8 @@ import re
 import sys
 from pathlib import Path
 
+PROJ_ROOT = Path(__file__).resolve().parents[3]
+
 # --- ReasonRAG system prompts (verbatim from pipeline/reasonrag_pipeline.py) ---
 REASONING_SYSTEM = (
     "You are an assistant for question answering with access to a retrieval tool. "
@@ -55,6 +57,12 @@ EVIDENCE_SYSTEM = (
 EVIDENCE_USER_TEMPLATE = "Question: {query}. Reference: <reference>{reference}</reference>"
 
 STEP_RE = re.compile(r"^Step\s+\d+\s*:\s*$", re.MULTILINE)
+
+DEFAULT_GOLD_TRAIN_JSONLS = [
+    PROJ_ROOT / "data/raw/hotpotqa/train.jsonl",
+    PROJ_ROOT / "data/raw/2wikimultihopqa/train.jsonl",
+    PROJ_ROOT / "data/raw/musique/train.jsonl",
+]
 
 
 # --------------------- R3 step parsing ---------------------------------------
@@ -94,6 +102,67 @@ def parse_steps(text):
 def extract_question(instruction):
     m = re.match(r"\s*The question:\s*(.*?)(?:\n|$)", instruction or "")
     return m.group(1).strip() if m else None
+
+
+def normalize_question(question: str) -> str:
+    return re.sub(r"\s+", " ", question or "").strip()
+
+
+def extract_gold_answer(row: dict):
+    gold = row.get("golden_answers")
+    if gold is None:
+        gold = row.get("answer")
+    if gold is None:
+        gold = row.get("answer_aliases")
+    if isinstance(gold, list):
+        for item in gold:
+            text = str(item).strip()
+            if text:
+                return text
+        return None
+    text = str(gold).strip()
+    return text or None
+
+
+def load_gold_answer_map(paths):
+    """question -> canonical short answer from original training datasets."""
+    gold_by_question = {}
+    stats = {"files": 0, "rows": 0, "with_gold": 0, "duplicates": 0, "conflicts": 0}
+    for path in paths:
+        path = Path(path)
+        if not path.exists():
+            print(f"[gold] skip missing: {path}", file=sys.stderr)
+            continue
+        stats["files"] += 1
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                stats["rows"] += 1
+                question = normalize_question(row.get("question", ""))
+                gold = extract_gold_answer(row)
+                if not question or not gold:
+                    continue
+                stats["with_gold"] += 1
+                prev = gold_by_question.get(question)
+                if prev is None:
+                    gold_by_question[question] = gold
+                elif prev == gold:
+                    stats["duplicates"] += 1
+                else:
+                    # Keep the first source deterministically; report conflicts.
+                    stats["conflicts"] += 1
+    print(
+        f"[gold] loaded questions={len(gold_by_question):,} stats="
+        f"{json.dumps(stats, ensure_ascii=False)}",
+        file=sys.stderr,
+    )
+    return gold_by_question
 
 
 def cache_key(query: str, reference: str) -> str:
@@ -177,7 +246,7 @@ def _tags_balanced(text):
 
 
 # --------------------- per-row reasoning sample ------------------------------
-def convert_reasoning_row(instruction, output, ev_cache):
+def convert_reasoning_row(instruction, output, ev_cache, gold_by_question=None, canonical_stats=None):
     question = extract_question(instruction)
     if not question:
         return None, "no_question"
@@ -188,6 +257,21 @@ def convert_reasoning_row(instruction, output, ev_cache):
     if len(cur_steps) != 1:
         return None, "output_not_single_step"
     cur = cur_steps[0]
+    if cur.get("answer") and gold_by_question is not None:
+        key = normalize_question(question)
+        gold = gold_by_question.get(key)
+        if gold:
+            if canonical_stats is not None:
+                canonical_stats["terminal_rows"] = canonical_stats.get("terminal_rows", 0) + 1
+                if normalize_question(cur.get("answer", "")) != normalize_question(gold):
+                    canonical_stats["answer_replaced"] = canonical_stats.get("answer_replaced", 0) + 1
+                else:
+                    canonical_stats["answer_already_same"] = canonical_stats.get("answer_already_same", 0) + 1
+            cur = dict(cur)
+            cur["answer"] = gold
+        elif canonical_stats is not None:
+            canonical_stats["terminal_rows"] = canonical_stats.get("terminal_rows", 0) + 1
+            canonical_stats["missing_gold"] = canonical_stats.get("missing_gold", 0) + 1
     out_text = build_reasoning_output(cur)
     if out_text is None:
         return None, "current_step_no_query_or_answer"
@@ -232,6 +316,20 @@ def main():
     ap.add_argument("--out-reasoning", required=True)
     ap.add_argument("--out-evidence", required=True)
     ap.add_argument("--limit", type=int, default=0, help="0=all R3 rows")
+    ap.add_argument(
+        "--canonical-answer",
+        action="store_true",
+        help="Replace terminal <answer> content with the original train-set gold answer.",
+    )
+    ap.add_argument(
+        "--gold-train-jsonl",
+        action="append",
+        default=[],
+        help=(
+            "Original train jsonl used for question->gold lookup. Can be repeated. "
+            "Defaults to HotpotQA/2Wiki/MuSiQue train files when --canonical-answer is set."
+        ),
+    )
     args = ap.parse_args()
 
     cache_path = Path(args.cache)
@@ -245,18 +343,35 @@ def main():
         df = df.head(args.limit)
     print(f"[load] R3 rows: {len(df):,}", file=sys.stderr)
 
+    gold_by_question = None
+    canonical_stats = None
+    if args.canonical_answer:
+        gold_paths = args.gold_train_jsonl or [str(p) for p in DEFAULT_GOLD_TRAIN_JSONLS]
+        gold_by_question = load_gold_answer_map(gold_paths)
+        canonical_stats = {"terminal_rows": 0, "answer_replaced": 0,
+                           "answer_already_same": 0, "missing_gold": 0}
+
     # --- reasoning samples ---
     stats_r = {"ok": 0}
     out_r = Path(args.out_reasoning)
     out_r.parent.mkdir(parents=True, exist_ok=True)
     with out_r.open("w") as f:
         for _, r in df.iterrows():
-            rec, status = convert_reasoning_row(r["instruction"], r["output"], ev_cache)
+            rec, status = convert_reasoning_row(
+                r["instruction"],
+                r["output"],
+                ev_cache,
+                gold_by_question=gold_by_question,
+                canonical_stats=canonical_stats,
+            )
             stats_r[status] = stats_r.get(status, 0) + 1
             if rec is not None:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"[reasoning] wrote -> {out_r}  stats={json.dumps(stats_r, ensure_ascii=False)}",
           file=sys.stderr)
+    if canonical_stats is not None:
+        print(f"[canonical] stats={json.dumps(canonical_stats, ensure_ascii=False)}",
+              file=sys.stderr)
 
     # --- evidence samples (one per cache entry whose (q, ref) is reached by
     #     the rows we just processed; for full run this == cache size) ---

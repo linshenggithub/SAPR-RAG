@@ -2,9 +2,9 @@
 
 **首次建立**：2026-05-30
 
-**最后更新**：2026-09-02
+**最后更新**：2026-09-05
 
-**当前主线**：比较 SFT 与 SFT+DPO 起点上的 Query/Answer 分动作 OPSD
+**当前主线**：Canonical SFT 起点上的分动作 OPSD 与匹配 GRPO 对照
 
 **用途**：统一记录实验动机、实现方法、控制变量、结果、可信度和产物位置，供复现、论文写作与后续交接使用。
 
@@ -32,14 +32,20 @@
 
 ### 当前总判断
 
-1. SFT→Query/Answer 分动作 OPSD ckpt1000 在 HotpotQA 全量 dev 上同时超过
-   SFT+DPO 与 ReasonRAG；相对 SFT+DPO 的 F1、Cover-EM 增益显著，
-   EM 仅呈正向趋势。
+1. SFT→Query/Answer 分动作 OPSD ckpt1000 在 HotpotQA 与 2Wiki 全量
+   dev 上取得有效收益：HotpotQA 的 F1、Cover-EM 和 2Wiki 的
+   EM、F1、Cover-EM 均显著超过 SFT+DPO；MuSiQue 未显著改善。
+   ckpt500 已有较高 Cover-EM，但三个数据集的 EM/F1 均低于 ckpt1000。
 2. 严格 LoRA GRPO-control 与 SFT 基本持平；全参数 GRPO 会增加检索但破坏终止行为。
 3. Reward-v2/v3 没有稳定提升 EM/F1/Cover-EM；D1b 证明 Query 生成质量与 Top-3 召回是主要瓶颈。
 4. 修复 LoRA rollout 后，Answer-only OPSD 在 25 step 有轻微正向趋势，但相对 SFT+DPO 不显著；扩到 100 step 后回落。
-5. 当前正在运行 SFT→Query/Answer 分动作 OPSD 对照；Evidence OPSD
-   在独立 auxiliary batch 完成前保持关闭。
+5. E12 的三数据集 ckpt500/1000 全量评测已完成；当前主线已切换到
+   SFT→external-teacher selective OPD。
+6. Canonical-answer SFT 证明旧 SFT 的 EM/F1 偏低主要来自 answer target
+   风格错配：把 terminal `<answer>` 替换为原始 GT 短答案后，HotpotQA
+   EM/F1 升至 0.4373/0.5513，超过 SFT+DPO 和 E12；但 2Wiki 与
+   MuSiQue 仍未超过 E12/SFT+DPO，且 Cover-EM 低于旧 SFT，说明该修正
+   主要改善答案格式对齐，不等价于全面提升 RAG 能力。
 
 ### 实验总表
 
@@ -59,7 +65,27 @@
 | E09 | LoRA 修复后 Answer-only OPSD 25 step | SFT+DPO；100 条 pilot；LoRA | Evidence Agent 对齐；teacher 只作用 Answer；β=0.03 | HotpotQA：EM 0.4054 / F1 0.5264 / Cover 0.4690；相对 E01 增量不显著 | A | 下文“第一轮” |
 | E10 | Answer-only OPSD 100 step | 与 E09 完全相同，仅训练延长至 100 step | 检验增益能否随 step 稳定扩大 | HotpotQA：EM 0.4032 / F1 0.5243 / Cover 0.4675；较 ckpt25 回落 | A | 下文“第二轮” |
 | E11 | Query/Answer 分动作 OPSD | SFT+DPO；HotpotQA+完整 2Wiki+MuSiQue 共 277,839 条；LoRA | Query 看 R3 搜索计划；Answer 看 gold；独立动作系数 | 旧 worker 回收前运行至约 step1624，仅保存到 ckpt1500；未完成全量评测 | P | 下文“分动作新方案” |
-| E12 | SFT→Query/Answer 分动作 OPSD | SFT ckpt1650；与 E11 相同的 277,839 条三源数据；LoRA | 跳过 DPO，只改变初始 adapter | ckpt1000 HotpotQA 7405：EM 0.4086 / F1 0.5379 / Cover 0.4984；F1、Cover 显著超过 SFT+DPO | A | 下文“HotpotQA 全量结果总表” |
+| E12 | SFT→Query/Answer 分动作 OPSD | SFT ckpt1650；与 E11 相同的 277,839 条三源数据；LoRA | 跳过 DPO，只改变初始 adapter | ckpt500/1000 均完成三数据集全量评测；ckpt1000 在 HotpotQA、2Wiki 有效，MuSiQue 未显著改善 | A | 下文“E12 三数据集全量 checkpoint 对照” |
+| E13 | SFT→external-teacher selective OPD | SFT ckpt1650；三源 train 277,839 条；14B SFT teacher | Student on-policy 同状态；仅 EM 失败轨迹施加 teacher token log-ratio；无 privileged prompt | teacher ceiling 与 2-step smoke 通过；1000-step 正式训练已启动，当前仅有训练健康度 | P | `docs/opd_plan.md`；下文“External-teacher selective OPD” |
+| E14 | Canonical-answer SFT | Qwen2.5-7B；R3 cold-start SFT 数据；LoRA ckpt4150 | 仅将 terminal `<answer>` 内容由 R3 长答案替换为原始训练集 GT 短答案，其余 query/history/evidence 不变 | 三数据集全量完成；HotpotQA EM 0.4373 / F1 0.5513 / Cover 0.4748；2Wiki EM 0.4051 / F1 0.4513 / Cover 0.4188；MuSiQue EM 0.1651 / F1 0.2405 / Cover 0.1841 | A | 下文“E14 Canonical-answer SFT”；`data/eval_results/sft_canonical_ckpt4150_3src_6gpu_20260904/` |
+| E15 | Canonical SFT→DPO | E14 canonical SFT ckpt4150 起点；LoRA DPO（pref_beta 0.2, sigmoid）；ckpt451 | 在 canonical SFT 基础上做 1 epoch DPO 偏好对齐 | 三数据集全量完成；HotpotQA EM 0.4140 / F1 0.5281 / Cover 0.4304；2Wiki EM 0.4187 / F1 0.4656 / Cover 0.4230；MuSiQue EM 0.1585 / F1 0.2459 / Cover 0.1676 | A | 下文“E15 Canonical SFT→DPO”；`data/eval_results/sft_canonical_dpo_3src_6gpu_20260905/` |
+| E16 | Canonical SFT→GRPO+分动作 OPSD | E14 canonical SFT ckpt4150；三源 train 277,839 条；LoRA | 复现 E12：GRPO reward + Query 0.01 / Answer 0.03 分动作 teacher，只替换 SFT 起点 | 1000-step 正式训练已启动；需与 E14 及匹配 GRPO-only control 比较后判断 OPSD 独立效果 | P | 下文“E16 Canonical SFT→分动作 OPSD” |
+
+### 外部天花板诊断（DeepSeek，非同口径参考）
+
+以下 DeepSeek 结果**不属于** SAPR-RAG 主实验（模型未经本项目训练、口径各异），仅作为"SOTA 模型在这些多跳测试集上能到多少"的天花板参考，集中列出以便查阅。完整方法见 `docs/midterm_results.md` §5。
+
+三档口径（由弱到强的证据供给）：
+
+| 口径 | 模型 | 数据集 | N | EM | Cover-EM | F1 | 说明 |
+|---|---|---|---:|---:|---:|---:|---|
+| Closed-book zeroshot | deepseek-v4-pro | MuSiQue | 2,417 | 0.1411 | 0.1630 | 0.1961 | 只给问题、无检索，纯参数知识 |
+| Agentic zeroshot（受控检索） | deepseek-chat | MuSiQue | 2,417 | 0.1920 | 0.2503 | 0.2589 | 同本项目 BGE+FAISS 检索器自主多轮；含 ~47% 系统错误率，为保守下限 |
+| Oracle（完美证据） | deepseek-v4-flash | HotpotQA | 7,405 | 0.3098 | 0.3480 | 0.3916 | distractor 10 段，非开放域上限 |
+| Oracle（完美证据） | deepseek-v4-flash | 2Wiki | 12,576 | 0.7407 | 0.8114 | 0.7992 | 支撑段落直供 |
+| Oracle（完美证据） | deepseek-v4-flash | MuSiQue | 2,417 | 0.5180 | 0.5933 | 0.6154 | 支撑段落直供（V4-Pro 为 0.5722/0.6554/0.6671） |
+
+关键读法：在 MuSiQue 上，受控 agentic zeroshot 的 Cover-EM 25.03%（保守下限）与本项目最好结果（E01 0.2069 / E12 0.2180）处于同一量级——公平检索口径下 SOTA 模型不显著领先本项目小模型；真正差距在 Oracle（完美证据）设置。产物见 `data/eval_results/ceiling/` 与 `data/eval_results/deepseek_agentic/`。
 
 ### HotpotQA 全量结果总表
 
@@ -71,6 +97,7 @@
 | ReasonRAG 论文基线 | 论文模型 | 0.3840 | 0.4890 | 未报告 | 外部基线 |
 | Zero-shot | Qwen2.5-7B | 0.2040 | 0.2730 | 0.2680 | A |
 | SFT | Base | 0.0971 | 0.2634 | **0.5070** | A |
+| Canonical-answer SFT ckpt4150 | Base | **0.4373** | **0.5513** | 0.4748 | A；修正 final answer target 为原始 GT 短答案 |
 | DPO-only | Base | 0.3492 | 0.4563 | 0.3999 | A；推理流程略有差异 |
 | SFT+DPO | SFT | 0.4008 | 0.5233 | 0.4693 | A；主要本地基线 |
 | 旧 GRPO ckpt125 | SFT | 0.1086 | 0.2742 | 0.5080 | C；训练集泄露 |
@@ -84,7 +111,8 @@
 | 旧全动作 OPSD ckpt3660 | SFT+DPO | 0.2883 | 0.4014 | 0.3860 | C；动作与流程错误 |
 | Answer-only OPSD ckpt25 | SFT+DPO | 0.4054 | 0.5264 | 0.4690 | A；增量不显著 |
 | Answer-only OPSD ckpt100 | SFT+DPO | 0.4032 | 0.5243 | 0.4675 | A；增益回落 |
-| **SFT→分动作 OPSD ckpt1000** | **SFT，不经过 DPO** | **0.4086** | **0.5379** | **0.4984** | **A；EM/F1 最高，Cover 显著高于 SFT+DPO** |
+| SFT→分动作 OPSD ckpt500 | SFT，不经过 DPO | 0.3118 | 0.4602 | **0.5165** | A；Cover 已提高，但 EM/F1 尚未形成 |
+| **SFT→分动作 OPSD ckpt1000** | **SFT，不经过 DPO** | 0.4086 | 0.5379 | **0.4984** | **A；OPSD 方法中最佳，Cover 显著高于 SFT+DPO** |
 
 E12 ckpt1000 相对本地 SFT+DPO，在同一 7,405 个 ID 上进行 20,000 次
 配对 bootstrap：
@@ -98,12 +126,340 @@ E12 ckpt1000 相对本地 SFT+DPO，在同一 7,405 个 ID 上进行 20,000 次
 因此，E12 是当前第一个在 HotpotQA 全量 dev 上同时提高 EM、F1 和
 Cover-EM 的 OPSD 方案，其中 F1 与 Cover-EM 达到统计显著，EM 尚未
 通过双侧 0.05 显著性阈值。该结果证明不经过 DPO 时，Query/Answer
-分动作 OPSD 仍能产生独立收益；2Wiki 与 MuSiQue 全量结果尚未完成。
+分动作 OPSD 仍能产生独立收益。
+
+### E12 三数据集全量 checkpoint 对照
+
+评测统一使用 Evidence Agent、BGE+FAISS Top-3、最多 6 个 agent turn、
+每轮最多 512 个生成 token。ckpt500 与 ckpt1000 均来自
+SFT `checkpoint-1650` 起点、不经过 DPO 的同一训练线。
+
+| 数据集 | 模型 | N | 回答率 | EM | F1 | Cover-EM | Max-turn | 空 evidence |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| HotpotQA | SFT+DPO | 7,405 | 96.57% | 0.4008 | 0.5233 | 0.4693 | 3.43% | 26.24% |
+| HotpotQA | E12 ckpt500 | 7,405 | 97.52% | 0.3118 | 0.4602 | **0.5165** | 2.47% | 18.08% |
+| HotpotQA | **E12 ckpt1000** | 7,405 | **97.66%** | **0.4086** | **0.5379** | 0.4984 | **2.21%** | **16.91%** |
+| 2Wiki | SFT+DPO | 12,576 | 82.72% | 0.3915 | 0.4688 | 0.4452 | 17.26% | 41.45% |
+| 2Wiki | E12 ckpt500 | 12,576 | 97.30% | 0.3855 | 0.4892 | **0.5484** | 2.70% | 29.22% |
+| 2Wiki | **E12 ckpt1000** | 12,576 | **98.51%** | **0.4866** | **0.5655** | 0.5476 | **1.48%** | **26.10%** |
+| MuSiQue | SFT+DPO | 2,417 | 83.08% | **0.1667** | 0.2477 | 0.2069 | 16.92% | 42.91% |
+| MuSiQue | E12 ckpt500 | 2,417 | 92.93% | 0.1233 | 0.2243 | **0.2238** | 7.07% | 26.69% |
+| MuSiQue | **E12 ckpt1000** | 2,417 | **94.99%** | 0.1547 | **0.2546** | 0.2180 | **4.92%** | **23.81%** |
+
+ReasonRAG 论文外部基线：
+
+| 数据集 | EM | F1 | Cover-EM |
+|---|---:|---:|---:|
+| HotpotQA | 0.384 | 0.489 | 未报告 |
+| 2Wiki | 未报告 | 0.372 | 未报告 |
+| MuSiQue | 未报告 | 0.321 | 未报告 |
+
+同 ID、20,000 次配对 bootstrap 相对 SFT+DPO：
+
+| 数据集 | checkpoint | EM 差值（双侧 p） | F1 差值（双侧 p） | Cover-EM 差值（双侧 p） |
+|---|---|---:|---:|---:|
+| HotpotQA | ckpt500 | -8.90pt (0.0001) | -6.31pt (0.0001) | +4.73pt (0.0001) |
+| HotpotQA | ckpt1000 | +0.80pt (0.0929) | +1.47pt (0.0015) | +2.92pt (0.0001) |
+| 2Wiki | ckpt500 | -0.60pt (0.1780) | +2.04pt (0.0001) | +10.32pt (0.0001) |
+| 2Wiki | ckpt1000 | +9.50pt (0.0001) | +9.67pt (0.0001) | +10.23pt (0.0001) |
+| MuSiQue | ckpt500 | -4.34pt (0.0001) | -2.34pt (0.0001) | +1.70pt (0.0226) |
+| MuSiQue | ckpt1000 | -1.20pt (0.0678) | +0.69pt (0.2928) | +1.12pt (0.1266) |
+
+checkpoint 轨迹呈现一致规律：
+
+- ckpt500 已有较高 Cover-EM 和较低 Max-turn，但 EM/F1 较低，说明
+  答案较常包含 gold 字符串，却尚未形成简洁精确的最终回答；
+- 到 ckpt1000，HotpotQA 与 2Wiki 的 EM/F1 明显提高，同时保持较高
+  Cover-EM，因此 ckpt1000 是该训练线的最佳 checkpoint；
+- MuSiQue 从 ckpt500 到 ckpt1000 有恢复，但相对 SFT+DPO 的三项差值
+  均未显著，且 F1 仍低于 ReasonRAG 论文值 0.321；
+- 2Wiki ckpt1000 的 F1 为 0.5655，显著高于 SFT+DPO 0.4688 和
+  ReasonRAG 论文值 0.372；HotpotQA ckpt1000 的 F1 为 0.5379，
+  也高于 ReasonRAG 0.489。
 
 权威产物：
 
 - `data/eval_results/hotpotqa/sft_opsd_ckpt1000_full7405_20260902/full/checkpoint-1000/hotpotqa/metrics.json`
 - `data/eval_results/hotpotqa/sft_opsd_ckpt1000_full7405_20260902/full/checkpoint-1000/hotpotqa/paired_bootstrap_vs_sft_dpo.json`
+- `data/eval_results/2wikimultihopqa/sft_opsd_ckpt1000_full12576_20260903/full/checkpoint-1000/2wikimultihopqa/`
+- `data/eval_results/musique/sft_opsd_ckpt1000_full2417_20260903/full/checkpoint-1000/musique/`
+- `data/eval_results/action_opsd_sft_ckpt500_3src_full_20260903/full/checkpoint-500/`
+
+### E14 Canonical-answer SFT
+
+**实验 ID**：E14
+**日期**：2026-09-04 -- 2026-09-05
+**状态**：1 epoch 训练完成；三数据集 full dev 评测完成；可作为有效 SFT
+数据修正结论。
+
+研究问题：旧 SFT 的 EM/F1 显著低于 zero-shot，是否主要由 SFT 训练
+target 中 `<answer>` 采用 R3 长解释答案、而非 benchmark canonical short
+answer 导致？
+
+唯一变量：保留 R3 cold-start 的多轮 `instruction`、query、history、
+analysis、evidence 与 step 结构不变，仅将 terminal step 的
+`<answer>...</answer>` 内容替换为原始训练数据集的 gold answer。构建时按
+归一化 question 回连原始 train 集：
+
+| 项目 | 数值 |
+|---|---:|
+| reasoning rows | 178,061 |
+| terminal answer rows | 51,253 |
+| 成功匹配 gold | 51,148 |
+| 替换为 GT | 51,100 |
+| 原本已一致 | 48 |
+| 未匹配到 gold | 105 |
+
+answer 长度从旧版 SFT 的平均 13.96 words / p50 12 words，下降到平均
+2.23 words / p50 2 words；`<=5 words` 占比从 27.96% 升到 96.7%。
+
+训练配置：
+
+| 项目 | 配置 |
+|---|---|
+| base model | Qwen2.5-7B-Instruct |
+| dataset | `sapr_reasoning_canonical,sapr_evidence_canonical` |
+| 训练方式 | LoRA SFT, fp16 |
+| worker | `4216626` |
+| GPU | `CUDA_VISIBLE_DEVICES=4,5,6,7` |
+| epoch | 1 |
+| train examples | 274,168 |
+| val examples | 2,770 |
+| total steps | 4,284 |
+| best checkpoint | `checkpoint-4150` |
+| final train loss | 0.20599 |
+| final eval loss | 0.14523 |
+
+评测配置：`agent_infer.py --backend vllm`，同 SAPR-RAG 多轮 pipeline；
+BGE+FAISS Top-3 retrieval daemon；最多 6 个 agent turn；reasoning
+`max_tokens=512`，evidence `max_tokens=128`；6 GPU 分片评测后合并。
+
+三数据集 full dev 结果：
+
+| 数据集 | N | 回答率 | EM | F1 | Cover-EM | avg_turns | Max-turn | 空 evidence |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| HotpotQA | 7,405 | 90.36% | **0.4373** | **0.5513** | 0.4748 | 2.457 | 9.62% | 18.41% |
+| 2Wiki | 12,576 | 75.07% | 0.4051 | 0.4513 | 0.4188 | 3.481 | 24.92% | 31.89% |
+| MuSiQue | 2,417 | 71.29% | 0.1651 | 0.2405 | 0.1841 | 3.736 | 28.71% | 26.53% |
+
+与旧 SFT / SFT+DPO 的核心对比：
+
+| 数据集 | 对比对象 | EM 差值 | F1 差值 | Cover-EM 差值 | 解读 |
+|---|---|---:|---:|---:|---|
+| HotpotQA | vs 旧 SFT | +34.02pt | +28.79pt | -3.22pt | 证实旧 SFT 的 EM/F1 主要受长答案 target 拖累 |
+| HotpotQA | vs SFT+DPO | +3.65pt | +2.80pt | +0.55pt | 单靠 canonical SFT 已超过 DPO 后答案指标 |
+| 2Wiki | vs 旧 SFT | +30.33pt | +19.98pt | -3.00pt | EM/F1 显著修复，但 Cover-EM 回落 |
+| 2Wiki | vs SFT+DPO | +1.36pt | -1.75pt | -2.64pt | 不构成对 SFT+DPO 的全面优势 |
+| MuSiQue | vs 旧 SFT | +11.59pt | +12.00pt | -0.70pt | EM/F1 修复明显 |
+| MuSiQue | vs SFT+DPO | -0.16pt | -0.72pt | -2.28pt | 基本持平或略低，未形成新最佳 |
+
+结论：E14 明确证明旧 SFT 的低 EM/F1 不是 SFT 学不到多跳 RAG，而是
+final `<answer>` 训练目标偏长导致的指标错配。canonical answer target
+能在 HotpotQA 上直接超过 SFT+DPO 和 E12 的 EM/F1，但 2Wiki 与 MuSiQue
+未超过 E12/SFT+DPO，且三数据集 Cover-EM 普遍低于旧 SFT/E12。该实验适合
+作为“答案格式对齐修复”的强证据；后续若继续做 DPO/OPSD，应优先以
+E14 为新 SFT 起点重跑对齐实验，验证是否能同时保留短答案 EM/F1 与
+OPSD 的 Cover-EM/行为收益。
+
+权威产物：
+
+- `03_sapr_rag/data/sft_build/out/sft_v2_reasoning_canonical.jsonl`
+- `03_sapr_rag/data/sft_build/out/sft_v2_evidence_canonical.jsonl`
+- `03_sapr_rag/scripts/train/sft_canonical_lora_fp16.yaml`
+- `03_sapr_rag/scripts/train/logs/sft_canonical_lora_fp16_preload_20260903_205417/train.log`
+- `03_sapr_rag/saves/qwen2_5_7b/lora/sft_canonical_fp16/checkpoint-4150/`
+- `data/eval_results/sft_canonical_ckpt4150_3src_6gpu_20260904/`
+
+### E15 Canonical SFT→DPO
+
+**实验 ID**：E15
+**日期**：2026-09-05
+**状态**：1 epoch DPO 训练完成；三数据集 full dev 评测完成。
+
+研究问题：在 E14 canonical SFT 基础上做偏好对齐（DPO），能否在保留
+canonical short answer 带来的 EM/F1 的同时，进一步提升多跳表现或 Cover-EM。
+
+训练配置：
+
+| 项目 | 配置 |
+|---|---|
+| base model | Qwen2.5-7B-Instruct |
+| 起点 adapter | `sft_canonical_fp16/checkpoint-4150`（E14） |
+| dataset | `sapr_proguide_dpo`（chosen/rejected 偏好对） |
+| 训练方式 | LoRA DPO；`pref_beta=0.2`，`pref_loss=sigmoid` |
+| worker | `4216626`；GPU 1-7（7 卡） |
+| epoch | 1（451 steps） |
+| lr | 5.0e-6，cosine |
+| cutoff_len | 2560 |
+| val_size | 0.05 |
+| final train loss | 1.2242 |
+| final eval loss | 1.1704（step400） |
+| best checkpoint | `checkpoint-451` |
+
+训练曲线健康：train loss 1.557→1.022；eval loss 1.387→1.170 单调下降无过拟合；
+rewards/margins 0.40→1.04 稳步扩大；rewards/accuracies 0.51→0.60，偏好对齐方向正确。
+
+评测配置：`agent_infer.py --backend vllm`，同 SAPR-RAG 多轮 pipeline；
+BGE+FAISS Top-3；最多 6 turn；reasoning `max_tokens=512`，evidence `max_tokens=128`；
+6 GPU 分片评测后合并（rows=unique=expected 全部通过）。
+
+三数据集 full dev 结果：
+
+| 数据集 | N | 回答率 | EM | F1 | Cover-EM | avg_turns | Max-turn | 空 evidence |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| HotpotQA | 7,405 | 95.00% | 0.4140 | 0.5281 | 0.4304 | 2.231 | 5.00% | 26.77% |
+| 2Wiki | 12,576 | 82.89% | 0.4187 | 0.4656 | 0.4230 | 3.266 | 17.09% | 40.19% |
+| MuSiQue | 2,417 | 83.12% | 0.1585 | 0.2459 | 0.1676 | 3.321 | 16.88% | 39.80% |
+
+与 E14 / SFT+DPO(E01) 的核心对比：
+
+| 数据集 | 对比对象 | EM 差值 | F1 差值 | Cover-EM 差值 | 解读 |
+|---|---|---:|---:|---:|---|
+| HotpotQA | vs E14 | -2.33pt | -2.32pt | -4.44pt | DPO 未带来增益，三指标均回落 |
+| HotpotQA | vs SFT+DPO(E01) | +1.32pt | +0.48pt | -3.89pt | EM/F1 略优，Cover-EM 更低 |
+| 2Wiki | vs E14 | +1.36pt | +1.43pt | +0.42pt | 三指标同步小幅提升 |
+| 2Wiki | vs SFT+DPO(E01) | +2.72pt | -0.32pt | -2.22pt | EM 明显更高，Cover-EM 略低 |
+| MuSiQue | vs E14 | -0.66pt | +0.54pt | -1.65pt | 基本持平，F1 微升 |
+| MuSiQue | vs SFT+DPO(E01) | -0.82pt | -0.18pt | -3.93pt | 未形成优势 |
+
+结论：canonical SFT 基础上做 DPO 的收益按数据集分化——仅在 2Wiki 上三指标
+同步小幅提升；HotpotQA 整体回落（尤其 Cover-EM -4.44pt），MuSiQue 基本持平。
+DPO 训练本身健康（margins/accuracies 均正向），但当前偏好数据（`sapr_proguide_dpo`）
+对短答案 canonical 起点的增益有限，且普遍压低 Cover-EM。E14 canonical SFT 仍是
+HotpotQA 上的答案指标最佳，E15 未能全面超越 E14。后续若继续偏好对齐，建议针对性
+构造更贴合多跳证据链的偏好对，并监控 Cover-EM 回落。
+
+权威产物：
+
+- `03_sapr_rag/scripts/train/dpo_canonical_lora.yaml`
+- `03_sapr_rag/scripts/train/run_dpo_canonical.sh`
+- `03_sapr_rag/saves/qwen2_5_7b/lora/sft_canonical_dpo/checkpoint-451/`
+- `data/eval_results/sft_canonical_dpo_3src_6gpu_20260905/`
+- `data/eval_results/sft_canonical_dpo_3src_6gpu_20260905/compare_dpo_vs_baselines.md`
+
+### E16 Canonical SFT→分动作 OPSD
+
+**实验 ID**：E16
+**日期**：2026-09-05
+**状态**：1000-step 正式训练已在 `worker4216626` 启动。
+
+研究问题：E12 的 Query/Answer 分动作 OPSD 在修复答案目标后的 E14
+canonical SFT 强起点上是否仍能提升 EM/F1/Cover-EM；以及相对匹配
+GRPO-only control，teacher 信号是否有独立收益。
+
+本实验复现 E12 在 `checkpoint-1000` 验证有效的目标，唯一核心变化是
+将起点从旧 SFT `checkpoint-1650` 替换为 E14
+`sft_canonical_fp16/checkpoint-4150`：
+
+| 项目 | 配置 |
+|---|---|
+| 起点 | E14 `sft_canonical_fp16/checkpoint-4150` |
+| 数据 | `hotpotqa_2wiki_musique_train_multi_opsd.jsonl`，277,839 条 |
+| 更新方式 | LoRA，学习率 `1e-6` |
+| GRPO reward | F1 / relevance / format，权重 `1.0 / 0.2 / 0.05` |
+| teacher | Query 0.01 / Evidence 0 / Answer 0.03 |
+| rollout | GPU7；Evidence Agent；最多 6 turn |
+| 检索 | GPU0；BGE+FAISS Top-3 |
+| 训练 | GPU2-6；per-device batch 2；grad accumulation 4 |
+| 采样 | 8 generations；steps-per-generation 8 |
+| 长度 | max completion 4096 |
+| 步数 | 1000；每 250 step 保存 |
+| 截断惩罚 | 关闭，与原始有效 E12 ckpt1000 保持一致 |
+| run | `opsd_canonical_sft_q001_a003_3src_s1000_20260905` |
+
+启动后前 6 step 未见 NaN、OOM 或服务错误。step 3 同时记录到
+Query scoped KL `0.1351` 和 Answer scoped KL `0.0542`，证明两类
+teacher 信号在 canonical SFT 起点下均实际生效。
+
+归因边界：E16 同时包含 GRPO 与 OPSD，单独比较 E16 与 E14 只能得到
+整套后训练收益。后续必须补跑相同起点、数据、reward、采样和步数但关闭
+teacher 的 GRPO-only control；只有 `E16 - GRPO control` 才能解释为
+OPSD 的独立贡献。
+
+权威产物：
+
+- `03_sapr_rag/scripts/grpo/run_canonical_sft_multi_opsd_s1000.sh`
+- `03_sapr_rag/scripts/grpo/logs/opsd_canonical_sft_q001_a003_3src_s1000_20260905/`
+- `03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/opsd_canonical_sft_q001_a003_3src_s1000_20260905/`
+
+### External-teacher selective OPD
+
+**实验 ID**：E13
+**日期**：2026-09-03
+**状态**：代码、teacher SFT、三数据集 ceiling、2-step smoke 已完成；
+1000-step 正式训练正在 `worker4220660` 运行。以下训练指标仅用于健康检查。
+
+该方案不再给 teacher 注入 gold answer、gold evidence 或 R3 query plan。
+Teacher 和 student 看到同一条 student on-policy 多轮轨迹；gold answer
+只通过独立 `sapr_em` reward 判定轨迹是否失败。纯 OPD 目标为：
+
+```text
+gate_i = 1[EM_i < 1]
+A_t = gate_i * 0.01 * (logp_teacher_t - logp_student_t)
+```
+
+环境 observation token 保持 mask；`opd_use_grpo_advantage=false`，因此
+不混入 GRPO advantage。训练数据由原三源数据删除全部 `teacher_*`
+字段得到，共 277,839 条。
+
+14B teacher 先用与 7B 相同的 ReasonRAG SFT 数据做 300-step LoRA
+协议训练：
+
+| 项目 | 结果 |
+|---|---:|
+| train loss | 0.3007 |
+| eval loss | 0.1835 |
+| checkpoint | `03_sapr_rag/saves/qwen2_5_14b/lora/sft_teacher/checkpoint-300` |
+
+固定三数据集各 50 条的 teacher ceiling：
+
+| 数据集 | 14B teacher F1 | 7B SFT F1 | 差值 |
+|---|---:|---:|---:|
+| HotpotQA | 0.3025 | 0.2436 | +0.0589 |
+| 2Wiki | 0.3524 | 0.1763 | +0.1761 |
+| MuSiQue | 0.2628 | 0.1568 | +0.1060 |
+| 宏平均 | 0.3059 | 0.1922 | +0.1137 |
+
+HotpotQA teacher 回答率比 7B SFT 低 2/50，其余两个数据集更高；
+考虑 50 条样本的离散粒度，pilot gate 使用最大 5pt 回答率下降容忍。
+全量结果不能沿用该容忍度。
+
+2-step smoke：
+
+- run：`opd_14b_sft_failed_em_smoke_v6_worker4220660`
+- loss：`0.0272 -> 0.0387`
+- grad norm：`0.0794 -> 0.0955`
+- teacher KL：`0.7538 -> 1.0005`
+- 两步截断率均为 0，checkpoint-1/2 均已保存。
+
+正式训练：
+
+| 项目 | 配置 |
+|---|---|
+| run | `opd_sft14b_failed_em_s1000_v2_20260903` |
+| student | Qwen2.5-7B + SFT `checkpoint-1650` |
+| teacher | Qwen2.5-14B + SFT `checkpoint-300`，冻结 |
+| 数据 | 三源 train 277,839 条，无 `teacher_*` 字段 |
+| 设备 | GPU0 retrieval；GPU2 teacher；GPU7 rollout；GPU1/3/4/5/6 train |
+| 优化 | pure OPD；failed-EM gate；teacher coef 0.01 |
+| batch | per-device 1；grad accumulation 4；5 generations |
+| 计划 | 1000 step；每 250 step 保存 |
+
+截至 step 5 的健康指标：
+
+- loss：`0.0356 / 0.0295 / 0.0362 / 0.0392 / 0.0353`；
+- grad norm：`0.122 / 0.088 / 0.127 / 0.113 / 0.095`；
+- teacher KL：`0.907 / 0.696 / 0.767 / 0.991 / 1.517`；
+- completion clipped ratio：连续为 0；
+- 未发现 NaN、OOM、Traceback 或服务错误；
+- step time 为 332--454 秒，当前 ETA 约 4.5 天，吞吐是主要工程风险。
+
+权威产物：
+
+- `data/eval_results/teacher_14b_sft_ceiling_50/ceiling_gate.json`
+- `03_sapr_rag/saves/qwen2_5_7b/lora/opd/opd_14b_sft_failed_em_smoke_v6_worker4220660/`
+- `03_sapr_rag/saves/qwen2_5_7b/lora/opd/opd_sft14b_failed_em_s1000_v2_20260903/`
+- `03_sapr_rag/scripts/opd/logs/opd_sft14b_failed_em_s1000_v2_20260903/`
 
 ### 三数据集基础实验矩阵
 
@@ -115,14 +471,17 @@ Cover-EM 的 OPSD 方案，其中 F1 与 Cover-EM 达到统计显著，EM 尚未
 |---|---|---:|---:|---:|---:|---:|---:|
 | HotpotQA | Zero-shot | 7,405 | 0.2680 | 0.3380 | 0.2040 | 0.2730 | 45.1% |
 | HotpotQA | SFT | 7,405 | **0.5070** | **0.6070** | 0.0971 | 0.2634 | 10.7% |
+| HotpotQA | Canonical-answer SFT | 7,405 | 0.4748 | 未评 | **0.4373** | **0.5513** | 9.6% |
 | HotpotQA | DPO-only | 7,405 | 0.3999 | 0.5356 | 0.3492 | 0.4563 | 未统一记录 |
 | HotpotQA | SFT+DPO | 7,405 | 0.4693 | 0.6060 | **0.4008** | **0.5233** | **3.4%** |
 | 2Wiki | Zero-shot | 12,576 | 0.1114 | 0.1178 | 0.0803 | 0.1049 | 66.6% |
 | 2Wiki | SFT | 12,576 | **0.4488** | 0.4431 | 0.1018 | 0.2515 | 27.9% |
+| 2Wiki | Canonical-answer SFT | 12,576 | 0.4188 | 未评 | **0.4051** | 0.4513 | 24.9% |
 | 2Wiki | DPO-only | 12,576 | 0.4061 | 0.4249 | 0.3496 | 0.4194 | 未统一记录 |
 | 2Wiki | SFT+DPO | 12,576 | 0.4452 | **0.4705** | **0.3915** | **0.4688** | **17.3%** |
 | MuSiQue | Zero-shot | 2,417 | 0.0956 | 0.1129 | 0.0728 | 0.1070 | 63.6% |
 | MuSiQue | SFT | 2,417 | 0.1911 | 0.2081 | 0.0492 | 0.1205 | 33.4% |
+| MuSiQue | Canonical-answer SFT | 2,417 | 0.1841 | 未评 | 0.1651 | 0.2405 | 28.7% |
 | MuSiQue | DPO-only | 2,417 | 0.1452 | 0.1957 | 0.1200 | 0.1935 | 未统一记录 |
 | MuSiQue | SFT+DPO | 2,417 | **0.2069** | **0.2462** | **0.1667** | **0.2477** | **16.9%** |
 
@@ -134,6 +493,9 @@ Cover-EM 的 OPSD 方案，其中 F1 与 Cover-EM 达到统计显著，EM 尚未
   EM/F1 的大幅提高主要反映回答更简洁、与 gold 字符串更对齐。
 - 2Wiki 和 MuSiQue 的 LLM-acc 在 SFT+DPO 后继续提高，说明 DPO 没有
   破坏 MuSiQue 能力，尽管 DPO 数据本身不含 MuSiQue。
+- Canonical-answer SFT 直接修复了旧 SFT 的答案长度错配：HotpotQA
+  EM/F1 超过 SFT+DPO，2Wiki/MuSiQue 的 EM/F1 也大幅高于旧 SFT；
+  但 LLM-judge 尚未补评，且 Cover-EM 不如旧 SFT/E12 稳定。
 
 ### 主结果可比性
 

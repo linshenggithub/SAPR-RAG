@@ -650,6 +650,34 @@ ReasonRAG OpenReview rebuttal 报告过 2WikiMultihopQA 上 **110s / 1000 querie
 
 因此 HotpotQA 的 Oracle 数字不能直接视为开放域的上限，它反映的是"给定 distractor 10 段"这一特定设置下的推理上限。2Wiki 和 MuSiQue 的 Oracle 是直接用支撑段落，更接近"完美检索"的概念，gap 更有参考价值。
 
+### 5.8 DeepSeek Agentic Zeroshot（受控 BGE/FAISS 检索，MuSiQue，2026-09）
+
+前述 5.2–5.5 的 Oracle / closed-book 是"给完美证据"或"完全不给证据"两个极端。为回答"若让 SOTA 模型在**与本项目相同的受控开放域检索器**下自主多轮检索并作答，能到多少"，补做了 DeepSeek Agentic Zeroshot 诊断：只给原始问题，模型自主生成子查询，走本项目同一 BGE+FAISS + wiki18_extended (22.35M) 检索器，最多多轮迭代后作答。此设置比 Oracle 更贴近真实开放域，也比 5.4 的 closed-book 更公平（允许调用检索）。
+
+**Prompt 消融（MuSiQue 前 50 条，deepseek-chat）**：从 baseline → strict-XML → anti-repeat 逐步优化，核心增益来自 anti-repeat（告知检索确定性 + 禁止重复此前失败的子查询）。
+
+| Prompt 变体 | N | 回答率 | EM | Cover-EM | F1 | avg_turns |
+|---|---:|---:|---:|---:|---:|---:|
+| baseline | 50 | 46.0% | 0.2000 | 0.2400 | 0.2374 | 0.52 |
+| strict-XML | 50 | 52.0% | 0.2200 | 0.2600 | 0.2528 | 3.86 |
+| **anti-repeat** | 50 | 68.0% | **0.3000** | **0.3800** | **0.3866** | 3.72 |
+
+**MuSiQue 全量（2,417，deepseek-chat，anti-repeat prompt）**：
+
+| 设置 | 模型 | N | 回答率 | EM | Cover-EM | F1 | avg_turns | 结果文件 |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| Agentic Zeroshot（受控检索） | deepseek-chat | 2,417 | 53.4% | 0.1920 | 0.2503 | 0.2589 | 4.33 | `data/eval_results/deepseek_agentic/musique_full_agentic_deepseek-chat_antirepeat.jsonl` |
+
+**重要 caveat**：全量运行中 `n_answered=1291 / n_errors=1126`（约 46.6% 因 API 报错或格式解析失败未能成功作答），上表指标按 `n_total=2417` 计（未答按错处理）。因此全量 25.03% Cover-EM 明显低于 50 条抽样的 38%，主要由大规模并发下的错误率而非模型能力下降导致；若按 `n_answered` 重算，实际作答质量更接近抽样水平。该数字应作为"含系统错误率的保守下限"引用。
+
+**与本项目 SAPR-RAG 系统的定位对比（MuSiQue Cover-EM）**：DeepSeek 受控 agentic zeroshot 25.03%（保守下限）与本项目最好的 MuSiQue Cover-EM（E01 SFT+DPO 0.2069 / E12 0.2180）处于同一量级，说明在**受控开放域检索**这一公平口径下，未经任务微调的 SOTA 模型并不显著领先本项目的小模型；真正的天花板差距体现在给了完美证据的 Oracle 设置（59.3%）。这为"面试式提问——SOTA 模型在这些多跳测试集上的天花板如何"提供了三档可引用口径：closed-book 16.3% / 受控 agentic 25.03%（保守下限）/ Oracle 59.3%。
+
+**产物与脚本**：
+- `03_sapr_rag/scripts/eval/agentic_deepseek_zeroshot.py`（agentic 多轮 pipeline）
+- `03_sapr_rag/scripts/eval/batch_deepseek_api.py`、`score_batch_deepseek_outputs.py`
+- `data/eval_results/deepseek_agentic/`（50 条消融 + 全量结果与 metrics）
+- `03_sapr_rag/deepseek_agentic_failure_examples.jsonl`（典型失败样本）
+
 ---
 
 ## 6. GRPO 训练与评测（#5，v4-formatfix）

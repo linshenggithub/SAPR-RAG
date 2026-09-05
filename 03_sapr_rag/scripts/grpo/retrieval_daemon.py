@@ -18,6 +18,7 @@ L2 normalize / mmap 只读索引 / contents 按首行切 title / 正文 [:500]�
        -d '{"queries": ["who founded Apple"], "top_k": 3}'
 """
 import argparse
+import os
 import socket
 import sys
 import threading
@@ -75,6 +76,12 @@ class BGEFaissRetriever:
             )
             t0 = time.time()
             res = faiss.StandardGpuResources()
+            # 限制 FAISS GPU 临时内存池。默认策略会一次性申请与索引等大的
+            # 临时缓冲（这里约 34GB），在共享卡上易触发 cudaMalloc OOM。
+            # 通过 FAISS_GPU_TEMP_MB 显式设定上限（默认 2048MB 足够 Flat 检索）。
+            temp_mb = int(os.environ.get("FAISS_GPU_TEMP_MB", "2048"))
+            if temp_mb > 0:
+                res.setTempMemory(temp_mb * 1024 * 1024)
             opts = faiss.GpuClonerOptions()
             opts.useFloat16 = bool(faiss_gpu_fp16)
             self.index = faiss.index_cpu_to_gpu(res, faiss_gpu_id, cpu_index, opts)

@@ -1,5 +1,9 @@
 # BGE wiki18_extended FAISS 索引构建文档
 
+> 本文记录索引的**构建历史**。第 7–8 节的部署位置和共享盘阻塞是旧状态，
+> 不代表当前运行环境。正式 H20 Worker 检索服务的环境、GPU 部署和启动命令
+> 见 [`retrieval_service_gpu_runbook.md`](retrieval_service_gpu_runbook.md)。
+
 记录 64GB BGE FAISS 索引的完整构建流程，作为重建（IVF/IVF-PQ/HNSW）和迁移的事实底稿。
 
 ## 1. 产物总览

@@ -1,8 +1,12 @@
 # 持久 faiss-cpu 检索环境记录
 
-日期：2026-08-10
+> **历史回退方案，不是当前正式配置。** 截至 2026-09-05，H20 Worker
+> 已验证 `faiss-gpu 1.14.3 + CUDA 12.9`，正式训练使用 BGE GPU +
+> FAISS GPU 常驻服务。请优先阅读
+> [`retrieval_service_gpu_runbook.md`](retrieval_service_gpu_runbook.md)。
+> 仅当 GPU FAISS 无法启动或显存不足时，才使用本文的 FAISS CPU 方案。
 
-适用场景：在 Merlin worker 上启动 SAPR-RAG 的 BGE GPU + FAISS CPU 检索服务，供 GRPO 多轮检索训练调用。
+日期：2026-08-10
 
 ## 结论
 

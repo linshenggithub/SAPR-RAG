@@ -932,6 +932,7 @@ Control 与 E16 必须使用相同数据顺序、reward、rollout、Evidence Age
 - 基础结果：`docs/midterm_results.md`
 - SFT/DPO 方案：`docs/sft_dpo_plan.md`
 - GRPO/OPSD 流程：`docs/grpo_opsd_pipeline_overview.md`
+- 正式检索服务部署：`docs/retrieval_service_gpu_runbook.md`
 - 失败归因：`docs/grpo_opsd_badcase_attribution.md`
 - SFT/DPO 数据构造：`03_sapr_rag/data/sft_build/`
 - SFT/DPO 配置：`03_sapr_rag/scripts/train/`

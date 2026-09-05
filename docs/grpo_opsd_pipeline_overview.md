@@ -1,5 +1,12 @@
 # GRPO / OPSD Pipeline Overview
 
+> **2026-09-05 运行配置更新**：当前 H20 正式训练使用单进程常驻
+> **BGE GPU + FAISS GPU** 检索服务。本文第 3 节和后文关于
+> “FAISS index 仍在 CPU mmap”的描述是历史实现说明，不再是当前推荐部署。
+> 新 Worker 的环境、启动命令、健康检查和训练/评测接入统一以
+> [`retrieval_service_gpu_runbook.md`](retrieval_service_gpu_runbook.md)
+> 为准。
+
 本文用于从代码层面梳理 SAPR-RAG 当前 GRPO 与 OPSD 训练链路。目标不是复述实验日志，而是回答：
 
 - 训练数据从哪里来；

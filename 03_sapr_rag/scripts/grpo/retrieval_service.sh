@@ -18,6 +18,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="${SAPR_RAG_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
+export NO_PROXY="${NO_PROXY:+$NO_PROXY,}127.0.0.1,localhost,::1"
+export no_proxy="$NO_PROXY"
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
 
@@ -44,6 +46,10 @@ do_start() {
     if is_alive; then
         echo "[svc] already alive on $HOST:$PORT — reuse, skip start."
         health; echo
+        return 0
+    fi
+    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "[svc] process pid=$(cat "$PID_FILE") is still starting — reuse, skip duplicate launch."
         return 0
     fi
     # 清理陈旧 pid 文件对应的死进程

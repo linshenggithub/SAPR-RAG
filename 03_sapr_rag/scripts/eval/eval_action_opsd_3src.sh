@@ -23,7 +23,8 @@ RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUT_ROOT="${OUT_ROOT:-$PROJ_ROOT/data/eval_results/action_opsd_3src_${MODE}_${RUN_TAG}}"
 DRY_RUN="${DRY_RUN:-false}"
 
-DATASETS=(hotpotqa 2wikimultihopqa musique)
+DATASETS_CSV="${DATASETS_CSV:-hotpotqa,2wikimultihopqa,musique}"
+IFS=',' read -r -a DATASETS <<<"$DATASETS_CSV"
 declare -A BASELINES=(
   [hotpotqa]="$PROJ_ROOT/data/eval_results/hotpotqa/sft_dpo_20260610_145349/merged.jsonl"
   [2wikimultihopqa]="$PROJ_ROOT/data/eval_results/2wikimultihopqa/sft_dpo_20260610_155526/merged.jsonl"
@@ -285,6 +286,7 @@ CONFIG_FILE="$OUT_ROOT/config_${MODE}.txt"
   echo "rollout_port=$ROLLOUT_PORT"
   echo "retrieval_url=$RETRIEVAL_URL"
   echo "bootstrap_samples=$BOOTSTRAP_SAMPLES"
+  echo "datasets=$DATASETS_CSV"
   echo "evidence_agent=true"
   echo "top_k=3"
   echo "started_at=$(date -Is)"

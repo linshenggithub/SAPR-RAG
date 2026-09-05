@@ -50,6 +50,8 @@ NUM_GENERATIONS="${NUM_GENERATIONS:-8}"
 SAVE_STEPS="${SAVE_STEPS:-25}"
 SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-60}"
 MAX_STEPS="${MAX_STEPS:-}"
+ENABLE_TRUNCATION_REWARD="${ENABLE_TRUNCATION_REWARD:-false}"
+TRUNCATION_REWARD_WEIGHT="${TRUNCATION_REWARD_WEIGHT:-0.5}"
 DRY_RUN="${DRY_RUN:-false}"
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-6}"
@@ -70,6 +72,10 @@ TRAIN_DEVICES="${TRAIN_DEVICES:-$DEFAULT_TRAIN_DEVICES}"
 case "$ENABLE_OPSD" in
     true|false) ;;
     *) echo "[run_grpo_opsd] ERROR: ENABLE_OPSD must be true or false, got: $ENABLE_OPSD" >&2; exit 2 ;;
+esac
+case "$ENABLE_TRUNCATION_REWARD" in
+    true|false) ;;
+    *) echo "[run_grpo_opsd] ERROR: ENABLE_TRUNCATION_REWARD must be true or false, got: $ENABLE_TRUNCATION_REWARD" >&2; exit 2 ;;
 esac
 case "$TEACHER_ACTION_SCOPE" in
     all|query|evidence|answer|multi) ;;
@@ -167,6 +173,14 @@ echo "[run_grpo_opsd] vllm_server=${VLLM_HOST}:${VLLM_PORT} group_port=${VLLM_GR
 echo "[run_grpo_opsd] opsd=$ENABLE_OPSD teacher_fields=$DATASET_TEACHER_FIELDS action_scope=$TEACHER_ACTION_SCOPE"
 echo "[run_grpo_opsd] teacher_coefs=global:$TEACHER_KL_COEF query:$TEACHER_QUERY_KL_COEF evidence:$TEACHER_EVIDENCE_KL_COEF answer:$TEACHER_ANSWER_KL_COEF"
 
+REWARD_FUNCS=(sapr_f1 sapr_relevance sapr_format)
+REWARD_WEIGHTS=(1.0 0.2 0.05)
+if [ "$ENABLE_TRUNCATION_REWARD" = "true" ]; then
+    REWARD_FUNCS+=(sapr_truncation)
+    REWARD_WEIGHTS+=("$TRUNCATION_REWARD_WEIGHT")
+fi
+echo "[run_grpo_opsd] reward_funcs=${REWARD_FUNCS[*]} reward_weights=${REWARD_WEIGHTS[*]}"
+
 CMD=(
     swift rlhf
     --rlhf_type grpo
@@ -174,8 +188,8 @@ CMD=(
     --adapters "$ADAPTER_PATH"
     --tuner_type lora
     --external_plugins "$PLUGIN"
-    --reward_funcs sapr_f1 sapr_relevance sapr_format
-    --reward_weights 1.0 0.2 0.05
+    --reward_funcs "${REWARD_FUNCS[@]}"
+    --reward_weights "${REWARD_WEIGHTS[@]}"
     --use_vllm true
     --vllm_mode server
     --vllm_server_host "$VLLM_HOST"

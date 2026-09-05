@@ -513,6 +513,22 @@ class SaprF1ORM(ORM):
 orms["sapr_f1"] = SaprF1ORM
 
 
+class SaprEMORM(ORM):
+    """二值答案 EM；同时作为 failed-only external-teacher OPD 的 gate。"""
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        golden_answers = kwargs.get("golden_answers")
+        rewards = []
+        for i, comp in enumerate(completions):
+            golds = _as_list(golden_answers[i]) if golden_answers else []
+            pred = normalize_answer(parse_final_answer(comp))
+            rewards.append(float(bool(pred) and any(pred == normalize_answer(gold) for gold in golds)))
+        return rewards
+
+
+orms["sapr_em"] = SaprEMORM
+
+
 class SaprRelevanceORM(ORM):
     """检索相关性：首次覆盖的 unique gold evidence 比例。值域 [0,1]。"""
 

@@ -79,7 +79,7 @@ except Exception as e:
     result["checks"]["datasets_json_feature"] = False
     result["errors"].append(f"datasets.features Json/List: {e}")
 
-# plugin 注册（三 ORM + scheduler）
+# plugin 注册（SAPR ORM + scheduler）
 try:
     sys.path.insert(0, grpo_dir)
     import plugin  # noqa
@@ -321,7 +321,7 @@ echo "── 功能性检查 ──"
 [ "$JSON_OK" = "True" ] && echo "  [OK]  datasets.features Json/List import" \
                        || { echo "  [FAIL] datasets.features Json/List import"; NEED_FIX=1; }
 
-EXPECTED_ORMS="['sapr_f1', 'sapr_format', 'sapr_relevance']"
+EXPECTED_ORMS="['sapr_em', 'sapr_f1', 'sapr_format', 'sapr_relevance']"
 EXPECTED_SCHED="['sapr_rag_scheduler']"
 if [ "$ORMS_OK" = "$EXPECTED_ORMS" ] && [ "$SCHED_OK" = "$EXPECTED_SCHED" ]; then
     echo "  [OK]  plugin 注册：$ORMS_OK + $SCHED_OK"

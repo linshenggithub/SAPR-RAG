@@ -52,6 +52,10 @@ SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-60}"
 MAX_STEPS="${MAX_STEPS:-}"
 ENABLE_TRUNCATION_REWARD="${ENABLE_TRUNCATION_REWARD:-false}"
 TRUNCATION_REWARD_WEIGHT="${TRUNCATION_REWARD_WEIGHT:-0.5}"
+# 纯 OPSD（无 RL reward）对照：ENABLE_REWARD=false 关闭全部任务 reward，
+# OPD_USE_GRPO_ADVANTAGE=false 丢弃 GRPO 组内 advantage，只保留 teacher log-ratio 信号。
+ENABLE_REWARD="${ENABLE_REWARD:-true}"
+OPD_USE_GRPO_ADVANTAGE="${OPD_USE_GRPO_ADVANTAGE:-true}"
 DRY_RUN="${DRY_RUN:-false}"
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-6}"
@@ -77,6 +81,17 @@ case "$ENABLE_TRUNCATION_REWARD" in
     true|false) ;;
     *) echo "[run_grpo_opsd] ERROR: ENABLE_TRUNCATION_REWARD must be true or false, got: $ENABLE_TRUNCATION_REWARD" >&2; exit 2 ;;
 esac
+case "$ENABLE_REWARD" in
+    true|false) ;;
+    *) echo "[run_grpo_opsd] ERROR: ENABLE_REWARD must be true or false, got: $ENABLE_REWARD" >&2; exit 2 ;;
+esac
+case "$OPD_USE_GRPO_ADVANTAGE" in
+    true|false) ;;
+    *) echo "[run_grpo_opsd] ERROR: OPD_USE_GRPO_ADVANTAGE must be true or false, got: $OPD_USE_GRPO_ADVANTAGE" >&2; exit 2 ;;
+esac
+if [ "$ENABLE_REWARD" = "false" ] && [ "$ENABLE_OPSD" != "true" ]; then
+    echo "[run_grpo_opsd] ERROR: ENABLE_REWARD=false (pure OPSD) requires ENABLE_OPSD=true" >&2; exit 2
+fi
 case "$TEACHER_ACTION_SCOPE" in
     all|query|evidence|answer|multi) ;;
     *) echo "[run_grpo_opsd] ERROR: invalid TEACHER_ACTION_SCOPE=$TEACHER_ACTION_SCOPE" >&2; exit 2 ;;
@@ -179,7 +194,14 @@ if [ "$ENABLE_TRUNCATION_REWARD" = "true" ]; then
     REWARD_FUNCS+=(sapr_truncation)
     REWARD_WEIGHTS+=("$TRUNCATION_REWARD_WEIGHT")
 fi
-echo "[run_grpo_opsd] reward_funcs=${REWARD_FUNCS[*]} reward_weights=${REWARD_WEIGHTS[*]}"
+REWARD_ARG=(--reward_funcs "${REWARD_FUNCS[@]}" --reward_weights "${REWARD_WEIGHTS[@]}")
+if [ "$ENABLE_REWARD" = "false" ]; then
+    REWARD_FUNCS=()
+    REWARD_WEIGHTS=()
+    REWARD_ARG=()
+fi
+echo "[run_grpo_opsd] enable_reward=$ENABLE_REWARD opd_use_grpo_advantage=$OPD_USE_GRPO_ADVANTAGE"
+echo "[run_grpo_opsd] reward_funcs=${REWARD_FUNCS[*]:-<none>} reward_weights=${REWARD_WEIGHTS[*]:-<none>}"
 
 CMD=(
     swift rlhf
@@ -188,8 +210,8 @@ CMD=(
     --adapters "$ADAPTER_PATH"
     --tuner_type lora
     --external_plugins "$PLUGIN"
-    --reward_funcs "${REWARD_FUNCS[@]}"
-    --reward_weights "${REWARD_WEIGHTS[@]}"
+    "${REWARD_ARG[@]}"
+    --opd_use_grpo_advantage "$OPD_USE_GRPO_ADVANTAGE"
     --use_vllm true
     --vllm_mode server
     --vllm_server_host "$VLLM_HOST"

@@ -1,5 +1,12 @@
 # 面向 ReasonRAG 方向的核心 Agentic RAG 文献谱系
 
+> **2026-09-06 更新**：ICLR/ICML 2026 已出现大量 turn/step-level credit
+> assignment 工作。本文后文关于“state-aware query/evidence/stop 是未覆盖
+> 空白”的判断需要结合
+> [`related_work_drafts/grpo_long_horizon_credit_assignment_survey_20260906.md`](related_work_drafts/grpo_long_horizon_credit_assignment_survey_20260906.md)
+> 重新理解。一般性的动作级 reward、势函数差分和树状信用分配已不能单独构成
+> 创新，当前可探索空间应进一步收敛到 RAG 特有的证据获取、吸收与答案利用分解。
+
 本文件只保留与本课题任务最直接相关的核心方法：Search-R1、ReasonRAG、DecEx-RAG、HiPRAG、ProRAG、Search-P1。它们都围绕 Agentic RAG / retrieval-augmented reasoning 中的搜索行为、过程奖励、路径奖励或搜索停止决策展开，并且实验任务包含多跳问答或复杂开放域问答。
 
 ## 1. 方向主线

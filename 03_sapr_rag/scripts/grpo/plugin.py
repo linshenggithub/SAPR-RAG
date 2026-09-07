@@ -614,6 +614,54 @@ class SaprMarginalRelevanceORM(ORM):
 orms["sapr_marginal_relevance"] = SaprMarginalRelevanceORM
 
 
+class SaprQueryEvidenceGainORM(ORM):
+    """逐轮新增 gold evidence 增益向量，供 Evidence-Attributed GRPO 做动作级信用分配。
+
+    与 SaprMarginalRelevanceORM 的区别：不做 gamma 折扣、不求和成标量。它把每个 query 轮次
+    的“本轮新覆盖 gold evidence 数 / gold 总数”按 retrieved_steps 顺序组成一个向量，
+    以副作用写入 ``rollout_infos[i][SAPR_ACTION_CREDIT_KEY]``（与 ms-swift 侧
+    ``action_credit_infos_key`` 对齐），供 trainer 在优势装配阶段读取。
+
+    该 reward 本身恒返回 0.0：它只负责产出逐轮向量，不改变 GRPO 的标量 reward，
+    因此即使被误配非零权重也不会污染结果。向量第 k 项对应第 k 个 <query> 轮次，
+    与 build_query_turn_index_map 里 query 序号一一对应（重复 query 也占一个轮次，
+    docs 为空则该轮增益为 0）。
+    """
+
+    def __call__(self, completions, **kwargs) -> List[float]:
+        rollout_infos = kwargs.get("rollout_infos")
+        gold_titles = kwargs.get("gold_titles")
+        gold_sup_sents = kwargs.get("gold_sup_sents")
+        key = os.environ.get("SAPR_ACTION_CREDIT_KEY", "query_evidence_gain")
+
+        rewards = []
+        for i in range(len(completions)):
+            info = rollout_infos[i] if rollout_infos else None
+            steps = _extract_steps(info if isinstance(info, dict) else {})
+            gtitles = _as_list(gold_titles[i]) if gold_titles else []
+            gsents = _as_list(gold_sup_sents[i]) if gold_sup_sents else []
+            num_gold = len(gtitles)
+
+            gains: List[float] = []
+            if num_gold > 0:
+                covered = set()
+                for step in steps:
+                    hits = _gold_hits_for_docs(step.get("docs", []) or [], gtitles, gsents)
+                    new_hits = hits - covered
+                    gains.append(len(new_hits) / num_gold)
+                    covered |= hits
+
+            # 副作用：把逐轮向量写回同一个 rollout_infos dict（trainer 会按 key 读取）。
+            if isinstance(info, dict):
+                info[key] = gains
+
+            rewards.append(0.0)
+        return rewards
+
+
+orms["sapr_query_evidence_gain"] = SaprQueryEvidenceGainORM
+
+
 class SaprTurnCostORM(ORM):
     """第一轮检索免费，之后每轮返回一个负奖励单位。"""
 

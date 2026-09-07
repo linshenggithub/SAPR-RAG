@@ -50,6 +50,12 @@
    评测。相对同起点旧 SFT，EM/F1 在三个数据集均提高，但 HotpotQA
    Cover-EM 从 0.5070 降至 0.5007；相对 SFT+DPO 与 E12，EM/F1 明显
    落后。该方法主要缩短了旧 SFT 的答案表达，尚未证明检索覆盖能力提升。
+8. B/C/D 归因确认 GRPO 是主要增益来源、OPSD 叠加在 GRPO 上无稳健独立贡献
+   （C−B≈0）。方向2 的 E17（Evidence-Attributed GRPO，动作级证据信用，coef=0.2）
+   在 ckpt-750 三数据集全量上相对 B 无增益（HotpotQA −0.7pt，2Wiki/MuSiQue 持平），
+   与 OPSD 同为"信号被 GRPO outcome advantage 淹没"的模式。sweep 子集曾显示领先但
+   属子集乐观偏差，全量证伪。下一步需决策：加大 coef / 改尖锐信号设计 / 或接受
+   强 SFT 上改 GRPO 增益空间有限的结论。
 
 ### 实验总表
 
@@ -76,6 +82,7 @@
 | E16 | Canonical SFT→GRPO+分动作 OPSD | E14 canonical SFT ckpt4150；三源 train 277,839 条；LoRA | 复现 E12：GRPO reward + Query 0.01 / Answer 0.03 分动作 teacher，只替换 SFT 起点 | ckpt1000 三数据集全量完成；HotpotQA .4636/.5816/.5025；2Wiki .5154/.5659/.5307；MuSiQue .1837/.2786/.2089；相对 E14 全面提升（2Wiki 约 +11pt）；OPSD 独立贡献待 B/D 对照 | A | 下文“E16 Canonical SFT→分动作 OPSD” |
 | B（E16 对照） | Canonical SFT→GRPO-only（关 teacher） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭全部 teacher（纯 GRPO reward） | ckpt1000 三数据集全量完成；HotpotQA .4629/.5837/.5026；2Wiki .5161/.5654/.5314；MuSiQue .1808/.2794/.2056 | A | 下文“B/D 对照与 OPSD 归因” |
 | D（E16 对照） | Canonical SFT→纯分动作 OPSD（无 RL reward） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭 GRPO reward 与组内 advantage，仅保留 Query/Answer teacher log-ratio | ckpt1000 三数据集全量完成；HotpotQA .4462/.5703/.5030；2Wiki .4948/.5548/.5270；MuSiQue .1758/.2717/.2085 | A | 下文“B/D 对照与 OPSD 归因” |
+| E17（G2 / 方向2） | Canonical SFT→GRPO + Evidence-Attributed（动作级证据信用） | E14 canonical SFT ckpt4150；与 B 同的三源 noteacher 数据/采样/步数；LoRA | 在 B（GRPO-only）之上唯一新增：逐轮“本轮新增 gold evidence 覆盖率”经组内逐 turn-slot 归一化后，作为附加 advantage 只加到对应 `<query>` turn 的 token（`action_credit_mode=query_evidence`, coef=0.2）；teacher 全关 | **ckpt-750（sweep 选优）三数据集全量完成，相对 B 无增益**：HotpotQA .4552/.5766/.4957（vs B −0.77/−0.71pt）；2Wiki .5153/.5668/.5316（vs B −0.08/+0.14pt，持平）；MuSiQue .1804/.2768/.2040（vs B −0.04/−0.26pt，持平）。coef=0.2 动作级证据信用在强 SFT+有效 GRPO 起点上未带来独立增益（与 OPSD 的 C−B≈0 同模式）。 | A | 下文“E17 Evidence-Attributed GRPO（方向2）” |
 
 ### 外部天花板诊断（DeepSeek，非同口径参考）
 
@@ -477,6 +484,105 @@ B/C/D 共用训练集 `hotpotqa_2wiki_musique_train_multi_opsd.jsonl`（277,839 
 - D 启动：`03_sapr_rag/scripts/grpo/run_canonical_sft_pure_opsd_s1000.sh`
 - D 训练：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/pure_opsd_canonical_sft_q001_a003_3src_s1000_20260906/`
 - D 评测：`data/eval_results/D_pure_opsd_ckpt1000_3src_20260906/`
+
+### E17 Evidence-Attributed GRPO（方向2）
+
+**实验 ID**：E17（方案矩阵中的 G2）
+
+研究问题：当前 GRPO（B）把单个 per-sequence outcome reward 广播给整条轨迹的所有
+token，无法区分是哪一轮 `<query>` 找到了关键证据；答错时正确的检索轮也被一起惩罚
+（长程信用分配问题），且约 20%–31% 的 rollout 组因 outcome 无方差导致梯度消失。E17
+在不改变 outcome advantage 的前提下，新增一个动作级（per-query-turn）证据信用项，检验
+能否在 B（GRPO-only）之上进一步提升 EM/F1。
+
+方法（相对 B 的唯一改动）：
+- 任务侧 `SaprQueryEvidenceGainORM`（reward 权重恒 0，仅产出逐轮向量）按 query 轮顺序
+  计算“本轮新增覆盖的 gold evidence 数 / gold 总数”，写入 `rollout_infos`；
+- ms-swift core 将该向量在**每个 prompt 组内按 turn-slot** 归一化（第 k 个 query 轮跨
+  K 条 rollout 组成一个归一化组），再只 scatter 到对应 `<query>` turn 的 token：
+  `A_token = A_outcome(seq) + coef * A_action(turn)`；
+- `action_credit_mode=query_evidence`，`coef=0.2`，`scale=group_turn`；teacher 全关。
+
+严格单变量：起点、三源 noteacher 数据、reward（F1 1.0 + relevance 0.2 + format 0.05）、
+rollout / Evidence Agent、1000 step、采样全部与 B 对齐；唯一差异即动作级证据信用项。
+
+| 配置项 | 值 |
+|---|---|
+| 起点 adapter | `sft_canonical_fp16/checkpoint-4150`（E14） |
+| 数据 | `data/grpo/hotpotqa_2wiki_musique_train_grpo_noteacher.jsonl`（277,839 条三源） |
+| action_credit | mode=query_evidence, coef=0.2, scale=group_turn, key=query_evidence_gain |
+| reward | sapr_f1 1.0 / sapr_relevance 0.2 / sapr_format 0.05 / sapr_query_evidence_gain 0.0 |
+| 训练布局 | GPU0 检索服务；GPU2-6 train；GPU7 rollout+Evidence Agent |
+| 步数/采样 | max_steps 1000；num_generations 8；steps_per_generation 8；per_device_bs 2；ga 4 |
+
+早期训练指标（step ~9–14，健康）：`reward` 0.63–0.75、`frac_reward_zero_std` 0.0–0.1
+（低于 B 的 0.20–0.28，动作级信用可能缓解零方差空转，待更多 step 确认）、
+`action_credit_token_ratio` 0.68–0.81、`action_credit_abs_mean` 0.22–0.60、
+`loss` 0.022–0.028、`kl` 0.59–0.73、`num_turns` 3.6–4.1；无 OOM，约 22–27 s/it。
+
+**训练已完成（2026-09-07 17:47，1000 step）**：DP rollout（两副本 GPU1+GPU7 数据并行采样，ms-swift `VLLMClient` 原生多 server）落地，端到端约省 16% 墙钟（23.6→19.8 s/it）。checkpoint-250/500/750/1000 全部保存于 `.../action_credit_..._coef0.2_20260906/v1-20260907-120649/`。训练侧 reward 波动上行、峰值 0.87–0.91（高于 B 的 0.685→0.757），F1 reward 峰值 0.70–0.76；`frac_reward_zero_std` 中段升至 0.3–0.4（GRPO 零方差组，正是动作级信用要缓解的场景）。正在做 checkpoint sweep（200 子集，`data/eval_results/E17_action_credit_sweep_20260907/`）挑最佳 ckpt，再做三数据集全量与 B 对照。ckpt-250 子集初值：HotpotQA .465/.578、2Wiki .540/.585（子集、非结论）。
+
+环境修复（复现要点）：worker4232292 系统 `libstdc++.so.6` 仅到 `GLIBCXX_3.4.30`，
+FAISS GPU 需要 `3.4.31`；启动检索服务前 `export LD_LIBRARY_PATH=$FAISS_ENV/lib`
+（micromamba `sapr_faiss_gpu_cuda129_py311/lib` 内含 3.4.31 的 libstdc++.so.6.0.35），
+否则 daemon 在 import faiss 时报 `GLIBCXX_3.4.31 not found` 退出。
+
+- E17 启动：`03_sapr_rag/scripts/grpo/run_canonical_sft_action_credit_s1000.sh`
+- E17 训练：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/action_credit_canonical_sft_3src_s1000_coef0.2_20260906/`
+- E17 日志：`03_sapr_rag/scripts/grpo/logs/action_credit_canonical_sft_3src_s1000_coef0.2_20260906/`
+#### Checkpoint 选择（sweep，200 子集）
+
+按 eval 表现选优（非最末尾 ckpt）。三数据集各前 200 条子集，综合 F1 排序：
+
+| ckpt | HotpotQA EM/F1 | 2Wiki EM/F1 | MuSiQue EM/F1 | 说明 |
+|---|---|---|---|---|
+| 250 | .465/.578 | .540/.585 | .235/.322 | |
+| 500 | .480/.594 | .555/.609 | .225/.315 | |
+| **750** | .480/.593 | .560/.611 | .230/.324 | **综合 F1 最高，选为最佳** |
+| 1000 | .485/.596 | .560/.604 | .230/.318 | 与 750 接近，无退化 |
+
+指标随 step 单调上升、无 E16 那种中段退化。**注意子集偏乐观**（见下）。
+
+#### 三数据集全量对照（ckpt-750 vs B）
+
+数据集全量：HotpotQA 7405 / 2Wiki 12576 / MuSiQue 2417。口径与 B/E14 一致。
+
+| 数据集 | 指标 | B(GRPO-only) | E17 ckpt-750 | 差值 |
+|---|---|---|---|---|
+| HotpotQA | EM | .4629 | .4552 | −0.77pt |
+| | F1 | .5837 | .5766 | −0.71pt |
+| | Cover | .5026 | .4957 | −0.69pt |
+| 2Wiki | EM | .5161 | .5153 | −0.08pt |
+| | F1 | .5654 | .5668 | +0.14pt |
+| | Cover | .5314 | .5316 | +0.02pt |
+| MuSiQue | EM | .1808 | .1804 | −0.04pt |
+| | F1 | .2794 | .2768 | −0.26pt |
+| | Cover | .2056 | .2040 | −0.16pt |
+
+**结论：coef=0.2 的动作级证据信用相对 B 无增益。** 三数据集全量上 E17 与 B
+基本持平、略偏负（HotpotQA −0.7pt，2Wiki/MuSiQue 均在噪声内）。目标（EM/F1 超过
+SFT+GRPO）在该配置下**未达成**。
+
+关键教训：
+- **子集乐观偏差**：sweep 的 200 子集（前 200 条、非随机）显示 2Wiki .560/.611、
+  MuSiQue .230/.324，明显高于全量的 .5153/.5668、.1804/.2768。子集选优可用于挑
+  ckpt，但**不能**据此判断相对基线的增益，必须全量对照。
+- **信号被 outcome advantage 淹没**：与 OPSD 的 C−B≈0 同一模式——在强 canonical
+  SFT + 已有效 GRPO 的起点上，额外的动作级信用信号与 GRPO 序列优势高度重叠，
+  coef=0.2 时无独立贡献。训练中 `action_credit_abs_mean` 频繁为 0（组内逐轮证据
+  覆盖趋同、无可区分性）也印证了这一点。
+
+后续可能方向（未执行，待决策）：
+- 扫更大 coef（0.5/1.0）看信号强度加大是否产生区分；
+- 改信号设计使其更尖锐（只奖励命中关键 gold 的那一轮 / 对错误轨迹中正确 query 轮
+  做反事实加权），提升组内可区分性；
+- 或据此得出结论：方向2（在强 SFT 上改 GRPO）增益空间本就有限。
+
+- E17 启动：`03_sapr_rag/scripts/grpo/run_canonical_sft_action_credit_s1000.sh`（DP rollout：GPU1+GPU7 双副本）
+- E17 训练：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/action_credit_canonical_sft_3src_s1000_coef0.2_20260906/v1-20260907-120649/`（ckpt-250/500/750/1000）
+- E17 日志：`03_sapr_rag/scripts/grpo/logs/action_credit_canonical_sft_3src_s1000_coef0.2_20260906/`
+- sweep 评测：`data/eval_results/E17_action_credit_sweep_20260907/`
+- 全量评测：`data/eval_results/E17_action_credit_full_ckpt750_20260907/full/checkpoint-750/`
 
 ### External-teacher selective OPD
 

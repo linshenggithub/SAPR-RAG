@@ -34,6 +34,16 @@ VLLM_PORT="${VLLM_PORT:-8000}"
 # weight-sync NCCL 通信组端口；默认 51299。
 # 必须避开：29500（torchrun --master-port 默认，训练进程组已占）、8000（vllm server）、8100（retrieval）。
 VLLM_GROUP_PORT="${VLLM_GROUP_PORT:-51299}"
+# DP rollout：VLLM_PORT / VLLM_GROUP_PORT / VLLM_HOST 支持空格分隔的多值（多个 rollout 副本）。
+# 单值时行为与原来完全一致（数组只有一个元素）。ms-swift 的这三个参数均为 List 类型，
+# 训练侧 VLLMClient 会把采样请求按副本数分片并行、并向每个副本各建一条 NCCL 通信组同步权重。
+read -r -a VLLM_PORT_ARR <<< "$VLLM_PORT"
+read -r -a VLLM_GROUP_PORT_ARR <<< "$VLLM_GROUP_PORT"
+read -r -a VLLM_HOST_ARR <<< "$VLLM_HOST"
+# host 只给一个但有多个 port 时，自动把 host 复制到与 port 等长。
+if [ "${#VLLM_HOST_ARR[@]}" -eq 1 ] && [ "${#VLLM_PORT_ARR[@]}" -gt 1 ]; then
+    _h="${VLLM_HOST_ARR[0]}"; VLLM_HOST_ARR=(); for _ in "${VLLM_PORT_ARR[@]}"; do VLLM_HOST_ARR+=("$_h"); done
+fi
 RESUME_FROM_CHECKPOINT="${RESUME_FROM_CHECKPOINT:-}"
 ENABLE_OPSD="${ENABLE_OPSD:-true}"
 TEACHER_KL_COEF="${TEACHER_KL_COEF:-0.1}"
@@ -56,6 +66,12 @@ TRUNCATION_REWARD_WEIGHT="${TRUNCATION_REWARD_WEIGHT:-0.5}"
 # OPD_USE_GRPO_ADVANTAGE=false 丢弃 GRPO 组内 advantage，只保留 teacher log-ratio 信号。
 ENABLE_REWARD="${ENABLE_REWARD:-true}"
 OPD_USE_GRPO_ADVANTAGE="${OPD_USE_GRPO_ADVANTAGE:-true}"
+# Evidence-Attributed GRPO（动作级证据信用）：ACTION_CREDIT_MODE=query_evidence 打开后，
+# 追加 sapr_query_evidence_gain（权重恒 0，仅产出逐轮向量），并向 swift 传 --action_credit_*。
+ACTION_CREDIT_MODE="${ACTION_CREDIT_MODE:-off}"
+ACTION_CREDIT_COEF="${ACTION_CREDIT_COEF:-0.0}"
+ACTION_CREDIT_SCALE="${ACTION_CREDIT_SCALE:-group_turn}"
+ACTION_CREDIT_INFOS_KEY="${ACTION_CREDIT_INFOS_KEY:-query_evidence_gain}"
 DRY_RUN="${DRY_RUN:-false}"
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-6}"
@@ -89,6 +105,13 @@ case "$OPD_USE_GRPO_ADVANTAGE" in
     true|false) ;;
     *) echo "[run_grpo_opsd] ERROR: OPD_USE_GRPO_ADVANTAGE must be true or false, got: $OPD_USE_GRPO_ADVANTAGE" >&2; exit 2 ;;
 esac
+case "$ACTION_CREDIT_MODE" in
+    off|query_evidence) ;;
+    *) echo "[run_grpo_opsd] ERROR: ACTION_CREDIT_MODE must be off or query_evidence, got: $ACTION_CREDIT_MODE" >&2; exit 2 ;;
+esac
+if [ "$ACTION_CREDIT_MODE" != "off" ] && [ "$ENABLE_REWARD" = "false" ]; then
+    echo "[run_grpo_opsd] ERROR: ACTION_CREDIT_MODE requires ENABLE_REWARD=true (additive on GRPO advantage)" >&2; exit 2
+fi
 if [ "$ENABLE_REWARD" = "false" ] && [ "$ENABLE_OPSD" != "true" ]; then
     echo "[run_grpo_opsd] ERROR: ENABLE_REWARD=false (pure OPSD) requires ENABLE_OPSD=true" >&2; exit 2
 fi
@@ -194,6 +217,11 @@ if [ "$ENABLE_TRUNCATION_REWARD" = "true" ]; then
     REWARD_FUNCS+=(sapr_truncation)
     REWARD_WEIGHTS+=("$TRUNCATION_REWARD_WEIGHT")
 fi
+if [ "$ACTION_CREDIT_MODE" != "off" ]; then
+    # 权重 0：该 reward 只把逐轮证据增益写入 rollout_infos，不改变标量 reward。
+    REWARD_FUNCS+=(sapr_query_evidence_gain)
+    REWARD_WEIGHTS+=(0.0)
+fi
 REWARD_ARG=(--reward_funcs "${REWARD_FUNCS[@]}" --reward_weights "${REWARD_WEIGHTS[@]}")
 if [ "$ENABLE_REWARD" = "false" ]; then
     REWARD_FUNCS=()
@@ -212,11 +240,15 @@ CMD=(
     --external_plugins "$PLUGIN"
     "${REWARD_ARG[@]}"
     --opd_use_grpo_advantage "$OPD_USE_GRPO_ADVANTAGE"
+    --action_credit_mode "$ACTION_CREDIT_MODE"
+    --action_credit_coef "$ACTION_CREDIT_COEF"
+    --action_credit_scale "$ACTION_CREDIT_SCALE"
+    --action_credit_infos_key "$ACTION_CREDIT_INFOS_KEY"
     --use_vllm true
     --vllm_mode server
-    --vllm_server_host "$VLLM_HOST"
-    --vllm_server_port "$VLLM_PORT"
-    --vllm_server_group_port "$VLLM_GROUP_PORT"
+    --vllm_server_host "${VLLM_HOST_ARR[@]}"
+    --vllm_server_port "${VLLM_PORT_ARR[@]}"
+    --vllm_server_group_port "${VLLM_GROUP_PORT_ARR[@]}"
     --vllm_server_pass_dataset true
     --torch_dtype bfloat16
     --dataset "$DATASET"

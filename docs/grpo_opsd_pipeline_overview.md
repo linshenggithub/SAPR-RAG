@@ -406,6 +406,11 @@ SaprRagScheduler.step()
 
 ## 9. OPSD 在 GRPO 上加了什么
 
+> OPSD 的目标函数、反向 KL 来由、k1/k3 区分、sampled-token 与全词表的差别、
+> 分动作 mask 以及纯 OPSD / GRPO+OPSD 的 advantage 分解，见
+> [`opsd_objective_and_implementation.md`](opsd_objective_and_implementation.md)。
+> 本节只给链路层面的概述。
+
 普通 GRPO 的 advantage 只来自规则 reward。OPSD 多了 teacher 对同一条 student response 的逐 token logp。
 
 当前 OPSD 是 dynamic self-distillation：

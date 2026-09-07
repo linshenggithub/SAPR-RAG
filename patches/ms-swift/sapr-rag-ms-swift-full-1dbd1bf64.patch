@@ -1,0 +1,1715 @@
+diff --git a/swift/dataset/preprocessor/core.py b/swift/dataset/preprocessor/core.py
+index 3333b2bda..19a55da00 100644
+--- a/swift/dataset/preprocessor/core.py
++++ b/swift/dataset/preprocessor/core.py
+@@ -35,6 +35,9 @@ class RowPreprocessor:
+                                 'channel',
+                                 'margin',
+                                 'teacher_prompt',
++                                'teacher_query_prompt',
++                                'teacher_evidence_prompt',
++                                'teacher_answer_prompt',
+                                 'chat_template_kwargs',
+                                 # Qwen3-TTS
+                                 'ref_audios',
+diff --git a/swift/infer_engine/grpo_vllm_engine.py b/swift/infer_engine/grpo_vllm_engine.py
+index d550cefb8..f4843333a 100644
+--- a/swift/infer_engine/grpo_vllm_engine.py
++++ b/swift/infer_engine/grpo_vllm_engine.py
+@@ -34,7 +34,10 @@ class GRPOVllmEngine(VllmEngine):
+ 
+     async def _get_grpo_lora_request_async(self, adapter_request: Optional[AdapterRequest] = None):
+         if not adapter_request and self.enable_lora:
+-            loaded_loras = self.engine.list_loras()
++            list_loras = getattr(self.engine, 'list_loras', None)
++            if list_loras is None:
++                return adapter_request
++            loaded_loras = list_loras()
+             if inspect.isawaitable(loaded_loras):
+                 loaded_loras = await loaded_loras
+             lora_loaded = VLLM_LORA_INT_ID in loaded_loras
+diff --git a/swift/pipelines/infer/rollout.py b/swift/pipelines/infer/rollout.py
+index e2df2e297..f4f568968 100644
+--- a/swift/pipelines/infer/rollout.py
++++ b/swift/pipelines/infer/rollout.py
+@@ -803,6 +803,7 @@ class SwiftRolloutDeploy(SwiftPipeline):
+             'template': template,
+             'use_async_engine': args.vllm_use_async_engine,
+             'max_lora_rank': args.vllm_max_lora_rank,
++            'adapters': args.adapters,
+         })
+         infer_backend = kwargs.pop('infer_backend', None) or args.infer_backend
+         if infer_backend != 'vllm':
+diff --git a/swift/rl_core/action_credit.py b/swift/rl_core/action_credit.py
+new file mode 100644
+index 000000000..7b83aca7d
+--- /dev/null
++++ b/swift/rl_core/action_credit.py
+@@ -0,0 +1,153 @@
++# Copyright (c) ModelScope Contributors. All rights reserved.
++"""Action-scoped credit assignment for multi-turn agentic RL (Evidence-Attributed GRPO).
++
++This module implements the *task-agnostic* half of action-level credit assignment. The
++standard GRPO advantage is a single per-sequence scalar broadcast to every response
++token, so a trajectory whose final answer is wrong pushes *all* of its turns down --
++including the query turn that actually retrieved the decisive evidence. That is the
++long-horizon credit-assignment problem: the outcome reward cannot tell which turn helped.
++
++Here we add a second, *per-turn* advantage term that is scattered only onto the tokens of
++the turn that produced it (e.g. each ``<query>`` turn receives its own evidence-gain
++signal). The environment/outcome GRPO advantage is left untouched; the per-turn term is
++*additive* on top of it::
++
++    A_token(t) = A_outcome(seq)                      # existing GRPO broadcast
++               + coef * A_action(turn(t))            # new: only on that turn's tokens
++
++The per-turn *raw* signal (e.g. "new gold evidence covered by this query") is produced by
++the task side (the SAPR reward plugin) and passed in as a per-sample vector; this module
++only (1) normalizes it within each prompt group per turn-slot and (2) scatters it to tokens
++via a turn-index map. Keeping the numeric core here (pure tensor / list functions) makes it
++backend-agnostic and unit-testable without a live trainer.
++"""
++
++from typing import Dict, List, Optional, Sequence
++
++import torch
++
++__all__ = [
++    'normalize_action_credit_by_group',
++    'scatter_turn_credit_to_tokens',
++]
++
++
++def normalize_action_credit_by_group(
++    credit_by_sample: Sequence[Optional[Sequence[float]]],
++    prompt_ids: Sequence[str],
++    num_generations: int,
++    scale: str = 'group_turn',
++) -> List[List[float]]:
++    """Normalize the raw per-turn credit vectors within each prompt group.
++
++    Mirrors GRPO's group normalization, but *per turn-slot*: for a given prompt, the
++    ``k``-th query turn across the ``K`` sampled trajectories forms one normalization
++    group. This is the multi-turn analogue of GiGPO's step-grouped micro-advantage and is
++    what lets a single good query stand out from its siblings even when every trajectory in
++    the group ends with the same (wrong) answer -- exactly the zero-variance-outcome case
++    where the plain GRPO advantage vanishes.
++
++    Trajectories have different query counts, so turn-slot ``k`` only groups the
++    trajectories that actually have a ``k``-th query; shorter trajectories simply do not
++    contribute to (or receive) slot ``k``.
++
++    Args:
++        credit_by_sample: length-``N`` sequence; entry ``i`` is that sample's raw per-turn
++            credit vector (one float per credited turn, in turn order) or ``None``/empty.
++        prompt_ids: length-``N`` prompt identifiers defining the groups.
++        num_generations: ``K`` (kept for signature parity / validation; grouping is by
++            ``prompt_id`` so variable group sizes are tolerated).
++        scale: ``'group_turn'`` centers and scales within (group, turn-slot);
++            ``'group_turn_center'`` only centers (subtracts the mean, no std division);
++            ``'none'`` returns the raw values unchanged.
++
++    Returns:
++        length-``N`` list of normalized per-turn vectors (same shape as the input vectors;
++        ``None`` inputs become empty lists).
++    """
++    del num_generations  # grouping is by prompt_id; K is not needed but kept for parity.
++    n = len(prompt_ids)
++    if len(credit_by_sample) != n:
++        raise ValueError(f'credit/prompt length mismatch: {len(credit_by_sample)} != {n}')
++
++    # Materialize to plain lists of floats (defensive copy; tolerate None/empty).
++    vectors: List[List[float]] = []
++    for vec in credit_by_sample:
++        if vec is None:
++            vectors.append([])
++        else:
++            vectors.append([float(x) for x in vec])
++
++    if scale == 'none':
++        return vectors
++
++    if scale not in {'group_turn', 'group_turn_center'}:
++        raise ValueError(f'Unsupported action_credit_scale: {scale!r}')
++
++    # Group sample indices by prompt id.
++    group_to_indices: Dict[str, List[int]] = {}
++    for idx, pid in enumerate(prompt_ids):
++        group_to_indices.setdefault(pid, []).append(idx)
++
++    out: List[List[float]] = [list(v) for v in vectors]
++    for _pid, idxs in group_to_indices.items():
++        max_turns = max((len(vectors[i]) for i in idxs), default=0)
++        for k in range(max_turns):
++            members = [i for i in idxs if k < len(vectors[i])]
++            if len(members) <= 1:
++                # A single (or zero) trajectory owns turn-slot k: no within-group contrast,
++                # so it yields no differential signal. Zero it out.
++                for i in members:
++                    out[i][k] = 0.0
++                continue
++            vals = torch.tensor([vectors[i][k] for i in members], dtype=torch.float32)
++            centered = vals - vals.mean()
++            if scale == 'group_turn':
++                std = vals.std(unbiased=True)
++                centered = centered / (std + 1e-4)
++            for pos, i in enumerate(members):
++                out[i][k] = float(centered[pos])
++    return out
++
++
++def scatter_turn_credit_to_tokens(
++    turn_credit: Sequence[Optional[Sequence[float]]],
++    turn_index_map: torch.Tensor,
++    completion_mask: torch.Tensor,
++) -> torch.Tensor:
++    """Scatter per-turn credit onto the response tokens of each turn.
++
++    Args:
++        turn_credit: length-``B`` sequence of per-turn credit vectors (already normalized).
++            Entry ``i`` is indexed by turn ordinal: ``turn_credit[i][k]`` is the credit for
++            the ``k``-th credited turn of sample ``i``.
++        turn_index_map: ``[B, T]`` long tensor; each response token holds the ordinal ``k``
++            of the credited turn it belongs to, or ``-1`` for tokens outside any credited
++            turn (template tokens, observations, non-credited actions).
++        completion_mask: ``[B, T]`` response-token mask; the returned term is zero outside it.
++
++    Returns:
++        ``[B, T]`` additive per-token credit term (before the coefficient is applied).
++    """
++    if turn_index_map.shape != completion_mask.shape:
++        raise ValueError(
++            f'turn_index_map shape {tuple(turn_index_map.shape)} != '
++            f'completion_mask shape {tuple(completion_mask.shape)}')
++    if len(turn_credit) != turn_index_map.shape[0]:
++        raise ValueError(
++            f'turn_credit length {len(turn_credit)} != batch {turn_index_map.shape[0]}')
++
++    out = torch.zeros_like(completion_mask, dtype=torch.float32)
++    comp_bool = completion_mask.bool()
++    for row in range(turn_index_map.shape[0]):
++        vec = turn_credit[row]
++        if not vec:
++            continue
++        idx_row = turn_index_map[row]
++        for k, value in enumerate(vec):
++            if value == 0.0:
++                continue
++            sel = (idx_row == k) & comp_bool[row]
++            if sel.any():
++                out[row, sel] = float(value)
++    return out
+diff --git a/swift/rl_core/advantage.py b/swift/rl_core/advantage.py
+index 1ab08b744..11babe03f 100644
+--- a/swift/rl_core/advantage.py
++++ b/swift/rl_core/advantage.py
+@@ -250,12 +250,47 @@ def compute_teacher_logratio(
+     return d.masked_fill(~completion_mask.bool(), 0.0)
+ 
+ 
++def compute_teacher_sequence_gate(
++    rewards_per_func: torch.Tensor,
++    reward_func_names: List[str],
++    mode: str = 'none',
++    threshold: float = 1.0,
++) -> torch.Tensor:
++    """Select sequences that should receive an external-teacher OPD signal.
++
++    ``failed_em`` and ``failed_f1`` gate on the corresponding raw reward
++    column before reward weighting or group normalization. Non-finite scores
++    are treated as failures so malformed/unanswered trajectories do not
++    silently bypass teacher correction.
++    """
++    batch_size = rewards_per_func.shape[0]
++    if mode == 'none':
++        return torch.ones(batch_size, dtype=torch.bool, device=rewards_per_func.device)
++    reward_aliases = {
++        'failed_em': ('sapr_em', 'SaprEMORM'),
++        'failed_f1': ('sapr_f1', 'SaprF1ORM'),
++    }.get(mode)
++    if reward_aliases is None:
++        raise ValueError(f'Unsupported teacher_sequence_gate: {mode!r}')
++    reward_name = next((name for name in reward_aliases if name in reward_func_names), None)
++    if reward_name is None:
++        raise ValueError(
++            f'teacher_sequence_gate={mode!r} requires one of reward functions {reward_aliases!r}; '
++            f'available reward functions: {reward_func_names}')
++    values = rewards_per_func[:, reward_func_names.index(reward_name)]
++    return (~torch.isfinite(values)) | (values < threshold)
++
++
+ def expand_advantage_to_per_token(
+     advantages: torch.Tensor,
+     completion_mask: torch.Tensor,
+     teacher_per_token_logps: Optional[torch.Tensor] = None,
+     policy_per_token_logps: Optional[torch.Tensor] = None,
+     teacher_kl_coef: float = 0.0,
++    teacher_action_mask: Optional[torch.Tensor] = None,
++    teacher_action_coef_mask: Optional[torch.Tensor] = None,
++    teacher_sequence_gate: Optional[torch.Tensor] = None,
++    use_base_advantage: bool = True,
+ ) -> torch.Tensor:
+     """Expand the per-sequence base advantage ``[B]`` to per-token ``[B, T]``.
+ 
+@@ -270,14 +305,42 @@ def expand_advantage_to_per_token(
+         teacher_per_token_logps: ``[B, T]`` teacher logp on sampled tokens (OPD-RL).
+         policy_per_token_logps: ``[B, T]`` student (old) logp on the same tokens.
+         teacher_kl_coef: Coefficient for the per-token teacher signal.
++        teacher_action_mask: Optional ``[B, T]`` mask restricting only the
++            privileged teacher signal. The base GRPO advantage remains unmasked.
++        teacher_action_coef_mask: Optional ``[B, T]`` coefficient map for
++            multi-action OPSD. When provided, it replaces the scalar coefficient
++            on selected tokens.
+ 
+     Returns:
+         ``[B, T]`` per-token advantage.
+     """
+-    per_token_adv = advantages.unsqueeze(1).expand_as(completion_mask).clone()
+-    if teacher_per_token_logps is not None and teacher_kl_coef != 0.0:
++    if use_base_advantage:
++        per_token_adv = advantages.unsqueeze(1).expand_as(completion_mask).clone()
++    else:
++        per_token_adv = torch.zeros_like(completion_mask, dtype=advantages.dtype)
++    has_teacher_coef = teacher_kl_coef != 0.0 or teacher_action_coef_mask is not None
++    if teacher_per_token_logps is not None and has_teacher_coef:
+         signed = compute_teacher_logratio(teacher_per_token_logps, policy_per_token_logps, completion_mask)
+-        per_token_adv = per_token_adv + teacher_kl_coef * signed
++        if teacher_sequence_gate is not None:
++            if teacher_sequence_gate.ndim != 1 or teacher_sequence_gate.shape[0] != signed.shape[0]:
++                raise ValueError(
++                    f'teacher_sequence_gate shape {teacher_sequence_gate.shape} '
++                    f'is incompatible with teacher signal shape {signed.shape}')
++            signed = signed * teacher_sequence_gate.to(dtype=signed.dtype).unsqueeze(1)
++        if teacher_action_mask is not None:
++            if teacher_action_mask.shape != signed.shape:
++                raise ValueError(
++                    f'teacher_action_mask shape {teacher_action_mask.shape} != teacher signal shape {signed.shape}')
++            signed = signed * teacher_action_mask.to(dtype=signed.dtype)
++        if teacher_action_coef_mask is not None:
++            if teacher_action_coef_mask.shape != signed.shape:
++                raise ValueError(
++                    f'teacher_action_coef_mask shape {teacher_action_coef_mask.shape} '
++                    f'!= teacher signal shape {signed.shape}')
++            signed = signed * teacher_action_coef_mask.to(dtype=signed.dtype)
++        else:
++            signed = teacher_kl_coef * signed
++        per_token_adv = per_token_adv + signed
+     return per_token_adv
+ 
+ 
+@@ -289,6 +352,7 @@ def apply_rlsd_reweight(
+     lam: float,
+     clip_range: float,
+     negative_only: bool = False,
++    teacher_action_mask: Optional[torch.Tensor] = None,
+ ) -> torch.Tensor:
+     """RLSD (Self-Distilled RLVR) token-level advantage reweighting.
+ 
+@@ -321,12 +385,14 @@ def apply_rlsd_reweight(
+         ``[B, T]`` per-token reweighted advantage (masked outside the response).
+     """
+     mask = completion_mask
++    teacher_mask = mask if teacher_action_mask is None else (mask & teacher_action_mask.bool())
+     base_bt = base_advantages.unsqueeze(1).expand_as(mask)
+-    delta = (teacher_per_token_logps.detach() - policy_per_token_logps.detach()) * mask
++    delta = (teacher_per_token_logps.detach() - policy_per_token_logps.detach()) * teacher_mask
+     sign_a = torch.sign(base_bt)
+-    weights = torch.exp(sign_a * delta) * mask
++    weights = torch.exp(sign_a * delta) * teacher_mask
+     clipped = torch.clamp(weights, min=1.0 - clip_range, max=1.0 + clip_range)
+     reweight = (1.0 - lam) + lam * clipped
++    reweight = torch.where(teacher_mask, reweight, torch.ones_like(reweight))
+     if negative_only:
+         seq_neg = (base_advantages < 0).float().unsqueeze(1)
+         reweight = seq_neg * reweight + (1.0 - seq_neg)
+diff --git a/swift/rl_core/data.py b/swift/rl_core/data.py
+index f859cba1d..7be28b1c4 100644
+--- a/swift/rl_core/data.py
++++ b/swift/rl_core/data.py
+@@ -67,6 +67,10 @@ class OnPolicySample:
+     # --- OPSD (On-Policy Self-Distillation), shared by GKD and OPD-RL ---
+     teacher_prompt: Optional[Any] = None  # OPSD: dataset ``teacher_prompt`` column (pre-collation)
+     teacher_messages: Optional[Messages] = None  # OPSD: messages with teacher_prompt replacing last user
++    teacher_query_prompt: Optional[Any] = None
++    teacher_evidence_prompt: Optional[Any] = None
++    teacher_answer_prompt: Optional[Any] = None
++    teacher_messages_by_scope: Dict[str, Messages] = field(default_factory=dict)
+ 
+     @property
+     def is_truncated(self) -> bool:
+@@ -81,43 +85,75 @@ class OnPolicySample:
+         val = self.extra.get(tag_key)
+         return str(val) if val is not None else None
+ 
+-    def build_teacher_view(self) -> bool:
++    def get_teacher_prompt(self, scope: Optional[str] = None) -> Optional[Any]:
++        if scope in {'query', 'evidence', 'answer'}:
++            return getattr(self, f'teacher_{scope}_prompt')
++        return self.teacher_prompt
++
++    def build_teacher_view(self, scope: Optional[str] = None, fallback_to_student: bool = False) -> bool:
+         """Populate the OPSD teacher view from ``teacher_prompt`` + the on-policy response.
+ 
+         OPSD scores the teacher on its OWN (teacher_prompt + same on-policy response)
+-        sequence: replace the last user message with ``teacher_prompt`` and keep the
+-        assistant response. Teacher and student share ``response_token_ids`` (identical
+-        response tokens, only the prompt differs). Returns ``True`` when an OPSD view
+-        exists (idempotent) and ``False`` when ``teacher_prompt`` is unset (non-OPSD).
++        sequence and keeps the assistant response. Scoped privileges are appended to the
++        relevant user message so the teacher retains the real question and retrieval
++        observation: query privilege is appended to the first user turn, while answer
++        and evidence privileges are appended to the last user turn. The legacy unscoped
++        prompt still replaces the last user message for backward compatibility. Teacher
++        and student share ``response_token_ids`` (identical response tokens, only the
++        prompt differs). Returns ``True`` when a privileged prompt exists and ``False``
++        when the requested scope is unset. ``fallback_to_student`` builds an identity
++        view for mixed batches while preserving the False return value.
+         """
+-        if self.teacher_messages is not None:
+-            return True
+-
+-        if not self.teacher_prompt:
++        key = scope or 'all'
++        prompt = self.get_teacher_prompt(scope)
++        has_prompt = bool(prompt)
++        if key in self.teacher_messages_by_scope:
++            return has_prompt
++        if scope is None and self.teacher_messages is not None:
++            return has_prompt
++
++        if not has_prompt and not fallback_to_student:
+             return False
+ 
+         messages = [dict(m) for m in self.messages]
+-        for msg in reversed(messages):
+-            if msg['role'] == 'user':
+-                msg['content'] = self.teacher_prompt
+-                break
++        if has_prompt:
++            user_indices = [i for i, msg in enumerate(messages) if msg['role'] == 'user']
++            if not user_indices:
++                return False
++            target = user_indices[0] if scope == 'query' else user_indices[-1]
++            if scope in {'query', 'evidence', 'answer'}:
++                content = messages[target].get('content', '')
++                if not isinstance(content, str) or not isinstance(prompt, str):
++                    raise TypeError('Scoped OPSD prompts currently require string user content and prompt')
++                messages[target]['content'] = f'{content}\n\n{prompt}'
++            else:
++                messages[target]['content'] = prompt
+ 
+-        self.teacher_messages = messages
+-        return True
++        self.teacher_messages_by_scope[key] = messages
++        if scope is None:
++            self.teacher_messages = messages
++        return has_prompt
+ 
+-    def to_teacher_template_dict(self) -> Dict[str, Any]:
++    def to_teacher_template_dict(self, scope: Optional[str] = None) -> Dict[str, Any]:
+         """Reconstruct the teacher-side dict consumed by ``template.encode`` (OPSD).
+ 
+         Uses ``teacher_messages`` (teacher_prompt-replaced) + the shared
+         ``response_token_ids`` (same on-policy response as the student).
+         """
+         d = self._standard_fields()
+-        d['messages'] = self.teacher_messages
++        key = scope or 'all'
++        d['messages'] = self.teacher_messages_by_scope.get(key, self.teacher_messages)
+         chat_template_kwargs = self.extra.get('chat_template_kwargs')
+         if chat_template_kwargs is not None:
+             d['chat_template_kwargs'] = chat_template_kwargs
+         if self.response_token_ids:
+             d['response_token_ids'] = self.response_token_ids
++            # OPSD: pass the loss mask so the teacher view masks the same
++            # observation tokens as the student (encode_teacher_view reads
++            # 'response_loss_mask'); otherwise multi-turn teacher/student frames
++            # disagree on valid-token count and remap asserts fail.
++            if self.response_loss_mask:
++                d['response_loss_mask'] = self.response_loss_mask
+         d['add_eos'] = False
+         return d
+ 
+@@ -299,6 +335,10 @@ class GRPOSample(OnPolicySample):
+     """On-policy sample with GRPO reward/advantage signals."""
+     rewards: Optional[List[Optional[float]]] = None  # optional mirror; main path uses rewards_per_func tensor
+     advantages: Optional[torch.Tensor] = None  # filled after _compute_advantages (0-dim tensor per sample)
++    teacher_sequence_gate: Optional[torch.Tensor] = None  # scalar bool; failed-only external-teacher OPD
++    # Evidence-Attributed GRPO: group-normalized per-query-turn credit vector (one float per
++    # query turn, in order). None/empty unless action_credit_mode != 'off'.
++    action_turn_credit: Optional[List[float]] = None
+ 
+ 
+ @dataclass
+@@ -321,6 +361,8 @@ class GRPOBatch:
+     ref_per_token_logps: Optional[torch.Tensor] = None  # [B, T]
+     rollout_per_token_logps: Optional[torch.Tensor] = None  # [B, T]
+     teacher_per_token_logps: Optional[torch.Tensor] = None  # [B, T], OPD-RL teacher logp on sampled tokens
++    teacher_action_mask: Optional[torch.Tensor] = None  # [B, T], action-scoped privileged teacher signal
++    teacher_action_coef_mask: Optional[torch.Tensor] = None  # [B, T], per-action OPSD coefficient
+     advantages: Optional[torch.Tensor] = None  # [B, T] per-token (base broadcast minus per-token teacher KL)
+     num_items_in_batch: Optional[torch.Tensor] = None  # scalar
+     logits_to_keep: Optional[int] = None
+diff --git a/swift/rlhf_trainers/args_mixin.py b/swift/rlhf_trainers/args_mixin.py
+index eb6d5f1fe..88d74ca58 100644
+--- a/swift/rlhf_trainers/args_mixin.py
++++ b/swift/rlhf_trainers/args_mixin.py
+@@ -438,6 +438,36 @@ class GRPOArgumentsMixin(RolloutTrainerArgumentsMixin):
+     # OPD-RL (On-Policy Distillation as RL)
+     # enabled when a teacher (teacher_model / teacher_model_server) is set on a GRPO run.
+     teacher_kl_coef: float = 1.0
++    # Apply the external-teacher signal only to failed student trajectories.
++    # The gate reads the raw sapr_em/sapr_f1 reward before weighting and group normalization.
++    teacher_sequence_gate: Literal['none', 'failed_em', 'failed_f1'] = 'none'
++    teacher_sequence_gate_threshold: float = 1.0
++    # False gives pure OPD: keep the on-policy rollout and teacher signal but remove
++    # the environment-reward GRPO advantage from the policy update.
++    opd_use_grpo_advantage: bool = True
++    # Restrict the privileged teacher signal to model turns ending in the selected
++    # protocol action. The environment/GRPO reward still trains every completion token.
++    teacher_action_scope: Literal['all', 'query', 'evidence', 'answer', 'multi'] = 'all'
++    # ``multi`` runs a separate teacher forward for every enabled action prompt,
++    # then scatters each signal only onto that action's sampled tokens.
++    teacher_query_kl_coef: float = 0.0
++    teacher_evidence_kl_coef: float = 0.0
++    teacher_answer_kl_coef: float = 0.0
++
++    # Action-level credit assignment (Evidence-Attributed GRPO).
++    # When enabled, a per-turn credit vector supplied by the reward side (via
++    # ``rollout_infos[action_credit_infos_key]``) is group-normalized per turn-slot and
++    # added, per token, only onto the tokens of its own query turn -- on top of the usual
++    # outcome GRPO advantage (which still trains every token). ``off`` (default) is
++    # bit-identical to standard GRPO: no per-turn term is computed or added.
++    action_credit_mode: Literal['off', 'query_evidence'] = 'off'
++    # Coefficient on the (normalized) per-turn credit term.
++    action_credit_coef: float = 0.0
++    # Per-turn-slot group normalization of the raw credit: 'group_turn' centers+scales,
++    # 'group_turn_center' only centers, 'none' uses the raw values as-is.
++    action_credit_scale: Literal['group_turn', 'group_turn_center', 'none'] = 'group_turn'
++    # rollout_infos key holding the per-sample per-query-turn raw credit vector.
++    action_credit_infos_key: str = 'query_evidence_gain'
+ 
+     # RLSD (Self-Distilled RLVR), https://arxiv.org/abs/2604.03128
+     # Token-level advantage reweighting using the teacher-vs-student logprob gap. Reuses the OPSD
+diff --git a/swift/rlhf_trainers/gkd_helpers.py b/swift/rlhf_trainers/gkd_helpers.py
+index d6244c944..ab6d98d29 100644
+--- a/swift/rlhf_trainers/gkd_helpers.py
++++ b/swift/rlhf_trainers/gkd_helpers.py
+@@ -22,14 +22,19 @@ logger = get_logger()
+ def encode_teacher_view(
+     sample: OnPolicySample,
+     template: Template,
++    scope: Optional[str] = None,
++    fallback_to_student: bool = False,
+ ) -> Dict[str, Any]:
+     """Encode the OPSD teacher view (teacher_prompt + the shared on-policy response).
+ 
+     Does NOT mutate ``sample.teacher_messages`` — works on copied message dicts
+     so the sample's teacher view can be re-encoded across steps_per_generation.
+-    Caller must have invoked ``sample.build_teacher_view()`` first.
++    Caller must have invoked ``sample.build_teacher_view()`` first. Scoped
++    views are used by action-specific OPSD; mixed batches may request an
++    identity fallback for rows without that scope's privileged annotation.
+     """
+-    teacher_row = sample.to_teacher_template_dict()
++    sample.build_teacher_view(scope, fallback_to_student=fallback_to_student)
++    teacher_row = sample.to_teacher_template_dict(scope)
+     msgs = teacher_row.get('messages')
+     if msgs is not None:
+         teacher_row['messages'] = [m.copy() for m in msgs]
+@@ -182,6 +187,8 @@ def assemble_teacher_completion_logprobs(
+     completion_mask: torch.Tensor,
+     device: torch.device,
+     response_token_ids: Optional[List[List[int]]] = None,
++    input_ids: Optional[torch.Tensor] = None,
++    attention_mask: Optional[torch.Tensor] = None,
+ ) -> TeacherOutput:
+     """Align parsed teacher *sampled-token* prompt logprobs to a ``[B, T, 1]`` completion frame (GRPO/OPD-RL).
+ 
+@@ -189,10 +196,11 @@ def assemble_teacher_completion_logprobs(
+     i.e. the sampled token's logp/id at each position. They are placed on
+     ``completion_mask``'s response region.
+ 
+-    When the teacher API returns logprobs for the **full sequence** (prompt + response
+-    + end tokens), ``response_token_ids`` is used to locate the response portion by
+-    matching token IDs from the end of the sequence (the response is the last
+-    ``count`` tokens before the end tokens).
++    When the teacher API returns logprobs for the **full sequence**, ``input_ids`` is
++    the authoritative alignment frame. This is required for multi-turn trajectories:
++    assistant responses are separated by environment/user messages and therefore do
++    not form one contiguous token subsequence. ``response_token_ids`` remains a
++    backward-compatible fallback for single-turn callers.
+     """
+     batch_size, seq_len = completion_mask.shape
+     out_lp = torch.zeros(batch_size, seq_len, 1, dtype=torch.float32, device=device)
+@@ -202,7 +210,49 @@ def assemble_teacher_completion_logprobs(
+         count = completion_indices.numel()
+         if count == 0:
+             continue
+-        if len(lps) == count + 1:
++        full_frame_aligned = False
++        if input_ids is not None:
++            if attention_mask is not None:
++                frame_positions = attention_mask[i].bool().nonzero(as_tuple=True)[0]
++            else:
++                frame_positions = torch.arange(input_ids.shape[1], device=input_ids.device)
++            full_ids = input_ids[i, frame_positions].tolist()
++            flat_ixs = [ix[0] for ix in ixs]
++            # vLLM prompt_logprobs has no value for the first prompt token, so
++            # parse_prompt_logprobs normally returns input_ids[1:]. Keep support
++            # for backends that return all prompt positions as well.
++            if flat_ixs == full_ids[1:]:
++                parsed_offset = -1
++                full_frame_aligned = True
++            elif flat_ixs == full_ids:
++                parsed_offset = 0
++                full_frame_aligned = True
++            if full_frame_aligned:
++                absolute_to_local = {
++                    int(absolute_position): local_position
++                    for local_position, absolute_position in enumerate(frame_positions.tolist())
++                }
++                # HF GRPO uses a completion-region frame of width
++                # ``logits_to_keep`` while model_inputs still contains the full
++                # sequence. Map that frame back to the corresponding suffix.
++                completion_to_model_offset = input_ids.shape[1] - completion_mask.shape[1]
++                selected_lps = []
++                selected_ixs = []
++                for completion_position in completion_indices.tolist():
++                    model_position = int(completion_position) + completion_to_model_offset
++                    local_position = absolute_to_local.get(model_position)
++                    parsed_position = None if local_position is None else local_position + parsed_offset
++                    if parsed_position is None or parsed_position < 0 or parsed_position >= len(lps):
++                        raise ValueError(
++                            f'Completion position {completion_position} (model position {model_position}) '
++                            'has no aligned teacher prompt logprob.')
++                    selected_lps.append(lps[parsed_position])
++                    selected_ixs.append(ixs[parsed_position])
++                lps, ixs = selected_lps, selected_ixs
++
++        if full_frame_aligned:
++            pass
++        elif len(lps) == count + 1:
+             lps, ixs = lps[:count], ixs[:count]
+         elif len(lps) > count + 1 and response_token_ids is not None:
+             # Teacher returned logprobs for the full sequence (prompt + response + end tokens).
+@@ -433,7 +483,7 @@ def should_compute_local_teacher_logps(
+     return is_dynamic_self_distillation and has_opsd_batch
+ 
+ 
+-def build_opsd_samples(samples: List[OnPolicySample]) -> bool:
++def build_opsd_samples(samples: List[OnPolicySample], scope: Optional[str] = None) -> bool:
+     """Build each sample's OPSD teacher view; return True if ANY sample is OPSD.
+ 
+     ``build_teacher_view`` must run for every sample (not short-circuited by ``any()``)
+@@ -441,11 +491,124 @@ def build_opsd_samples(samples: List[OnPolicySample]) -> bool:
+     """
+     has_opsd = False
+     for s in samples:
+-        if s.build_teacher_view():
++        if s.build_teacher_view(scope):
+             has_opsd = True
+     return has_opsd
+ 
+ 
++def build_teacher_action_mask(
++    samples: List[OnPolicySample],
++    completion_mask: torch.Tensor,
++    tokenizer: Any,
++    scope: str,
++    input_ids: Optional[torch.Tensor] = None,
++) -> torch.Tensor:
++    """Build a student-frame mask for action-scoped privileged supervision.
++
++    Multi-turn schedulers keep each assistant response in a separate
++    ``response_token_ids`` entry. We classify the whole assistant turn by its
++    terminal protocol tag and scatter the selected turn tokens onto the same
++    encoded student frame. This is stricter than flattening by token count:
++    chat templates may add trainable assistant-boundary tokens that are absent
++    from ``response_token_ids``. Those template tokens keep the normal GRPO
++    advantage but do not receive privileged teacher supervision.
++    """
++    if scope == 'all':
++        return completion_mask.bool().clone()
++    if scope not in {'query', 'evidence', 'answer'}:
++        raise ValueError(f'Unsupported teacher_action_scope: {scope}')
++    if len(samples) != completion_mask.shape[0]:
++        raise ValueError(
++            f'sample/mask batch mismatch: samples={len(samples)} mask_batch={completion_mask.shape[0]}')
++    if input_ids is not None:
++        if input_ids.shape[0] != completion_mask.shape[0]:
++            raise ValueError(
++                f'input/mask batch mismatch: input={input_ids.shape[0]} mask_batch={completion_mask.shape[0]}')
++        if input_ids.shape[1] < completion_mask.shape[1]:
++            raise ValueError(
++                f'input frame shorter than completion frame: input={input_ids.shape[1]} '
++                f'completion={completion_mask.shape[1]}')
++
++    def classify_action(text: str) -> Optional[str]:
++        # Match SaprRagScheduler.check_finished: any answer tag terminates the
++        # turn before a query can be executed. Otherwise query is the action.
++        if '<answer>' in text:
++            return 'answer'
++        if '<query>' in text:
++            return 'query'
++        if '<evidence>' in text:
++            return 'evidence'
++        return None
++
++    output = torch.zeros_like(completion_mask, dtype=torch.bool)
++    for row, sample in enumerate(samples):
++        response_turns = sample.response_token_ids or []
++        if response_turns and isinstance(response_turns[0], int):
++            response_turns = [response_turns]
++
++        loss_turns = sample.response_loss_mask or []
++        if loss_turns and isinstance(loss_turns[0], int):
++            loss_turns = [loss_turns]
++        if not loss_turns:
++            loss_turns = [[1] * len(turn) for turn in response_turns]
++        if len(response_turns) != len(loss_turns):
++            raise ValueError(
++                f'response/loss turn mismatch at sample {row}: '
++                f'{len(response_turns)} != {len(loss_turns)}')
++
++        if input_ids is not None:
++            frame_ids = input_ids[row, -completion_mask.shape[1]:].tolist()
++            cursor = 0
++            for turn_idx, (turn_ids, turn_loss_mask) in enumerate(zip(response_turns, loss_turns)):
++                if len(turn_ids) != len(turn_loss_mask):
++                    raise ValueError(
++                        f'response/loss token mismatch at sample {row}: '
++                        f'{len(turn_ids)} != {len(turn_loss_mask)}')
++
++                start = None
++                max_start = len(frame_ids) - len(turn_ids)
++                for candidate in range(cursor, max_start + 1):
++                    if frame_ids[candidate:candidate + len(turn_ids)] != list(turn_ids):
++                        continue
++                    if all(
++                            not keep or bool(completion_mask[row, candidate + offset])
++                            for offset, keep in enumerate(turn_loss_mask)):
++                        start = candidate
++                        break
++                if start is None:
++                    raise ValueError(
++                        f'cannot align action tokens at sample {row}, turn {turn_idx}: '
++                        f'turn_tokens={len(turn_ids)} frame_tokens={len(frame_ids)} cursor={cursor}')
++
++                text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
++                turn_selected = classify_action(text) == scope
++                for offset, keep in enumerate(turn_loss_mask):
++                    if keep and turn_selected:
++                        output[row, start + offset] = True
++                cursor = start + len(turn_ids)
++            continue
++
++        # Backward-compatible fallback for callers without encoded input IDs.
++        selected = []
++        for turn_ids, turn_loss_mask in zip(response_turns, loss_turns):
++            if len(turn_ids) != len(turn_loss_mask):
++                raise ValueError(
++                    f'response/loss token mismatch at sample {row}: '
++                    f'{len(turn_ids)} != {len(turn_loss_mask)}')
++            text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
++            turn_selected = classify_action(text) == scope
++            selected.extend(turn_selected for keep in turn_loss_mask if keep)
++
++        student_positions = completion_mask[row].nonzero(as_tuple=True)[0]
++        if len(selected) != student_positions.numel():
++            raise ValueError(
++                f'action mask token mismatch at sample {row}: '
++                f'selected_frame={len(selected)} completion={student_positions.numel()}')
++        if selected:
++            output[row, student_positions] = torch.tensor(selected, dtype=torch.bool, device=output.device)
++    return output
++
++
+ def remap_teacher_logps_to_student_frame(
+     teacher_logps: torch.Tensor,
+     teacher_completion_mask: torch.Tensor,
+@@ -470,3 +633,126 @@ def remap_teacher_logps_to_student_frame(
+             'Teacher and student must share the same response tokens.')
+         out[i, s_idx] = teacher_logps[i, t_idx]
+     return out
++
++
++def build_query_turn_index_map(
++    samples: List[OnPolicySample],
++    completion_mask: torch.Tensor,
++    tokenizer: Any,
++    input_ids: Optional[torch.Tensor] = None,
++) -> torch.Tensor:
++    """Build a ``[B, T]`` per-token map of *query-turn ordinals* in the student frame.
++
++    This is the token-alignment half of Evidence-Attributed GRPO. It mirrors
++    :func:`build_teacher_action_mask` exactly (same multi-turn token-subsequence alignment,
++    same ``classify_action`` protocol-tag rule, same strict loss-mask checks), but instead
++    of a binary action mask it returns, for every response token, the **ordinal ``k`` of the
++    query turn it belongs to** (0-based, counting only ``<query>`` turns in order), or
++    ``-1`` for any token outside a query turn (template tokens, observations, evidence /
++    answer turns).
++
++    The ordinal ``k`` is aligned with the task side's per-turn credit vector: the SAPR
++    reward plugin emits one evidence-gain value per executed query (one ``retrieved_steps``
++    entry per query turn, in order), so credit vector index ``k`` corresponds to the
++    ``k``-th ``<query>`` turn here. Turns that do not run a search still consume an ordinal
++    only if they are classified as ``query``; callers must build the credit vector with the
++    same "one entry per query turn" convention (see the plugin).
++
++    Returns:
++        ``[B, T]`` long tensor of query-turn ordinals (``-1`` outside query turns).
++    """
++    if len(samples) != completion_mask.shape[0]:
++        raise ValueError(
++            f'sample/mask batch mismatch: samples={len(samples)} mask_batch={completion_mask.shape[0]}')
++    if input_ids is not None:
++        if input_ids.shape[0] != completion_mask.shape[0]:
++            raise ValueError(
++                f'input/mask batch mismatch: input={input_ids.shape[0]} mask_batch={completion_mask.shape[0]}')
++        if input_ids.shape[1] < completion_mask.shape[1]:
++            raise ValueError(
++                f'input frame shorter than completion frame: input={input_ids.shape[1]} '
++                f'completion={completion_mask.shape[1]}')
++
++    def classify_action(text: str) -> Optional[str]:
++        # Identical to build_teacher_action_mask: an answer tag terminates the turn before a
++        # query can execute, so answer takes precedence over query, which precedes evidence.
++        if '<answer>' in text:
++            return 'answer'
++        if '<query>' in text:
++            return 'query'
++        if '<evidence>' in text:
++            return 'evidence'
++        return None
++
++    output = torch.full_like(completion_mask, -1, dtype=torch.long)
++    for row, sample in enumerate(samples):
++        response_turns = sample.response_token_ids or []
++        if response_turns and isinstance(response_turns[0], int):
++            response_turns = [response_turns]
++
++        loss_turns = sample.response_loss_mask or []
++        if loss_turns and isinstance(loss_turns[0], int):
++            loss_turns = [loss_turns]
++        if not loss_turns:
++            loss_turns = [[1] * len(turn) for turn in response_turns]
++        if len(response_turns) != len(loss_turns):
++            raise ValueError(
++                f'response/loss turn mismatch at sample {row}: '
++                f'{len(response_turns)} != {len(loss_turns)}')
++
++        query_ordinal = 0
++        if input_ids is not None:
++            frame_ids = input_ids[row, -completion_mask.shape[1]:].tolist()
++            cursor = 0
++            for turn_idx, (turn_ids, turn_loss_mask) in enumerate(zip(response_turns, loss_turns)):
++                if len(turn_ids) != len(turn_loss_mask):
++                    raise ValueError(
++                        f'response/loss token mismatch at sample {row}: '
++                        f'{len(turn_ids)} != {len(turn_loss_mask)}')
++
++                start = None
++                max_start = len(frame_ids) - len(turn_ids)
++                for candidate in range(cursor, max_start + 1):
++                    if frame_ids[candidate:candidate + len(turn_ids)] != list(turn_ids):
++                        continue
++                    if all(
++                            not keep or bool(completion_mask[row, candidate + offset])
++                            for offset, keep in enumerate(turn_loss_mask)):
++                        start = candidate
++                        break
++                if start is None:
++                    raise ValueError(
++                        f'cannot align action tokens at sample {row}, turn {turn_idx}: '
++                        f'turn_tokens={len(turn_ids)} frame_tokens={len(frame_ids)} cursor={cursor}')
++
++                text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
++                is_query = classify_action(text) == 'query'
++                if is_query:
++                    for offset, keep in enumerate(turn_loss_mask):
++                        if keep:
++                            output[row, start + offset] = query_ordinal
++                    query_ordinal += 1
++                cursor = start + len(turn_ids)
++            continue
++
++        # Backward-compatible fallback for callers without encoded input IDs.
++        student_positions = completion_mask[row].nonzero(as_tuple=True)[0]
++        selected: List[int] = []
++        for turn_ids, turn_loss_mask in zip(response_turns, loss_turns):
++            if len(turn_ids) != len(turn_loss_mask):
++                raise ValueError(
++                    f'response/loss token mismatch at sample {row}: '
++                    f'{len(turn_ids)} != {len(turn_loss_mask)}')
++            text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
++            is_query = classify_action(text) == 'query'
++            this_ordinal = query_ordinal if is_query else -1
++            selected.extend(this_ordinal for keep in turn_loss_mask if keep)
++            if is_query:
++                query_ordinal += 1
++        if len(selected) != student_positions.numel():
++            raise ValueError(
++                f'query index map token mismatch at sample {row}: '
++                f'selected_frame={len(selected)} completion={student_positions.numel()}')
++        if selected:
++            output[row, student_positions] = torch.tensor(selected, dtype=torch.long, device=output.device)
++    return output
+diff --git a/swift/rlhf_trainers/grpo_trainer.py b/swift/rlhf_trainers/grpo_trainer.py
+index 1463ee659..90a9fb044 100644
+--- a/swift/rlhf_trainers/grpo_trainer.py
++++ b/swift/rlhf_trainers/grpo_trainer.py
+@@ -51,11 +51,14 @@ from swift.dataset import RowPreprocessor
+ from swift.rewards import orms, rm_plugins
+ from swift.rl_core.advantage import (apply_rlsd_reweight, compute_advantages, compute_advantages_dynamic,
+                                      compute_reward_metrics, compute_sdar_loss, compute_teacher_kl_per_token,
+-                                     expand_advantage_to_per_token)
++                                     compute_teacher_sequence_gate, expand_advantage_to_per_token)
++from swift.rl_core.action_credit import (normalize_action_credit_by_group,
++                                        scatter_turn_credit_to_tokens)
+ from swift.rl_core.data import GRPOBatch, GRPOSample
+ from swift.rl_core.grpo_algorithm import score_completions
+ from swift.rlhf_trainers.gkd_helpers import (assemble_teacher_completion_logprobs, build_opsd_samples,
+-                                             build_teacher_requests, encode_teacher_view,
++                                             build_query_turn_index_map, build_teacher_action_mask, build_teacher_requests,
++                                             encode_teacher_view,
+                                              fetch_teacher_parsed_by_routing, remap_teacher_logps_to_student_frame,
+                                              should_compute_local_teacher_logps)
+ from swift.sequence_parallel import GatherLoss, sequence_parallel
+@@ -123,6 +126,51 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+         # functions it is the sole signal. Same gating as GKD: teacher set -> teacher branch.
+         self._setup_teacher()
+         self.teacher_kl_coef = args.teacher_kl_coef
++        self.teacher_action_scope = args.teacher_action_scope
++        self.teacher_sequence_gate = args.teacher_sequence_gate
++        self.teacher_sequence_gate_threshold = args.teacher_sequence_gate_threshold
++        self.opd_use_grpo_advantage = args.opd_use_grpo_advantage
++        self.teacher_action_coefs = {
++            'query': args.teacher_query_kl_coef,
++            'evidence': args.teacher_evidence_kl_coef,
++            'answer': args.teacher_answer_kl_coef,
++        }
++        # Action-level credit assignment (Evidence-Attributed GRPO): additive per-turn
++        # advantage scattered only onto its own query turn. 'off' keeps standard GRPO.
++        self.action_credit_mode = args.action_credit_mode
++        self.action_credit_coef = args.action_credit_coef
++        self.action_credit_scale = args.action_credit_scale
++        self.action_credit_infos_key = args.action_credit_infos_key
++        if self.action_credit_mode != 'off':
++            if self.action_credit_coef == 0.0:
++                raise ValueError('action_credit_mode != off requires a non-zero action_credit_coef')
++            if not self.opd_use_grpo_advantage:
++                raise ValueError('action_credit is an additive term on the GRPO advantage; '
++                                 'it is incompatible with opd_use_grpo_advantage=false')
++            if self.advantage_reweight == 'rlsd':
++                raise ValueError('action_credit is not compatible with advantage_reweight=rlsd')
++        if self.teacher_sequence_gate != 'none':
++            if not self._has_teacher:
++                raise ValueError('teacher_sequence_gate requires teacher_model or teacher_model_server')
++            required_rewards = {
++                'failed_em': ('sapr_em', 'SaprEMORM'),
++                'failed_f1': ('sapr_f1', 'SaprF1ORM'),
++            }[self.teacher_sequence_gate]
++            if not any(name in self.reward_func_names for name in required_rewards):
++                raise ValueError(
++                    f'teacher_sequence_gate={self.teacher_sequence_gate!r} requires '
++                    f'--reward_funcs to include one of {required_rewards!r}; got {self.reward_func_names}')
++        if not self.opd_use_grpo_advantage and not self._has_teacher:
++            raise ValueError('opd_use_grpo_advantage=false requires teacher_model or teacher_model_server')
++        if not self.opd_use_grpo_advantage and (self.advantage_reweight == 'rlsd' or self.sdar_loss_coef > 0):
++            raise ValueError('pure OPD is not compatible with RLSD or SDAR')
++        if self.teacher_action_scope == 'multi':
++            if self.use_teacher_api:
++                raise ValueError('teacher_action_scope=multi currently supports only the local self-distillation teacher')
++            if self.advantage_reweight == 'rlsd' or self.sdar_loss_coef > 0:
++                raise ValueError('teacher_action_scope=multi is not compatible with RLSD or SDAR')
++            if not any(coef != 0.0 for coef in self.teacher_action_coefs.values()):
++                raise ValueError('teacher_action_scope=multi requires at least one non-zero per-action coefficient')
+         if not self.reward_funcs and not self.use_gym_env and not self._has_teacher:
+             raise ValueError('You must specify reward_funcs or reward_model')
+ 
+@@ -236,6 +284,29 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+         self._rewards_per_func = total_rewards_per_func
+         return samples
+ 
++    def _compute_action_turn_credit(self, samples: List[GRPOSample]) -> List[List[float]]:
++        """Group-normalize the per-query-turn credit and return the local per-sample vectors.
++
++        The raw per-turn credit vector for each sample is produced by the reward side and
++        carried in ``rollout_infos[action_credit_infos_key]`` (one float per executed query
++        turn, in order). We gather across processes, normalize within each prompt group per
++        turn-slot (:func:`normalize_action_credit_by_group`), then slice back to this process.
++        """
++        key = self.action_credit_infos_key
++        local_raw: List[List[float]] = []
++        for s in samples:
++            info = s.rollout_infos or {}
++            vec = info.get(key) if isinstance(info, dict) else None
++            local_raw.append([float(x) for x in vec] if vec else [])
++        total_raw = gather_object(local_raw)
++        total_prompt_ids = gather_object([s.prompt_id for s in samples])
++        if len(total_raw) != len(total_prompt_ids):
++            raise ValueError(
++                f'action credit gather mismatch: credit={len(total_raw)} prompt_ids={len(total_prompt_ids)}')
++        normalized = normalize_action_credit_by_group(
++            total_raw, total_prompt_ids, self.num_generations, scale=self.action_credit_scale)
++        return get_even_process_data(self, normalized)
++
+     def _postprocess_batch(self, samples: List[GRPOSample], batch_encoded_inputs: List[Dict[str, Any]]) -> None:
+         """Compute advantages and write them into each ``grpo_batch``."""
+         # OPD-RL teacher API: fetch single-token teacher logps before advantage computation.
+@@ -245,8 +316,28 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+ 
+         local_advantages = get_even_process_data(self, total_advantages)
+         assert len(local_advantages) == len(samples)
++        if self._has_teacher:
++            total_teacher_gate = compute_teacher_sequence_gate(
++                self._rewards_per_func,
++                self.reward_func_names,
++                mode=self.teacher_sequence_gate,
++                threshold=self.teacher_sequence_gate_threshold,
++            )
++            local_teacher_gate = get_even_process_data(self, total_teacher_gate)
++            assert len(local_teacher_gate) == len(samples)
++        else:
++            local_teacher_gate = [None] * len(samples)
+         for i, advantage in enumerate(local_advantages):
+             samples[i].advantages = advantage
++            samples[i].teacher_sequence_gate = local_teacher_gate[i]
++        # Evidence-Attributed GRPO: normalize the per-query-turn credit within each prompt
++        # group (per turn-slot) using the *global* gather, then distribute back to the local
++        # samples so the mini-batch loop only scatters it onto query-turn tokens. The raw
++        # per-turn vector is produced by the reward side and carried in rollout_infos.
++        if self.action_credit_mode != 'off':
++            local_credit = self._compute_action_turn_credit(samples)
++            for i, credit in enumerate(local_credit):
++                samples[i].action_turn_credit = credit
+         # log metrics in samples
+         self._logs['advantages'].extend(total_advantages.tolist())
+ 
+@@ -262,6 +353,15 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+             device = self.accelerator.device
+             grpo_batch: GRPOBatch = batch_encoded['grpo_batch']
+             base_advantages = torch.stack([data.advantages.to(device) for data in batch])
++            teacher_sequence_gate = None
++            if self._has_teacher:
++                teacher_sequence_gate = torch.stack([
++                    data.teacher_sequence_gate.to(device=device, dtype=torch.bool)
++                    for data in batch
++                ])
++                grpo_batch.teacher_action_mask &= teacher_sequence_gate.unsqueeze(1)
++                if grpo_batch.teacher_action_coef_mask is not None:
++                    grpo_batch.teacher_action_coef_mask *= teacher_sequence_gate.unsqueeze(1)
+             use_rlsd = (self.advantage_reweight == 'rlsd' and grpo_batch.teacher_per_token_logps is not None)
+             use_sdar = (self.sdar_loss_coef > 0 and grpo_batch.teacher_per_token_logps is not None)
+             if use_rlsd:
+@@ -278,6 +378,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+                     lam=lam,
+                     clip_range=self.rlsd_reweight_clip_range,
+                     negative_only=self.rlsd_negative_only,
++                    teacher_action_mask=grpo_batch.teacher_action_mask,
+                 )
+                 self._metrics[mode]['rlsd_lambda'].append(lam)
+             elif use_sdar:
+@@ -297,8 +398,34 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+                     teacher_per_token_logps=grpo_batch.teacher_per_token_logps,
+                     policy_per_token_logps=grpo_batch.old_per_token_logps
+                     if grpo_batch.teacher_per_token_logps is not None else None,
+-                    teacher_kl_coef=self.teacher_kl_coef if grpo_batch.teacher_per_token_logps is not None else 0.0,
++                    teacher_kl_coef=(
++                        0.0 if self.teacher_action_scope == 'multi' else self.teacher_kl_coef
++                    ) if grpo_batch.teacher_per_token_logps is not None else 0.0,
++                    teacher_action_mask=grpo_batch.teacher_action_mask,
++                    teacher_action_coef_mask=grpo_batch.teacher_action_coef_mask,
++                    teacher_sequence_gate=teacher_sequence_gate,
++                    use_base_advantage=self.opd_use_grpo_advantage,
++                )
++            if self.action_credit_mode != 'off' and not use_rlsd:
++                # Add the group-normalized per-turn credit onto its own query-turn tokens,
++                # on top of the outcome advantage already written to grpo_batch.advantages.
++                model_inputs = batch_encoded['model_inputs']
++                turn_index_map = build_query_turn_index_map(
++                    batch,
++                    grpo_batch.completion_mask,
++                    self.processing_class,
++                    input_ids=model_inputs.get('input_ids'),
+                 )
++                turn_credit = [data.action_turn_credit or [] for data in batch]
++                credit_term = scatter_turn_credit_to_tokens(
++                    turn_credit, turn_index_map, grpo_batch.completion_mask).to(grpo_batch.advantages.device)
++                grpo_batch.advantages = grpo_batch.advantages + self.action_credit_coef * credit_term
++                mode = 'train' if self.model.training else 'eval'
++                credited = (turn_index_map >= 0) & grpo_batch.completion_mask.bool()
++                self._metrics[mode]['action_credit_token_ratio'].append(
++                    (credited.sum() / grpo_batch.completion_mask.sum().clamp(min=1.0)).item())
++                self._metrics[mode]['action_credit_abs_mean'].append(
++                    (credit_term.abs().sum() / credited.sum().clamp(min=1.0)).item())
+             if grpo_batch.teacher_per_token_logps is not None:
+                 mode = 'train' if self.model.training else 'eval'
+                 # Monitoring uses the non-negative k3 estimator (a "distance from the teacher" gauge
+@@ -307,6 +434,13 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+                                                   grpo_batch.completion_mask)
+                 self._metrics[mode]['teacher_kl'].append(
+                     (k3.sum() / grpo_batch.completion_mask.sum().clamp(min=1.0)).item())
++                scoped_mask = grpo_batch.completion_mask & grpo_batch.teacher_action_mask
++                self._metrics[mode]['teacher_kl_scoped'].append(
++                    ((k3 * scoped_mask).sum() / scoped_mask.sum().clamp(min=1.0)).item())
++                self._metrics[mode]['teacher_action_scope_ratio'].append(
++                    (scoped_mask.sum() / grpo_batch.completion_mask.sum().clamp(min=1.0)).item())
++                self._metrics[mode]['teacher_sequence_gate_ratio'].append(
++                    teacher_sequence_gate.float().mean().item())
+ 
+     def _log_rollout(self, samples: List[GRPOSample]) -> None:
+         """Log prompts/completions and extra gathered metrics (solution, num_turns)."""
+@@ -537,7 +671,10 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+ 
+             return advantages
+ 
+-    def _collate_teacher_opsd_batch(self, batch: List[GRPOSample], template) -> Tuple[Dict[str, Any], GRPOBatch]:
++    def _collate_teacher_opsd_batch(self,
++                                    batch: List[GRPOSample],
++                                    template,
++                                    scope: Optional[str] = None) -> Tuple[Dict[str, Any], GRPOBatch]:
+         """Encode + collate the OPSD teacher view (teacher_prompt + same response).
+ 
+         Produces a teacher micro-batch whose completion frame may differ in length from
+@@ -545,7 +682,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+         student frame. ``build_teacher_view`` is already done by ``build_opsd_samples``.
+         """
+         for s in batch:
+-            s.encoded = encode_teacher_view(s, template)
++            s.encoded = encode_teacher_view(s, template, scope=scope, fallback_to_student=True)
+         teacher_model_inputs, teacher_grpo_batch = collate_to_grpo_micro_batch(
+             batch, template, device=self.accelerator.device, use_logits_to_keep=True)
+         teacher_model_inputs.pop('labels', None)
+@@ -632,11 +769,14 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+             grpo_batch: GRPOBatch = batch_encoded['grpo_batch']
+             device = grpo_batch.completion_mask.device
+             n = len(chunk)
++            model_inputs = batch_encoded['model_inputs']
+             teacher_out = assemble_teacher_completion_logprobs(
+                 parsed[offset:offset + n],
+                 grpo_batch.completion_mask,
+                 device,
+-                response_token_ids=[s.response_token_ids for s in chunk])
++                response_token_ids=[s.response_token_ids for s in chunk],
++                input_ids=model_inputs.get('input_ids'),
++                attention_mask=model_inputs.get('attention_mask'))
+             grpo_batch.teacher_per_token_logps = teacher_out.topk_logprobs[..., 0]
+             offset += n
+ 
+@@ -750,6 +890,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+         ga_batch_encoded_inputs: List[Dict[str, Any]] = []
+         for batch in gas_chunks:
+             teacher_model_inputs = teacher_grpo_batch = None
++            multi_teacher_batches = {}
+             with self._template_context(template):
+                 for s in batch:
+                     encoded_inputs = encode_sample(s, template)
+@@ -757,12 +898,55 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+                     s.encoded = encoded_inputs
+                 model_inputs, grpo_batch = collate_to_grpo_micro_batch(
+                     batch, template, device=self.accelerator.device, use_logits_to_keep=True)
+-                # OPSD: the local teacher forwards its own (teacher_prompt + same response)
+-                # encoding, so collate a separate teacher micro-batch (different length).
+-                has_opsd_batch = build_opsd_samples(batch)
+-                is_opsd = (has_opsd_batch and (self._has_teacher_explicit() or self._is_dynamic_self_distillation))
+-                if is_opsd:
+-                    teacher_model_inputs, teacher_grpo_batch = self._collate_teacher_opsd_batch(batch, template)
++                if self.teacher_action_scope == 'multi':
++                    coef_mask = torch.zeros_like(grpo_batch.completion_mask, dtype=torch.float32)
++                    selected_count = torch.zeros_like(grpo_batch.completion_mask, dtype=torch.int8)
++                    for scope, coef in self.teacher_action_coefs.items():
++                        if coef == 0.0:
++                            continue
++                        action_mask = build_teacher_action_mask(
++                            batch,
++                            grpo_batch.completion_mask,
++                            self.processing_class,
++                            scope,
++                            input_ids=model_inputs['input_ids'],
++                        )
++                        has_prompt = torch.tensor(
++                            [bool(s.get_teacher_prompt(scope)) for s in batch],
++                            dtype=torch.bool,
++                            device=action_mask.device,
++                        ).unsqueeze(1)
++                        action_mask &= has_prompt
++                        if not action_mask.any():
++                            continue
++                        if not build_opsd_samples(batch, scope):
++                            continue
++                        selected_count += action_mask.to(dtype=selected_count.dtype)
++                        coef_mask += action_mask.to(dtype=coef_mask.dtype) * coef
++                        multi_teacher_batches[scope] = (
++                            action_mask,
++                            *self._collate_teacher_opsd_batch(batch, template, scope=scope),
++                        )
++                    if (selected_count > 1).any():
++                        raise ValueError('multi-action OPSD masks overlap on at least one completion token')
++                    grpo_batch.teacher_action_coef_mask = coef_mask
++                    grpo_batch.teacher_action_mask = coef_mask.ne(0)
++                    is_opsd = bool(multi_teacher_batches)
++                else:
++                    grpo_batch.teacher_action_mask = build_teacher_action_mask(
++                        batch,
++                        grpo_batch.completion_mask,
++                        self.processing_class,
++                        self.teacher_action_scope,
++                        input_ids=model_inputs['input_ids'],
++                    )
++                    # OPSD: the local teacher forwards its own (teacher_prompt + same response)
++                    # encoding, so collate a separate teacher micro-batch (different length).
++                    has_opsd_batch = build_opsd_samples(batch)
++                    is_opsd = (
++                        has_opsd_batch and (self._has_teacher_explicit() or self._is_dynamic_self_distillation))
++                    if is_opsd:
++                        teacher_model_inputs, teacher_grpo_batch = self._collate_teacher_opsd_batch(batch, template)
+ 
+             model_inputs.pop('labels', None)
+             batch_encoded_inputs = {'model_inputs': model_inputs, 'grpo_batch': grpo_batch}
+@@ -793,17 +977,47 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+                 grpo_batch.ref_per_token_logps = ref_per_token_logps
+                 # OPD-RL: local teacher logp on the sampled tokens (API path filled later).
+                 if should_compute_local_teacher_logps(
+-                        has_teacher_explicit=self._has_teacher_explicit(),
+-                        is_dynamic_self_distillation=self._is_dynamic_self_distillation,
+-                        use_teacher_api=self.use_teacher_api,
+-                        has_opsd_batch=is_opsd,
++                    has_teacher_explicit=self._has_teacher_explicit(),
++                    is_dynamic_self_distillation=self._is_dynamic_self_distillation,
++                    use_teacher_api=self.use_teacher_api,
++                    has_opsd_batch=is_opsd,
+                 ):
+-                    grpo_batch.teacher_per_token_logps = self._compute_teacher_logps(
+-                        model_inputs,
+-                        grpo_batch,
+-                        origin_data=origin_data,
+-                        teacher_model_inputs=teacher_model_inputs,
+-                        teacher_grpo_batch=teacher_grpo_batch)
++                    if self.teacher_action_scope == 'multi':
++                        combined_teacher_logps = grpo_batch.old_per_token_logps.detach().clone()
++                        metrics_mode = 'train' if self.model.training else 'eval'
++                        completion_tokens = grpo_batch.completion_mask.sum().clamp(min=1.0)
++                        for scope, (
++                            action_mask,
++                            action_inputs,
++                            action_batch,
++                        ) in multi_teacher_batches.items():
++                            action_logps = self._compute_teacher_logps(
++                                model_inputs,
++                                grpo_batch,
++                                origin_data=origin_data,
++                                teacher_model_inputs=action_inputs,
++                                teacher_grpo_batch=action_batch,
++                            )
++                            action_k3 = compute_teacher_kl_per_token(
++                                action_logps,
++                                grpo_batch.old_per_token_logps,
++                                grpo_batch.completion_mask,
++                            )
++                            action_tokens = action_mask.sum().clamp(min=1.0)
++                            self._metrics[metrics_mode][f'teacher_action_scope_ratio_{scope}'].append(
++                                (action_mask.sum() / completion_tokens).item())
++                            self._metrics[metrics_mode][f'teacher_kl_scoped_{scope}'].append(
++                                ((action_k3 * action_mask).sum() / action_tokens).item())
++                            combined_teacher_logps = torch.where(
++                                action_mask, action_logps, combined_teacher_logps)
++                        grpo_batch.teacher_per_token_logps = combined_teacher_logps
++                    else:
++                        grpo_batch.teacher_per_token_logps = self._compute_teacher_logps(
++                            model_inputs,
++                            grpo_batch,
++                            origin_data=origin_data,
++                            teacher_model_inputs=teacher_model_inputs,
++                            teacher_grpo_batch=teacher_grpo_batch)
+             ga_batch_encoded_inputs.append(batch_encoded_inputs)
+ 
+         # --- log completion lengths ---
+@@ -1150,10 +1364,11 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+         # current-forward student logps (per_token_logps, retains grad) and the OPSD teacher logps
+         # on the same sampled tokens (detached, remapped to the student frame).
+         if self.sdar_loss_coef > 0 and grpo_batch.teacher_per_token_logps is not None:
++            sdar_response_mask = completion_mask & grpo_batch.teacher_action_mask
+             sdar_loss, sdar_metrics = compute_sdar_loss(
+                 student_log_probs=per_token_logps,
+                 teacher_log_probs=grpo_batch.teacher_per_token_logps,
+-                response_mask=completion_mask,
++                response_mask=sdar_response_mask,
+                 gate_beta=self.sdar_gate_beta,
+             )
+             loss = loss + self.sdar_loss_coef * sdar_loss
+diff --git a/swift/rollout/multi_turn.py b/swift/rollout/multi_turn.py
+index f02fb5cdb..f79e4a67d 100644
+--- a/swift/rollout/multi_turn.py
++++ b/swift/rollout/multi_turn.py
+@@ -325,6 +325,13 @@ class MultiTurnScheduler(RolloutScheduler, ABC):
+                         total_response_loss_mask = [[1] * len(final_token_ids)]
+                     if current_logprobs:
+                         total_rollout_logprobs = [current_logprobs]
++                else:
++                    # A new final assistant turn after one or more tool/environment turns.
++                    if final_token_ids:
++                        total_response_ids.append(list(final_token_ids))
++                        total_response_loss_mask.append([1] * len(final_token_ids))
++                    if current_logprobs:
++                        total_rollout_logprobs.append(current_logprobs)
+ 
+                 # Validate rollout_logprobs completeness: if logprobs are incomplete (missing for some turns),
+                 # clear them to disable rollout importance sampling correction (which requires complete logprobs)
+diff --git a/tests/utils/test_action_credit.py b/tests/utils/test_action_credit.py
+new file mode 100644
+index 000000000..58aac82a0
+--- /dev/null
++++ b/tests/utils/test_action_credit.py
+@@ -0,0 +1,91 @@
++"""Tests for Evidence-Attributed GRPO action-level credit assignment."""
++
++import unittest
++
++import torch
++
++from swift.rl_core.action_credit import (normalize_action_credit_by_group,
++                                         scatter_turn_credit_to_tokens)
++
++
++class TestNormalizeActionCredit(unittest.TestCase):
++
++    def test_group_turn_centering_and_scaling(self):
++        # One prompt, K=3 trajectories, each with a first query turn gain.
++        credit = [[1.0], [0.0], [0.5]]
++        prompt_ids = ['p', 'p', 'p']
++        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=3, scale='group_turn_center')
++        # Centered by the slot-0 mean (0.5): [0.5, -0.5, 0.0]
++        self.assertAlmostEqual(out[0][0], 0.5, places=5)
++        self.assertAlmostEqual(out[1][0], -0.5, places=5)
++        self.assertAlmostEqual(out[2][0], 0.0, places=5)
++
++    def test_variable_turn_counts_group_per_slot(self):
++        # Trajectory 0 has 2 query turns, trajectory 1 has 1. Slot 1 has a single owner
++        # -> no within-group contrast -> zeroed.
++        credit = [[1.0, 1.0], [0.0]]
++        prompt_ids = ['p', 'p']
++        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=2, scale='group_turn_center')
++        self.assertAlmostEqual(out[0][0], 0.5, places=5)
++        self.assertAlmostEqual(out[1][0], -0.5, places=5)
++        # slot 1 only owned by trajectory 0 -> zero
++        self.assertEqual(out[0][1], 0.0)
++
++    def test_separate_prompts_do_not_mix(self):
++        credit = [[1.0], [1.0]]
++        prompt_ids = ['a', 'b']
++        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=1, scale='group_turn_center')
++        # Each prompt-slot has a single owner -> zeroed (no contrast).
++        self.assertEqual(out[0][0], 0.0)
++        self.assertEqual(out[1][0], 0.0)
++
++    def test_scale_none_passthrough(self):
++        credit = [[0.3, 0.7], None]
++        out = normalize_action_credit_by_group(credit, ['p', 'p'], num_generations=2, scale='none')
++        self.assertEqual(out[0], [0.3, 0.7])
++        self.assertEqual(out[1], [])
++
++    def test_group_turn_scaling_unit_std(self):
++        credit = [[2.0], [0.0]]
++        out = normalize_action_credit_by_group(credit, ['p', 'p'], num_generations=2, scale='group_turn')
++        # centered [1,-1]; std (unbiased) = sqrt(2); /(std+1e-4) ~ +/-0.707
++        self.assertAlmostEqual(out[0][0], 1.0 / (2 ** 0.5 + 1e-4), places=4)
++        self.assertAlmostEqual(out[1][0], -1.0 / (2 ** 0.5 + 1e-4), places=4)
++
++    def test_length_mismatch_raises(self):
++        with self.assertRaises(ValueError):
++            normalize_action_credit_by_group([[1.0]], ['p', 'p'], num_generations=1)
++
++
++class TestScatterTurnCredit(unittest.TestCase):
++
++    def test_scatter_by_turn_ordinal(self):
++        # 1 sample, 6 tokens; turns: q0 at [0,1], q1 at [3,4]; token 2,5 outside.
++        turn_index_map = torch.tensor([[0, 0, -1, 1, 1, -1]])
++        completion_mask = torch.tensor([[1, 1, 1, 1, 1, 1]])
++        credit = [[0.5, -0.25]]
++        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
++        expected = torch.tensor([[0.5, 0.5, 0.0, -0.25, -0.25, 0.0]])
++        torch.testing.assert_close(out, expected)
++
++    def test_masked_tokens_get_no_credit(self):
++        turn_index_map = torch.tensor([[0, 0, 1, 1]])
++        completion_mask = torch.tensor([[1, 0, 1, 1]])  # token1 not a completion token
++        credit = [[1.0, 2.0]]
++        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
++        expected = torch.tensor([[1.0, 0.0, 2.0, 2.0]])
++        torch.testing.assert_close(out, expected)
++
++    def test_empty_credit_is_zero(self):
++        turn_index_map = torch.tensor([[-1, -1, -1]])
++        completion_mask = torch.tensor([[1, 1, 1]])
++        out = scatter_turn_credit_to_tokens([[]], turn_index_map, completion_mask)
++        torch.testing.assert_close(out, torch.zeros(1, 3))
++
++    def test_shape_mismatch_raises(self):
++        with self.assertRaises(ValueError):
++            scatter_turn_credit_to_tokens([[1.0]], torch.zeros(1, 3, dtype=torch.long), torch.zeros(1, 4))
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/tests/utils/test_multi_teacher.py b/tests/utils/test_multi_teacher.py
+index cfb29dfee..d7d19912f 100644
+--- a/tests/utils/test_multi_teacher.py
++++ b/tests/utils/test_multi_teacher.py
+@@ -17,8 +17,10 @@ from typing import List, Optional
+ from swift.dataset import load_dataset
+ from swift.rl_core.advantage import expand_advantage_to_per_token
+ from swift.rl_core.data import OnPolicySample
+-from swift.rlhf_trainers.gkd_helpers import (TeacherServerConfig, fetch_teacher_parsed_by_routing,
+-                                             parse_teacher_model_server, route_samples_to_teachers)
++from swift.rlhf_trainers.gkd_helpers import (TeacherServerConfig, assemble_teacher_completion_logprobs,
++                                             build_query_turn_index_map, build_teacher_action_mask,
++                                             fetch_teacher_parsed_by_routing, parse_teacher_model_server,
++                                             route_samples_to_teachers)
+ 
+ 
+ def _make_sample(tag: Optional[str] = None) -> OnPolicySample:
+@@ -313,6 +315,189 @@ class TestExpandAdvantageScalarCoef(unittest.TestCase):
+         )
+         torch.testing.assert_close(result[0], torch.ones(T) * 1.0)
+ 
++    def test_action_mask_only_limits_teacher_signal(self):
++        result = expand_advantage_to_per_token(
++            torch.tensor([1.0]),
++            torch.ones(1, 4),
++            teacher_per_token_logps=torch.tensor([[2.0] * 4]),
++            policy_per_token_logps=torch.tensor([[1.0] * 4]),
++            teacher_kl_coef=0.5,
++            teacher_action_mask=torch.tensor([[False, False, True, True]]),
++        )
++        torch.testing.assert_close(result, torch.tensor([[1.0, 1.0, 1.5, 1.5]]))
++
++    def test_per_action_coefficient_mask(self):
++        result = expand_advantage_to_per_token(
++            torch.tensor([1.0]),
++            torch.ones(1, 4),
++            teacher_per_token_logps=torch.tensor([[2.0] * 4]),
++            policy_per_token_logps=torch.tensor([[1.0] * 4]),
++            teacher_action_mask=torch.tensor([[True, True, False, True]]),
++            teacher_action_coef_mask=torch.tensor([[0.01, 0.01, 0.0, 0.03]]),
++        )
++        torch.testing.assert_close(result, torch.tensor([[1.01, 1.01, 1.0, 1.03]]))
++
++
++class TestScopedTeacherViews(unittest.TestCase):
++
++    def _sample(self):
++        return OnPolicySample(
++            messages=[
++                {'role': 'system', 'content': 'system'},
++                {'role': 'user', 'content': 'question'},
++                {'role': 'assistant', 'content': 'query'},
++                {'role': 'user', 'content': 'retrieved evidence'},
++                {'role': 'assistant', 'content': 'answer'},
++            ],
++            teacher_query_prompt='reference search plan',
++            teacher_answer_prompt='gold answer context',
++        )
++
++    def test_query_privilege_appends_to_first_user(self):
++        sample = self._sample()
++        self.assertTrue(sample.build_teacher_view('query'))
++        messages = sample.teacher_messages_by_scope['query']
++        self.assertEqual(messages[1]['content'], 'question\n\nreference search plan')
++        self.assertEqual(messages[3]['content'], 'retrieved evidence')
++
++    def test_answer_privilege_appends_to_last_user(self):
++        sample = self._sample()
++        self.assertTrue(sample.build_teacher_view('answer'))
++        messages = sample.teacher_messages_by_scope['answer']
++        self.assertEqual(messages[1]['content'], 'question')
++        self.assertEqual(messages[3]['content'], 'retrieved evidence\n\ngold answer context')
++
++    def test_missing_scope_can_build_identity_fallback(self):
++        sample = self._sample()
++        self.assertFalse(sample.build_teacher_view('evidence', fallback_to_student=True))
++        self.assertEqual(sample.teacher_messages_by_scope['evidence'], sample.messages)
++
++
++class _FakeTokenizer:
++
++    def decode(self, token_ids, skip_special_tokens=False):
++        del skip_special_tokens
++        return {
++            1: 'reasoning <query>q</query>',
++            2: 'reasoning <answer>a</answer>',
++            3: 'reasoning <query>q</query> correction <answer>a</answer>',
++        }[token_ids[0]]
++
++
++class TestTeacherFullFrameAlignment(unittest.TestCase):
++
++    def test_interleaved_multi_turn_completion_positions(self):
++        # vLLM omits the first prompt token from prompt_logprobs. Assistant
++        # tokens (11, 12) and (21, 22) are separated by environment tokens.
++        input_ids = torch.tensor([[101, 11, 12, 151645, 301, 302, 21, 22, 151645]])
++        completion_mask = torch.tensor([[False, True, True, True, False, False, True, True, True]])
++        parsed_ids = input_ids[0, 1:].tolist()
++        parsed = [(
++            [[-0.1 * index] for index in range(1, len(parsed_ids) + 1)],
++            [[token_id] for token_id in parsed_ids],
++        )]
++        output = assemble_teacher_completion_logprobs(
++            parsed,
++            completion_mask,
++            torch.device('cpu'),
++            response_token_ids=[[[11, 12], [21, 22]]],
++            input_ids=input_ids,
++            attention_mask=torch.ones_like(input_ids),
++        )
++        selected = output.topk_indices[..., 0][completion_mask]
++        torch.testing.assert_close(selected, torch.tensor([11, 12, 151645, 21, 22, 151645]))
++
++    def test_left_padding_maps_back_to_absolute_frame(self):
++        input_ids = torch.tensor([[0, 0, 101, 11, 12]])
++        attention_mask = torch.tensor([[0, 0, 1, 1, 1]])
++        completion_mask = torch.tensor([[False, False, False, True, True]])
++        parsed = [([[-0.1], [-0.2]], [[11], [12]])]
++        output = assemble_teacher_completion_logprobs(
++            parsed,
++            completion_mask,
++            torch.device('cpu'),
++            input_ids=input_ids,
++            attention_mask=attention_mask,
++        )
++        selected = output.topk_indices[..., 0][completion_mask]
++        torch.testing.assert_close(selected, torch.tensor([11, 12]))
++
++    def test_completion_region_frame_maps_to_full_input_suffix(self):
++        input_ids = torch.tensor([[101, 201, 202, 11, 12, 151645, 301, 21, 22]])
++        # HF logits_to_keep frame corresponds to input_ids[:, -6:].
++        completion_mask = torch.tensor([[True, True, True, False, True, True]])
++        parsed_ids = input_ids[0, 1:].tolist()
++        parsed = [(
++            [[-0.1 * index] for index in range(1, len(parsed_ids) + 1)],
++            [[token_id] for token_id in parsed_ids],
++        )]
++        output = assemble_teacher_completion_logprobs(
++            parsed,
++            completion_mask,
++            torch.device('cpu'),
++            input_ids=input_ids,
++            attention_mask=torch.ones_like(input_ids),
++        )
++        selected = output.topk_indices[..., 0][completion_mask]
++        torch.testing.assert_close(selected, torch.tensor([11, 12, 151645, 21, 22]))
++
++
++class TestTeacherActionMask(unittest.TestCase):
++
++    def test_answer_turn_scattered_to_completion_frame(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 11], [2, 22]],
++            response_loss_mask=[[1, 1], [1, 1]],
++        )
++        completion_mask = torch.tensor([[False, True, True, True, True, False]])
++        result = build_teacher_action_mask([sample], completion_mask, _FakeTokenizer(), 'answer')
++        torch.testing.assert_close(
++            result,
++            torch.tensor([[False, False, False, True, True, False]]),
++        )
++
++    def test_query_turn_respects_environment_loss_mask(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 11, 12], [2, 22]],
++            response_loss_mask=[[1, 0, 1], [1, 1]],
++        )
++        completion_mask = torch.tensor([[True, True, True, True]])
++        result = build_teacher_action_mask([sample], completion_mask, _FakeTokenizer(), 'query')
++        torch.testing.assert_close(result, torch.tensor([[True, True, False, False]]))
++
++    def test_answer_has_priority_when_turn_contains_both_tags(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[3, 33]],
++            response_loss_mask=[[1, 1]],
++        )
++        completion_mask = torch.tensor([[True, True]])
++        query_mask = build_teacher_action_mask([sample], completion_mask, _FakeTokenizer(), 'query')
++        answer_mask = build_teacher_action_mask([sample], completion_mask, _FakeTokenizer(), 'answer')
++        torch.testing.assert_close(query_mask, torch.tensor([[False, False]]))
++        torch.testing.assert_close(answer_mask, torch.tensor([[True, True]]))
++
++    def test_encoded_frame_excludes_template_boundary_tokens(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 11], [2, 22]],
++            response_loss_mask=[[1, 1], [1, 1]],
++        )
++        input_ids = torch.tensor([[100, 1, 11, 151645, 9, 9, 2, 22, 151645, 198]])
++        completion_mask = torch.tensor([[False, True, True, True, False, False, True, True, True, True]])
++        result = build_teacher_action_mask(
++            [sample],
++            completion_mask,
++            _FakeTokenizer(),
++            'answer',
++            input_ids=input_ids,
++        )
++        torch.testing.assert_close(
++            result,
++            torch.tensor([[False, False, False, False, False, False, True, True, False, False]]),
++        )
+ 
+ class TestStreamingDatasetMultiTeacherRouting(unittest.TestCase):
+     """End-to-end: streaming load_dataset injects ``dataset`` tags that multi-teacher routing consumes."""
+@@ -401,5 +586,67 @@ class TestStreamingDatasetMultiTeacherRouting(unittest.TestCase):
+         self.assertEqual(len(routing[1]), code_count)
+ 
+ 
++
++class TestQueryTurnIndexMap(unittest.TestCase):
++    """build_query_turn_index_map: per-token query-turn ordinals for Evidence-Attributed GRPO."""
++
++    def test_two_query_turns_get_distinct_ordinals(self):
++        # token id 1 -> "<query>" turn, id 2 -> "<answer>" turn (per _FakeTokenizer).
++        # Two query turns [1,11] and [1,12], then an answer turn [2,22].
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 11], [1, 12], [2, 22]],
++            response_loss_mask=[[1, 1], [1, 1], [1, 1]],
++        )
++        completion_mask = torch.tensor([[True, True, True, True, True, True]])
++        result = build_query_turn_index_map([sample], completion_mask, _FakeTokenizer())
++        # q0 -> ordinal 0, q1 -> ordinal 1, answer -> -1
++        torch.testing.assert_close(result, torch.tensor([[0, 0, 1, 1, -1, -1]]))
++
++    def test_answer_and_evidence_excluded(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[2, 22]],
++            response_loss_mask=[[1, 1]],
++        )
++        completion_mask = torch.tensor([[True, True]])
++        result = build_query_turn_index_map([sample], completion_mask, _FakeTokenizer())
++        torch.testing.assert_close(result, torch.tensor([[-1, -1]]))
++
++    def test_respects_environment_loss_mask(self):
++        # Middle token has loss_mask 0 (environment token spliced into the turn). In the
++        # no-input_ids fallback, completion_mask frames only the kept tokens (same contract
++        # as build_teacher_action_mask), so the two kept query tokens both get ordinal 0.
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 11, 12]],
++            response_loss_mask=[[1, 0, 1]],
++        )
++        completion_mask = torch.tensor([[True, True]])
++        result = build_query_turn_index_map([sample], completion_mask, _FakeTokenizer())
++        torch.testing.assert_close(result, torch.tensor([[0, 0]]))
++
++    def test_input_ids_frame_alignment(self):
++        # Query turn tokens (11,12) and answer (21,22) separated by env tokens in the frame.
++        input_ids = torch.tensor([[101, 11, 12, 151645, 301, 21, 22, 151645]])
++        completion_mask = torch.tensor([[False, True, True, True, False, True, True, True]])
++
++        class _FrameTok:
++
++            def decode(self, token_ids, skip_special_tokens=False):
++                del skip_special_tokens
++                return {11: '<query>q</query>', 21: '<answer>a</answer>'}[token_ids[0]]
++
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[11, 12], [21, 22]],
++            response_loss_mask=[[1, 1], [1, 1]],
++        )
++        result = build_query_turn_index_map([sample], completion_mask, _FrameTok(), input_ids=input_ids)
++        # query tokens at frame positions 1,2 -> ordinal 0; answer tokens -> -1; env/template -> -1
++        expected = torch.tensor([[-1, 0, 0, -1, -1, -1, -1, -1]])
++        torch.testing.assert_close(result, expected)
++
++
+ if __name__ == '__main__':
+     unittest.main()
+diff --git a/tests/utils/test_teacher_advantage.py b/tests/utils/test_teacher_advantage.py
+index 4e4c619fa..2fc050879 100644
+--- a/tests/utils/test_teacher_advantage.py
++++ b/tests/utils/test_teacher_advantage.py
+@@ -3,7 +3,8 @@
+ import torch
+ import unittest
+ 
+-from swift.rl_core.advantage import compute_teacher_kl_per_token, compute_teacher_logratio
++from swift.rl_core.advantage import (compute_teacher_kl_per_token, compute_teacher_logratio,
++                                     compute_teacher_sequence_gate, expand_advantage_to_per_token)
+ 
+ 
+ class TestTeacherAdvantageMasking(unittest.TestCase):
+@@ -35,5 +36,69 @@ class TestTeacherAdvantageMasking(unittest.TestCase):
+         torch.testing.assert_close(logratio, torch.tensor([[1.0, 0.0, 0.0]]))
+ 
+ 
++class TestTeacherSequenceGate(unittest.TestCase):
++
++    def test_failed_em_selects_only_incorrect_sequences(self):
++        rewards = torch.tensor([
++            [1.0, 0.4],
++            [0.0, 0.8],
++            [float('nan'), 0.0],
++        ])
++        gate = compute_teacher_sequence_gate(
++            rewards,
++            ['sapr_em', 'sapr_f1'],
++            mode='failed_em',
++        )
++        torch.testing.assert_close(gate, torch.tensor([False, True, True]))
++
++    def test_failed_f1_uses_configured_threshold(self):
++        rewards = torch.tensor([
++            [1.0, 0.95],
++            [0.0, 0.70],
++        ])
++        gate = compute_teacher_sequence_gate(
++            rewards,
++            ['sapr_em', 'sapr_f1'],
++            mode='failed_f1',
++            threshold=0.9,
++        )
++        torch.testing.assert_close(gate, torch.tensor([False, True]))
++
++    def test_registered_orm_class_names_are_supported(self):
++        gate = compute_teacher_sequence_gate(
++            torch.tensor([[1.0], [0.0]]),
++            ['SaprEMORM'],
++            mode='failed_em',
++        )
++        torch.testing.assert_close(gate, torch.tensor([False, True]))
++
++    def test_missing_gate_reward_fails_fast(self):
++        with self.assertRaisesRegex(ValueError, 'sapr_em'):
++            compute_teacher_sequence_gate(
++                torch.tensor([[0.5]]),
++                ['sapr_f1'],
++                mode='failed_em',
++            )
++
++    def test_pure_opd_zeros_base_and_applies_sequence_gate(self):
++        result = expand_advantage_to_per_token(
++            torch.tensor([3.0, 4.0]),
++            torch.ones(2, 3, dtype=torch.bool),
++            teacher_per_token_logps=torch.tensor([
++                [-1.0, -2.0, -3.0],
++                [-1.0, -2.0, -3.0],
++            ]),
++            policy_per_token_logps=torch.tensor([
++                [-2.0, -2.5, -4.0],
++                [-2.0, -2.5, -4.0],
++            ]),
++            teacher_kl_coef=0.1,
++            teacher_sequence_gate=torch.tensor([False, True]),
++            use_base_advantage=False,
++        )
++        torch.testing.assert_close(result[0], torch.zeros(3))
++        torch.testing.assert_close(result[1], torch.tensor([0.1, 0.05, 0.1]))
++
++
+ if __name__ == '__main__':
+     unittest.main()

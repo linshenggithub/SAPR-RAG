@@ -56,6 +56,8 @@ docs/                    Setup, experiment protocol, coding and writing standard
 
 - [GPU 检索服务运行手册](docs/retrieval_service_gpu_runbook.md)：新 Worker 上部署
   BGE GPU + FAISS GPU 常驻服务，包含启动、验证、训练/评测接入和故障处理。
+- [ms-swift 本地修改与迁移手册](docs/ms_swift_local_patches.md)：固定上游版本、
+  完整补丁、11 个修改文件说明及迁移验证流程。
 - [后训练实验说明](docs/post_training_experiment_overview.md)：SFT、DPO、GRPO、
   OPSD 与 OPD 的方法和实验关系。
 - [实验总表](docs/experiment_tracker.md)：全部实验配置、状态和结果的权威记录。

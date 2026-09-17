@@ -40,165 +40,6 @@ index e2df2e297..f4f568968 100644
          })
          infer_backend = kwargs.pop('infer_backend', None) or args.infer_backend
          if infer_backend != 'vllm':
-diff --git a/swift/rl_core/action_credit.py b/swift/rl_core/action_credit.py
-new file mode 100644
-index 000000000..7b83aca7d
---- /dev/null
-+++ b/swift/rl_core/action_credit.py
-@@ -0,0 +1,153 @@
-+# Copyright (c) ModelScope Contributors. All rights reserved.
-+"""Action-scoped credit assignment for multi-turn agentic RL (Evidence-Attributed GRPO).
-+
-+This module implements the *task-agnostic* half of action-level credit assignment. The
-+standard GRPO advantage is a single per-sequence scalar broadcast to every response
-+token, so a trajectory whose final answer is wrong pushes *all* of its turns down --
-+including the query turn that actually retrieved the decisive evidence. That is the
-+long-horizon credit-assignment problem: the outcome reward cannot tell which turn helped.
-+
-+Here we add a second, *per-turn* advantage term that is scattered only onto the tokens of
-+the turn that produced it (e.g. each ``<query>`` turn receives its own evidence-gain
-+signal). The environment/outcome GRPO advantage is left untouched; the per-turn term is
-+*additive* on top of it::
-+
-+    A_token(t) = A_outcome(seq)                      # existing GRPO broadcast
-+               + coef * A_action(turn(t))            # new: only on that turn's tokens
-+
-+The per-turn *raw* signal (e.g. "new gold evidence covered by this query") is produced by
-+the task side (the SAPR reward plugin) and passed in as a per-sample vector; this module
-+only (1) normalizes it within each prompt group per turn-slot and (2) scatters it to tokens
-+via a turn-index map. Keeping the numeric core here (pure tensor / list functions) makes it
-+backend-agnostic and unit-testable without a live trainer.
-+"""
-+
-+from typing import Dict, List, Optional, Sequence
-+
-+import torch
-+
-+__all__ = [
-+    'normalize_action_credit_by_group',
-+    'scatter_turn_credit_to_tokens',
-+]
-+
-+
-+def normalize_action_credit_by_group(
-+    credit_by_sample: Sequence[Optional[Sequence[float]]],
-+    prompt_ids: Sequence[str],
-+    num_generations: int,
-+    scale: str = 'group_turn',
-+) -> List[List[float]]:
-+    """Normalize the raw per-turn credit vectors within each prompt group.
-+
-+    Mirrors GRPO's group normalization, but *per turn-slot*: for a given prompt, the
-+    ``k``-th query turn across the ``K`` sampled trajectories forms one normalization
-+    group. This is the multi-turn analogue of GiGPO's step-grouped micro-advantage and is
-+    what lets a single good query stand out from its siblings even when every trajectory in
-+    the group ends with the same (wrong) answer -- exactly the zero-variance-outcome case
-+    where the plain GRPO advantage vanishes.
-+
-+    Trajectories have different query counts, so turn-slot ``k`` only groups the
-+    trajectories that actually have a ``k``-th query; shorter trajectories simply do not
-+    contribute to (or receive) slot ``k``.
-+
-+    Args:
-+        credit_by_sample: length-``N`` sequence; entry ``i`` is that sample's raw per-turn
-+            credit vector (one float per credited turn, in turn order) or ``None``/empty.
-+        prompt_ids: length-``N`` prompt identifiers defining the groups.
-+        num_generations: ``K`` (kept for signature parity / validation; grouping is by
-+            ``prompt_id`` so variable group sizes are tolerated).
-+        scale: ``'group_turn'`` centers and scales within (group, turn-slot);
-+            ``'group_turn_center'`` only centers (subtracts the mean, no std division);
-+            ``'none'`` returns the raw values unchanged.
-+
-+    Returns:
-+        length-``N`` list of normalized per-turn vectors (same shape as the input vectors;
-+        ``None`` inputs become empty lists).
-+    """
-+    del num_generations  # grouping is by prompt_id; K is not needed but kept for parity.
-+    n = len(prompt_ids)
-+    if len(credit_by_sample) != n:
-+        raise ValueError(f'credit/prompt length mismatch: {len(credit_by_sample)} != {n}')
-+
-+    # Materialize to plain lists of floats (defensive copy; tolerate None/empty).
-+    vectors: List[List[float]] = []
-+    for vec in credit_by_sample:
-+        if vec is None:
-+            vectors.append([])
-+        else:
-+            vectors.append([float(x) for x in vec])
-+
-+    if scale == 'none':
-+        return vectors
-+
-+    if scale not in {'group_turn', 'group_turn_center'}:
-+        raise ValueError(f'Unsupported action_credit_scale: {scale!r}')
-+
-+    # Group sample indices by prompt id.
-+    group_to_indices: Dict[str, List[int]] = {}
-+    for idx, pid in enumerate(prompt_ids):
-+        group_to_indices.setdefault(pid, []).append(idx)
-+
-+    out: List[List[float]] = [list(v) for v in vectors]
-+    for _pid, idxs in group_to_indices.items():
-+        max_turns = max((len(vectors[i]) for i in idxs), default=0)
-+        for k in range(max_turns):
-+            members = [i for i in idxs if k < len(vectors[i])]
-+            if len(members) <= 1:
-+                # A single (or zero) trajectory owns turn-slot k: no within-group contrast,
-+                # so it yields no differential signal. Zero it out.
-+                for i in members:
-+                    out[i][k] = 0.0
-+                continue
-+            vals = torch.tensor([vectors[i][k] for i in members], dtype=torch.float32)
-+            centered = vals - vals.mean()
-+            if scale == 'group_turn':
-+                std = vals.std(unbiased=True)
-+                centered = centered / (std + 1e-4)
-+            for pos, i in enumerate(members):
-+                out[i][k] = float(centered[pos])
-+    return out
-+
-+
-+def scatter_turn_credit_to_tokens(
-+    turn_credit: Sequence[Optional[Sequence[float]]],
-+    turn_index_map: torch.Tensor,
-+    completion_mask: torch.Tensor,
-+) -> torch.Tensor:
-+    """Scatter per-turn credit onto the response tokens of each turn.
-+
-+    Args:
-+        turn_credit: length-``B`` sequence of per-turn credit vectors (already normalized).
-+            Entry ``i`` is indexed by turn ordinal: ``turn_credit[i][k]`` is the credit for
-+            the ``k``-th credited turn of sample ``i``.
-+        turn_index_map: ``[B, T]`` long tensor; each response token holds the ordinal ``k``
-+            of the credited turn it belongs to, or ``-1`` for tokens outside any credited
-+            turn (template tokens, observations, non-credited actions).
-+        completion_mask: ``[B, T]`` response-token mask; the returned term is zero outside it.
-+
-+    Returns:
-+        ``[B, T]`` additive per-token credit term (before the coefficient is applied).
-+    """
-+    if turn_index_map.shape != completion_mask.shape:
-+        raise ValueError(
-+            f'turn_index_map shape {tuple(turn_index_map.shape)} != '
-+            f'completion_mask shape {tuple(completion_mask.shape)}')
-+    if len(turn_credit) != turn_index_map.shape[0]:
-+        raise ValueError(
-+            f'turn_credit length {len(turn_credit)} != batch {turn_index_map.shape[0]}')
-+
-+    out = torch.zeros_like(completion_mask, dtype=torch.float32)
-+    comp_bool = completion_mask.bool()
-+    for row in range(turn_index_map.shape[0]):
-+        vec = turn_credit[row]
-+        if not vec:
-+            continue
-+        idx_row = turn_index_map[row]
-+        for k, value in enumerate(vec):
-+            if value == 0.0:
-+                continue
-+            sel = (idx_row == k) & comp_bool[row]
-+            if sel.any():
-+                out[row, sel] = float(value)
-+    return out
 diff --git a/swift/rl_core/advantage.py b/swift/rl_core/advantage.py
 index 1ab08b744..11babe03f 100644
 --- a/swift/rl_core/advantage.py
@@ -323,7 +164,7 @@ index 1ab08b744..11babe03f 100644
          seq_neg = (base_advantages < 0).float().unsqueeze(1)
          reweight = seq_neg * reweight + (1.0 - seq_neg)
 diff --git a/swift/rl_core/data.py b/swift/rl_core/data.py
-index f859cba1d..7be28b1c4 100644
+index f859cba1d..3ff498715 100644
 --- a/swift/rl_core/data.py
 +++ b/swift/rl_core/data.py
 @@ -67,6 +67,10 @@ class OnPolicySample:
@@ -430,7 +271,7 @@ index f859cba1d..7be28b1c4 100644
          d['add_eos'] = False
          return d
  
-@@ -299,6 +335,10 @@ class GRPOSample(OnPolicySample):
+@@ -299,6 +335,14 @@ class GRPOSample(OnPolicySample):
      """On-policy sample with GRPO reward/advantage signals."""
      rewards: Optional[List[Optional[float]]] = None  # optional mirror; main path uses rewards_per_func tensor
      advantages: Optional[torch.Tensor] = None  # filled after _compute_advantages (0-dim tensor per sample)
@@ -438,10 +279,14 @@ index f859cba1d..7be28b1c4 100644
 +    # Evidence-Attributed GRPO: group-normalized per-query-turn credit vector (one float per
 +    # query turn, in order). None/empty unless action_credit_mode != 'off'.
 +    action_turn_credit: Optional[List[float]] = None
++    # Action-Causal GRPO: independently normalized final-answer F1 advantage.
++    answer_advantage: Optional[torch.Tensor] = None
++    # Causal Return-to-Go GRPO: one normalized advantage per generated query turn.
++    query_turn_advantage: Optional[List[float]] = None
  
  
  @dataclass
-@@ -321,6 +361,8 @@ class GRPOBatch:
+@@ -321,6 +365,8 @@ class GRPOBatch:
      ref_per_token_logps: Optional[torch.Tensor] = None  # [B, T]
      rollout_per_token_logps: Optional[torch.Tensor] = None  # [B, T]
      teacher_per_token_logps: Optional[torch.Tensor] = None  # [B, T], OPD-RL teacher logp on sampled tokens
@@ -451,10 +296,10 @@ index f859cba1d..7be28b1c4 100644
      num_items_in_batch: Optional[torch.Tensor] = None  # scalar
      logits_to_keep: Optional[int] = None
 diff --git a/swift/rlhf_trainers/args_mixin.py b/swift/rlhf_trainers/args_mixin.py
-index eb6d5f1fe..88d74ca58 100644
+index eb6d5f1fe..2fac74f3f 100644
 --- a/swift/rlhf_trainers/args_mixin.py
 +++ b/swift/rlhf_trainers/args_mixin.py
-@@ -438,6 +438,36 @@ class GRPOArgumentsMixin(RolloutTrainerArgumentsMixin):
+@@ -438,6 +438,51 @@ class GRPOArgumentsMixin(RolloutTrainerArgumentsMixin):
      # OPD-RL (On-Policy Distillation as RL)
      # enabled when a teacher (teacher_model / teacher_model_server) is set on a GRPO run.
      teacher_kl_coef: float = 1.0
@@ -488,13 +333,37 @@ index eb6d5f1fe..88d74ca58 100644
 +    action_credit_scale: Literal['group_turn', 'group_turn_center', 'none'] = 'group_turn'
 +    # rollout_infos key holding the per-sample per-query-turn raw credit vector.
 +    action_credit_infos_key: str = 'query_evidence_gain'
++    # ``zero_outcome`` applies action credit only to prompt groups whose sequence-level
++    # GRPO advantages are all zero. This rescues dead groups without perturbing groups
++    # that standard GRPO already ranks.
++    action_credit_gate: Literal['all', 'zero_outcome'] = 'all'
++    # ``action_causal`` replaces sequence-wide reward broadcasting with action-specific
++    # routing. ``signed_query_reweight`` preserves the standard sequence advantage and
++    # only changes its magnitude on query tokens using outcome-signed local credit.
++    # ``causal_return`` replaces only tagged query spans with future evidence return advantages.
++    advantage_mode: Literal['sequence', 'action_causal', 'signed_query_reweight', 'causal_return'] = 'sequence'
++    # Long-horizon answer-quality coefficient applied only to query-turn tokens in
++    # ``action_causal`` mode. The local query term uses ``action_credit_coef``.
++    action_query_outcome_coef: float = 0.25
++    # Symmetric clip for normalized query credit in ``signed_query_reweight`` mode.
++    # Together with action_credit_coef it must satisfy coef * clip < 1.
++    action_credit_clip: float = 2.0
  
      # RLSD (Self-Distilled RLVR), https://arxiv.org/abs/2604.03128
      # Token-level advantage reweighting using the teacher-vs-student logprob gap. Reuses the OPSD
 diff --git a/swift/rlhf_trainers/gkd_helpers.py b/swift/rlhf_trainers/gkd_helpers.py
-index d6244c944..ab6d98d29 100644
+index d6244c944..f8c989589 100644
 --- a/swift/rlhf_trainers/gkd_helpers.py
 +++ b/swift/rlhf_trainers/gkd_helpers.py
+@@ -7,7 +7,7 @@ outputs.  Shared by the HF and Megatron GKD trainers.
+ """
+ import torch
+ from dataclasses import dataclass, field
+-from typing import Any, Dict, List, Optional, Tuple
++from typing import Any, Dict, List, Optional, Sequence, Tuple
+ 
+ from swift.rl_core.data import GKDSample, OnPolicySample
+ from swift.template.base import Template
 @@ -22,14 +22,19 @@ logger = get_logger()
  def encode_teacher_view(
      sample: OnPolicySample,
@@ -728,7 +597,7 @@ index d6244c944..ab6d98d29 100644
  def remap_teacher_logps_to_student_frame(
      teacher_logps: torch.Tensor,
      teacher_completion_mask: torch.Tensor,
-@@ -470,3 +633,126 @@ def remap_teacher_logps_to_student_frame(
+@@ -470,3 +633,182 @@ def remap_teacher_logps_to_student_frame(
              'Teacher and student must share the same response tokens.')
          out[i, s_idx] = teacher_logps[i, t_idx]
      return out
@@ -739,6 +608,7 @@ index d6244c944..ab6d98d29 100644
 +    completion_mask: torch.Tensor,
 +    tokenizer: Any,
 +    input_ids: Optional[torch.Tensor] = None,
++    payload_only: bool = False,
 +) -> torch.Tensor:
 +    """Build a ``[B, T]`` per-token map of *query-turn ordinals* in the student frame.
 +
@@ -756,6 +626,9 @@ index d6244c944..ab6d98d29 100644
 +    ``k``-th ``<query>`` turn here. Turns that do not run a search still consume an ordinal
 +    only if they are classified as ``query``; callers must build the credit vector with the
 +    same "one entry per query turn" convention (see the plugin).
++
++    When ``payload_only`` is true, only the exact tagged query segment receives
++    the ordinal; reasoning text before the protocol tag remains ``-1``.
 +
 +    Returns:
 +        ``[B, T]`` long tensor of query-turn ordinals (``-1`` outside query turns).
@@ -782,6 +655,42 @@ index d6244c944..ab6d98d29 100644
 +        if '<evidence>' in text:
 +            return 'evidence'
 +        return None
++
++    decoded_token_cache: Dict[int, str] = {}
++
++    def query_payload_offsets(turn_ids: Sequence[int]) -> set[int]:
++        # Generated BPE sequences are not guaranteed to survive decode -> encode with the
++        # identical token boundaries. Build character offsets directly from the original
++        # token ids instead; caching keeps this linear in the number of distinct ids.
++        pieces = []
++        for token_id in turn_ids:
++            token_id = int(token_id)
++            if token_id not in decoded_token_cache:
++                decoded_token_cache[token_id] = tokenizer.decode(
++                    [token_id], skip_special_tokens=False)
++            pieces.append(decoded_token_cache[token_id])
++        text = ''.join(pieces)
++        lower = text.lower()
++        start = lower.find('<query>')
++        if start < 0:
++            raise ValueError('query turn is missing an opening <query> tag')
++        close = lower.find('</query>', start + len('<query>'))
++        # vLLM stop strings may remove the closing tag from generated token ids even
++        # though the scheduler repairs it in message text. In that case every remaining
++        # token after the opening tag is part of the trainable query payload.
++        end = len(text) if close < 0 else close + len('</query>')
++
++        selected = set()
++        cursor = 0
++        for index, piece in enumerate(pieces):
++            token_start = cursor
++            token_end = cursor + len(piece)
++            if token_end > start and token_start < end:
++                selected.add(index)
++            cursor = token_end
++        if not selected:
++            raise ValueError('query payload segment produced an empty token mask')
++        return selected
 +
 +    output = torch.full_like(completion_mask, -1, dtype=torch.long)
 +    for row, sample in enumerate(samples):
@@ -827,8 +736,13 @@ index d6244c944..ab6d98d29 100644
 +                text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
 +                is_query = classify_action(text) == 'query'
 +                if is_query:
++                    payload_offsets = (
++                        query_payload_offsets(turn_ids) if payload_only else None
++                    )
 +                    for offset, keep in enumerate(turn_loss_mask):
-+                        if keep:
++                        if keep and (
++                            payload_offsets is None or offset in payload_offsets
++                        ):
 +                            output[row, start + offset] = query_ordinal
 +                    query_ordinal += 1
 +                cursor = start + len(turn_ids)
@@ -845,7 +759,18 @@ index d6244c944..ab6d98d29 100644
 +            text = tokenizer.decode(turn_ids, skip_special_tokens=False).lower()
 +            is_query = classify_action(text) == 'query'
 +            this_ordinal = query_ordinal if is_query else -1
-+            selected.extend(this_ordinal for keep in turn_loss_mask if keep)
++            payload_offsets = (
++                query_payload_offsets(turn_ids)
++                if is_query and payload_only
++                else None
++            )
++            selected.extend(
++                this_ordinal
++                if payload_offsets is None or offset in payload_offsets
++                else -1
++                for offset, keep in enumerate(turn_loss_mask)
++                if keep
++            )
 +            if is_query:
 +                query_ordinal += 1
 +        if len(selected) != student_positions.numel():
@@ -856,17 +781,20 @@ index d6244c944..ab6d98d29 100644
 +            output[row, student_positions] = torch.tensor(selected, dtype=torch.long, device=output.device)
 +    return output
 diff --git a/swift/rlhf_trainers/grpo_trainer.py b/swift/rlhf_trainers/grpo_trainer.py
-index 1463ee659..90a9fb044 100644
+index 1463ee659..96fe871b8 100644
 --- a/swift/rlhf_trainers/grpo_trainer.py
 +++ b/swift/rlhf_trainers/grpo_trainer.py
-@@ -51,11 +51,14 @@ from swift.dataset import RowPreprocessor
+@@ -51,11 +51,17 @@ from swift.dataset import RowPreprocessor
  from swift.rewards import orms, rm_plugins
  from swift.rl_core.advantage import (apply_rlsd_reweight, compute_advantages, compute_advantages_dynamic,
                                       compute_reward_metrics, compute_sdar_loss, compute_teacher_kl_per_token,
 -                                     expand_advantage_to_per_token)
 +                                     compute_teacher_sequence_gate, expand_advantage_to_per_token)
-+from swift.rl_core.action_credit import (normalize_action_credit_by_group,
-+                                        scatter_turn_credit_to_tokens)
++from swift.rl_core.action_credit import (compose_action_causal_advantages, compose_causal_return_advantages,
++                                         compose_outcome_signed_query_advantages,
++                                         compute_causal_query_return_advantages, gate_action_credit_by_outcome,
++                                         normalize_action_credit_by_group, normalize_sequence_credit_by_group,
++                                         scatter_turn_credit_to_tokens)
  from swift.rl_core.data import GRPOBatch, GRPOSample
  from swift.rl_core.grpo_algorithm import score_completions
  from swift.rlhf_trainers.gkd_helpers import (assemble_teacher_completion_logprobs, build_opsd_samples,
@@ -876,7 +804,7 @@ index 1463ee659..90a9fb044 100644
                                               fetch_teacher_parsed_by_routing, remap_teacher_logps_to_student_frame,
                                               should_compute_local_teacher_logps)
  from swift.sequence_parallel import GatherLoss, sequence_parallel
-@@ -123,6 +126,51 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -123,6 +129,115 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
          # functions it is the sole signal. Same gating as GKD: teacher set -> teacher branch.
          self._setup_teacher()
          self.teacher_kl_coef = args.teacher_kl_coef
@@ -895,14 +823,78 @@ index 1463ee659..90a9fb044 100644
 +        self.action_credit_coef = args.action_credit_coef
 +        self.action_credit_scale = args.action_credit_scale
 +        self.action_credit_infos_key = args.action_credit_infos_key
++        self.action_credit_gate = args.action_credit_gate
++        self.advantage_mode = args.advantage_mode
++        self.action_query_outcome_coef = args.action_query_outcome_coef
++        self.action_credit_clip = args.action_credit_clip
 +        if self.action_credit_mode != 'off':
-+            if self.action_credit_coef == 0.0:
++            if self.advantage_mode != 'causal_return' and self.action_credit_coef == 0.0:
 +                raise ValueError('action_credit_mode != off requires a non-zero action_credit_coef')
 +            if not self.opd_use_grpo_advantage:
 +                raise ValueError('action_credit is an additive term on the GRPO advantage; '
 +                                 'it is incompatible with opd_use_grpo_advantage=false')
 +            if self.advantage_reweight == 'rlsd':
 +                raise ValueError('action_credit is not compatible with advantage_reweight=rlsd')
++        if self.advantage_mode == 'action_causal':
++            if self.action_credit_mode != 'query_evidence':
++                raise ValueError('advantage_mode=action_causal requires action_credit_mode=query_evidence')
++            if self.action_credit_gate != 'all':
++                raise ValueError('advantage_mode=action_causal requires action_credit_gate=all')
++            if self.advantage_estimator != 'grpo' or self.scale_rewards != 'group':
++                raise ValueError('advantage_mode=action_causal currently requires GRPO with group reward scaling')
++            if self.dynamic_num_samples:
++                raise ValueError('advantage_mode=action_causal does not yet support dynamic_num_samples')
++            if self._has_teacher_explicit() or self.advantage_reweight == 'rlsd' or self.sdar_loss_coef > 0:
++                raise ValueError('advantage_mode=action_causal is not compatible with teacher, RLSD, or SDAR')
++            if not any(name in self.reward_func_names for name in ('sapr_f1', 'SaprF1ORM')):
++                raise ValueError('advantage_mode=action_causal requires the sapr_f1 reward')
++        if self.advantage_mode == 'signed_query_reweight':
++            if self.action_credit_mode != 'query_evidence':
++                raise ValueError('advantage_mode=signed_query_reweight requires action_credit_mode=query_evidence')
++            if self.action_credit_gate != 'all':
++                raise ValueError('advantage_mode=signed_query_reweight requires action_credit_gate=all')
++            if self.advantage_estimator != 'grpo' or self.scale_rewards != 'group':
++                raise ValueError(
++                    'advantage_mode=signed_query_reweight currently requires GRPO with group reward scaling')
++            if self.dynamic_num_samples:
++                raise ValueError('advantage_mode=signed_query_reweight does not yet support dynamic_num_samples')
++            if self._has_teacher_explicit() or self.advantage_reweight == 'rlsd' or self.sdar_loss_coef > 0:
++                raise ValueError(
++                    'advantage_mode=signed_query_reweight is not compatible with teacher, RLSD, or SDAR')
++            if self.action_credit_coef <= 0.0:
++                raise ValueError('signed_query_reweight requires action_credit_coef > 0')
++            if self.action_credit_clip <= 0.0:
++                raise ValueError('signed_query_reweight requires action_credit_clip > 0')
++            if self.action_credit_coef * self.action_credit_clip >= 1.0:
++                raise ValueError(
++                    'signed_query_reweight requires action_credit_coef * action_credit_clip < 1')
++        if self.advantage_mode == 'causal_return':
++            if self.action_credit_mode != 'query_evidence':
++                raise ValueError('advantage_mode=causal_return requires action_credit_mode=query_evidence')
++            if self.action_credit_gate != 'all':
++                raise ValueError('advantage_mode=causal_return requires action_credit_gate=all')
++            if self.action_credit_scale != 'group_turn':
++                raise ValueError('advantage_mode=causal_return requires action_credit_scale=group_turn')
++            if self.advantage_estimator != 'grpo' or self.scale_rewards != 'group':
++                raise ValueError(
++                    'advantage_mode=causal_return currently requires GRPO with group reward scaling')
++            if self.dynamic_num_samples:
++                raise ValueError('advantage_mode=causal_return does not yet support dynamic_num_samples')
++            if self._has_teacher_explicit() or self.advantage_reweight == 'rlsd' or self.sdar_loss_coef > 0:
++                raise ValueError(
++                    'advantage_mode=causal_return is not compatible with teacher, RLSD, or SDAR')
++            if self.kl_in_reward and self.beta != 0.0:
++                raise ValueError('advantage_mode=causal_return does not support KL in reward')
++            required_reward_aliases = (
++                ('sapr_relevance', 'SaprRelevanceORM'),
++                ('sapr_query_evidence_gain', 'SaprQueryEvidenceGainORM'),
++            )
++            for aliases in required_reward_aliases:
++                if not any(name in self.reward_func_names for name in aliases):
++                    raise ValueError(
++                        'advantage_mode=causal_return requires reward function '
++                        f'{aliases[0]!r}; got {self.reward_func_names}')
++
 +        if self.teacher_sequence_gate != 'none':
 +            if not self._has_teacher:
 +                raise ValueError('teacher_sequence_gate requires teacher_model or teacher_model_server')
@@ -928,11 +920,39 @@ index 1463ee659..90a9fb044 100644
          if not self.reward_funcs and not self.use_gym_env and not self._has_teacher:
              raise ValueError('You must specify reward_funcs or reward_model')
  
-@@ -236,6 +284,29 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -236,6 +351,134 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
          self._rewards_per_func = total_rewards_per_func
          return samples
  
-+    def _compute_action_turn_credit(self, samples: List[GRPOSample]) -> List[List[float]]:
++    def _compute_answer_advantages(self, rewards_per_func: torch.Tensor) -> torch.Tensor:
++        """Independently normalize final-answer F1 within each prompt group."""
++        reward_name = next(
++            (name for name in ('sapr_f1', 'SaprF1ORM') if name in self.reward_func_names),
++            None,
++        )
++        if reward_name is None:
++            raise ValueError('action-causal advantages require the sapr_f1 reward')
++        values = rewards_per_func[:, self.reward_func_names.index(reward_name)]
++        values = torch.nan_to_num(values, nan=0.0)
++        mode = 'train' if self.model.training else 'eval'
++        num_generations = self.num_generations if mode == 'train' else self.num_generations_eval
++        advantages = normalize_sequence_credit_by_group(values, num_generations)
++        self._metrics[mode]['action_answer_advantage_abs_mean'].append(
++            advantages.abs().mean().item())
++        grouped = values.view(-1, num_generations)
++        if num_generations > 1:
++            group_std = grouped.std(dim=1)
++            zero_std = torch.isclose(group_std, torch.zeros_like(group_std))
++        else:
++            zero_std = torch.ones(grouped.shape[0], dtype=torch.bool, device=grouped.device)
++        self._metrics[mode]['action_answer_zero_std'].append(zero_std.float().mean().item())
++        return advantages
++
++    def _compute_action_turn_credit(
++        self,
++        samples: List[GRPOSample],
++        outcome_advantages: torch.Tensor,
++    ) -> List[List[float]]:
 +        """Group-normalize the per-query-turn credit and return the local per-sample vectors.
 +
 +        The raw per-turn credit vector for each sample is produced by the reward side and
@@ -953,12 +973,89 @@ index 1463ee659..90a9fb044 100644
 +                f'action credit gather mismatch: credit={len(total_raw)} prompt_ids={len(total_prompt_ids)}')
 +        normalized = normalize_action_credit_by_group(
 +            total_raw, total_prompt_ids, self.num_generations, scale=self.action_credit_scale)
-+        return get_even_process_data(self, normalized)
++        outcome_values = outcome_advantages.detach().float().cpu().tolist()
++        gated = gate_action_credit_by_outcome(
++            normalized,
++            total_prompt_ids,
++            outcome_values,
++            mode=self.action_credit_gate,
++        )
++
++        group_to_values: Dict[str, List[float]] = defaultdict(list)
++        for prompt_id, advantage in zip(total_prompt_ids, outcome_values):
++            group_to_values[prompt_id].append(float(advantage))
++        active_groups = sum(
++            self.action_credit_gate == 'all' or all(abs(value) <= 1e-8 for value in values)
++            for values in group_to_values.values())
++        mode = 'train' if self.model.training else 'eval'
++        self._metrics[mode]['action_credit_gate_group_ratio'].append(
++            active_groups / max(len(group_to_values), 1))
++        group_to_credit: Dict[str, List[float]] = defaultdict(list)
++        for prompt_id, credit in zip(total_prompt_ids, gated):
++            group_to_credit[prompt_id].extend(credit)
++        nonzero_groups = sum(any(abs(value) > 1e-8 for value in values) for values in group_to_credit.values())
++        self._metrics[mode]['action_credit_nonzero_group_ratio'].append(
++            nonzero_groups / max(len(group_to_credit), 1))
++        return get_even_process_data(self, gated)
++
++    def _compute_causal_query_return_advantages(
++        self,
++        samples: List[GRPOSample],
++        sequence_advantages: torch.Tensor,
++    ) -> List[List[float]]:
++        """Build local per-query return advantages from existing reward components."""
++        key = self.action_credit_infos_key
++        local_gains: List[List[float]] = []
++        for sample in samples:
++            info = sample.rollout_infos or {}
++            gains = info.get(key) if isinstance(info, dict) else None
++            local_gains.append([float(value) for value in gains] if gains else [])
++        total_gains = gather_object(local_gains)
++        total_prompt_ids = gather_object([sample.prompt_id for sample in samples])
++        if len(total_gains) != len(total_prompt_ids):
++            raise ValueError(
++                f'causal-return gather mismatch: gains={len(total_gains)} '
++                f'prompt_ids={len(total_prompt_ids)}')
++
++        relevance_name = next(
++            (name for name in ('sapr_relevance', 'SaprRelevanceORM') if name in self.reward_func_names),
++            None,
++        )
++        if relevance_name is None:
++            raise ValueError('causal-return advantages require the sapr_relevance reward')
++        relevance_index = self.reward_func_names.index(relevance_name)
++        relevance_rewards = torch.nan_to_num(self._rewards_per_func[:, relevance_index], nan=0.0)
++        sequence_rewards = torch.nan_to_num(
++            self._rewards_per_func * self.reward_weights.unsqueeze(0), nan=0.0
++        ).sum(dim=1)
++        relevance_weight = float(self.reward_weights[relevance_index].item())
++        query_advantages = compute_causal_query_return_advantages(
++            sequence_rewards=sequence_rewards,
++            sequence_advantages=sequence_advantages,
++            relevance_rewards=relevance_rewards,
++            turn_gains=total_gains,
++            prompt_ids=total_prompt_ids,
++            num_generations=self.num_generations,
++            relevance_weight=relevance_weight,
++            scale=self.action_credit_scale,
++        )
++
++        sequence_advantage_values = sequence_advantages.detach().float().cpu().tolist()
++        late_deltas = [
++            abs(value - sequence_advantage_values[index])
++            for index, values in enumerate(query_advantages)
++            for value in values[1:]
++        ]
++        mode = 'train' if self.model.training else 'eval'
++        self._metrics[mode]['causal_return_late_delta_abs_mean'].append(
++            sum(late_deltas) / len(late_deltas) if late_deltas else 0.0)
++        self._metrics[mode]['causal_return_late_query_count'].append(float(len(late_deltas)))
++        return get_even_process_data(self, query_advantages)
 +
      def _postprocess_batch(self, samples: List[GRPOSample], batch_encoded_inputs: List[Dict[str, Any]]) -> None:
          """Compute advantages and write them into each ``grpo_batch``."""
          # OPD-RL teacher API: fetch single-token teacher logps before advantage computation.
-@@ -245,8 +316,28 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -245,8 +488,42 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
  
          local_advantages = get_even_process_data(self, total_advantages)
          assert len(local_advantages) == len(samples)
@@ -973,21 +1070,35 @@ index 1463ee659..90a9fb044 100644
 +            assert len(local_teacher_gate) == len(samples)
 +        else:
 +            local_teacher_gate = [None] * len(samples)
++        if self.advantage_mode == 'action_causal':
++            total_answer_advantages = self._compute_answer_advantages(self._rewards_per_func)
++            local_answer_advantages = get_even_process_data(self, total_answer_advantages)
++            assert len(local_answer_advantages) == len(samples)
++        else:
++            local_answer_advantages = [None] * len(samples)
++        if self.advantage_mode == 'causal_return':
++            local_query_advantages = self._compute_causal_query_return_advantages(
++                samples, total_advantages)
++            assert len(local_query_advantages) == len(samples)
++        else:
++            local_query_advantages = [None] * len(samples)
          for i, advantage in enumerate(local_advantages):
              samples[i].advantages = advantage
 +            samples[i].teacher_sequence_gate = local_teacher_gate[i]
++            samples[i].answer_advantage = local_answer_advantages[i]
++            samples[i].query_turn_advantage = local_query_advantages[i]
 +        # Evidence-Attributed GRPO: normalize the per-query-turn credit within each prompt
 +        # group (per turn-slot) using the *global* gather, then distribute back to the local
 +        # samples so the mini-batch loop only scatters it onto query-turn tokens. The raw
 +        # per-turn vector is produced by the reward side and carried in rollout_infos.
-+        if self.action_credit_mode != 'off':
-+            local_credit = self._compute_action_turn_credit(samples)
++        if self.action_credit_mode != 'off' and self.advantage_mode != 'causal_return':
++            local_credit = self._compute_action_turn_credit(samples, total_advantages)
 +            for i, credit in enumerate(local_credit):
 +                samples[i].action_turn_credit = credit
          # log metrics in samples
          self._logs['advantages'].extend(total_advantages.tolist())
  
-@@ -262,6 +353,15 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -262,9 +539,152 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
              device = self.accelerator.device
              grpo_batch: GRPOBatch = batch_encoded['grpo_batch']
              base_advantages = torch.stack([data.advantages.to(device) for data in batch])
@@ -1002,8 +1113,146 @@ index 1463ee659..90a9fb044 100644
 +                    grpo_batch.teacher_action_coef_mask *= teacher_sequence_gate.unsqueeze(1)
              use_rlsd = (self.advantage_reweight == 'rlsd' and grpo_batch.teacher_per_token_logps is not None)
              use_sdar = (self.sdar_loss_coef > 0 and grpo_batch.teacher_per_token_logps is not None)
-             if use_rlsd:
-@@ -278,6 +378,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+-            if use_rlsd:
++            if self.advantage_mode == 'action_causal':
++                model_inputs = batch_encoded['model_inputs']
++                turn_index_map = build_query_turn_index_map(
++                    batch,
++                    grpo_batch.completion_mask,
++                    self.processing_class,
++                    input_ids=model_inputs.get('input_ids'),
++                )
++                answer_mask = build_teacher_action_mask(
++                    batch,
++                    grpo_batch.completion_mask,
++                    self.processing_class,
++                    'answer',
++                    input_ids=model_inputs.get('input_ids'),
++                )
++                answer_advantages = torch.stack([data.answer_advantage.to(device) for data in batch])
++                turn_credit = [data.action_turn_credit or [] for data in batch]
++                grpo_batch.advantages = compose_action_causal_advantages(
++                    answer_advantages,
++                    turn_credit,
++                    turn_index_map,
++                    answer_mask,
++                    grpo_batch.completion_mask,
++                    query_outcome_coef=self.action_query_outcome_coef,
++                    query_credit_coef=self.action_credit_coef,
++                ).to(device)
++
++                mode = 'train' if self.model.training else 'eval'
++                completion_tokens = grpo_batch.completion_mask.sum().clamp(min=1.0)
++                query_mask = (turn_index_map >= 0) & grpo_batch.completion_mask.bool()
++                local_credit = scatter_turn_credit_to_tokens(
++                    turn_credit, turn_index_map, grpo_batch.completion_mask).to(device)
++                routed_mask = query_mask | answer_mask
++                self._metrics[mode]['action_query_token_ratio'].append(
++                    (query_mask.sum() / completion_tokens).item())
++                self._metrics[mode]['action_answer_token_ratio'].append(
++                    (answer_mask.sum() / completion_tokens).item())
++                self._metrics[mode]['action_unrouted_token_ratio'].append(
++                    ((grpo_batch.completion_mask.bool() & ~routed_mask).sum() / completion_tokens).item())
++                self._metrics[mode]['action_credit_abs_mean'].append(
++                    (local_credit.abs().sum() / query_mask.sum().clamp(min=1.0)).item())
++                self._metrics[mode]['action_query_advantage_abs_mean'].append(
++                    (grpo_batch.advantages.abs()[query_mask].mean().item() if query_mask.any() else 0.0))
++                self._metrics[mode]['action_answer_token_advantage_abs_mean'].append(
++                    (grpo_batch.advantages.abs()[answer_mask].mean().item() if answer_mask.any() else 0.0))
++            elif self.advantage_mode == 'signed_query_reweight':
++                model_inputs = batch_encoded['model_inputs']
++                turn_index_map = build_query_turn_index_map(
++                    batch,
++                    grpo_batch.completion_mask,
++                    self.processing_class,
++                    input_ids=model_inputs.get('input_ids'),
++                )
++                turn_credit = [data.action_turn_credit or [] for data in batch]
++                base_per_token = expand_advantage_to_per_token(
++                    base_advantages, grpo_batch.completion_mask)
++                grpo_batch.advantages = compose_outcome_signed_query_advantages(
++                    base_advantages,
++                    turn_credit,
++                    turn_index_map,
++                    grpo_batch.completion_mask,
++                    credit_coef=self.action_credit_coef,
++                    credit_clip=self.action_credit_clip,
++                ).to(device)
++
++                mode = 'train' if self.model.training else 'eval'
++                query_mask = (turn_index_map >= 0) & grpo_batch.completion_mask.bool()
++                query_tokens = query_mask.sum().clamp(min=1.0)
++                completion_tokens = grpo_batch.completion_mask.sum().clamp(min=1.0)
++                raw_credit = scatter_turn_credit_to_tokens(
++                    turn_credit, turn_index_map, grpo_batch.completion_mask).to(device)
++                delta = grpo_batch.advantages - base_per_token
++                sign_flips = (
++                    (grpo_batch.advantages * base_per_token < 0) & query_mask
++                ).sum()
++                self._metrics[mode]['action_query_token_ratio'].append(
++                    (query_mask.sum() / completion_tokens).item())
++                self._metrics[mode]['action_credit_abs_mean'].append(
++                    (raw_credit.abs().sum() / query_tokens).item())
++                self._metrics[mode]['action_credit_clipped_ratio'].append(
++                    (((raw_credit.abs() > self.action_credit_clip) & query_mask).sum()
++                     / query_tokens).item())
++                self._metrics[mode]['action_query_reweight_delta_abs_mean'].append(
++                    (delta.abs()[query_mask].mean().item() if query_mask.any() else 0.0))
++                self._metrics[mode]['action_query_advantage_abs_mean'].append(
++                    (grpo_batch.advantages.abs()[query_mask].mean().item() if query_mask.any() else 0.0))
++                self._metrics[mode]['action_query_sign_flip_ratio'].append(
++                    (sign_flips / query_tokens).item())
++            elif self.advantage_mode == 'causal_return':
++                model_inputs = batch_encoded['model_inputs']
++                turn_index_map = build_query_turn_index_map(
++                    batch,
++                    grpo_batch.completion_mask,
++                    self.processing_class,
++                    input_ids=model_inputs.get('input_ids'),
++                    payload_only=True,
++                )
++                query_turn_advantages = [data.query_turn_advantage or [] for data in batch]
++                base_per_token = expand_advantage_to_per_token(
++                    base_advantages, grpo_batch.completion_mask)
++                grpo_batch.advantages = compose_causal_return_advantages(
++                    base_advantages,
++                    query_turn_advantages,
++                    turn_index_map,
++                    grpo_batch.completion_mask,
++                ).to(device)
++
++                mode = 'train' if self.model.training else 'eval'
++                query_mask = (turn_index_map >= 0) & grpo_batch.completion_mask.bool()
++                late_query_mask = (turn_index_map > 0) & query_mask
++                first_query_mask = (turn_index_map == 0) & query_mask
++                query_tokens = query_mask.sum().clamp(min=1.0)
++                completion_tokens = grpo_batch.completion_mask.sum().clamp(min=1.0)
++                delta = grpo_batch.advantages - base_per_token
++                sign_flips = (
++                    (grpo_batch.advantages * base_per_token < 0) & late_query_mask
++                ).sum()
++                first_delta = (
++                    delta.abs()[first_query_mask].max().item()
++                    if first_query_mask.any() else 0.0
++                )
++                self._metrics[mode]['causal_return_query_payload_ratio'].append(
++                    (query_mask.sum() / completion_tokens).item())
++                self._metrics[mode]['causal_return_late_query_ratio'].append(
++                    (late_query_mask.sum() / query_tokens).item())
++                self._metrics[mode]['causal_return_delta_abs_mean'].append(
++                    (delta.abs()[late_query_mask].mean().item()
++                     if late_query_mask.any() else 0.0))
++                self._metrics[mode]['causal_return_sign_flip_ratio'].append(
++                    (sign_flips / late_query_mask.sum().clamp(min=1.0)).item())
++                self._metrics[mode]['causal_return_first_query_delta_max'].append(first_delta)
++                self._metrics[mode]['causal_return_query_advantage_abs_mean'].append(
++                    (grpo_batch.advantages.abs()[query_mask].mean().item()
++                     if query_mask.any() else 0.0))
++            elif use_rlsd:
+                 # RLSD (Self-Distilled RLVR): multiplicative, sign-aware, clipped token-level reweight
+                 # of the per-sequence advantage using the teacher-vs-student logprob gap, in place of the
+                 # additive OPD-RL term. Teacher = current policy conditioned on the ground-truth answer.
+@@ -278,6 +698,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
                      lam=lam,
                      clip_range=self.rlsd_reweight_clip_range,
                      negative_only=self.rlsd_negative_only,
@@ -1011,7 +1260,7 @@ index 1463ee659..90a9fb044 100644
                  )
                  self._metrics[mode]['rlsd_lambda'].append(lam)
              elif use_sdar:
-@@ -297,8 +398,34 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -297,8 +718,34 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
                      teacher_per_token_logps=grpo_batch.teacher_per_token_logps,
                      policy_per_token_logps=grpo_batch.old_per_token_logps
                      if grpo_batch.teacher_per_token_logps is not None else None,
@@ -1024,7 +1273,7 @@ index 1463ee659..90a9fb044 100644
 +                    teacher_sequence_gate=teacher_sequence_gate,
 +                    use_base_advantage=self.opd_use_grpo_advantage,
 +                )
-+            if self.action_credit_mode != 'off' and not use_rlsd:
++            if self.advantage_mode == 'sequence' and self.action_credit_mode != 'off' and not use_rlsd:
 +                # Add the group-normalized per-turn credit onto its own query-turn tokens,
 +                # on top of the outcome advantage already written to grpo_batch.advantages.
 +                model_inputs = batch_encoded['model_inputs']
@@ -1047,7 +1296,7 @@ index 1463ee659..90a9fb044 100644
              if grpo_batch.teacher_per_token_logps is not None:
                  mode = 'train' if self.model.training else 'eval'
                  # Monitoring uses the non-negative k3 estimator (a "distance from the teacher" gauge
-@@ -307,6 +434,13 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -307,6 +754,13 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
                                                    grpo_batch.completion_mask)
                  self._metrics[mode]['teacher_kl'].append(
                      (k3.sum() / grpo_batch.completion_mask.sum().clamp(min=1.0)).item())
@@ -1061,7 +1310,7 @@ index 1463ee659..90a9fb044 100644
  
      def _log_rollout(self, samples: List[GRPOSample]) -> None:
          """Log prompts/completions and extra gathered metrics (solution, num_turns)."""
-@@ -537,7 +671,10 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -537,7 +991,10 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
  
              return advantages
  
@@ -1073,7 +1322,7 @@ index 1463ee659..90a9fb044 100644
          """Encode + collate the OPSD teacher view (teacher_prompt + same response).
  
          Produces a teacher micro-batch whose completion frame may differ in length from
-@@ -545,7 +682,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -545,7 +1002,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
          student frame. ``build_teacher_view`` is already done by ``build_opsd_samples``.
          """
          for s in batch:
@@ -1082,7 +1331,7 @@ index 1463ee659..90a9fb044 100644
          teacher_model_inputs, teacher_grpo_batch = collate_to_grpo_micro_batch(
              batch, template, device=self.accelerator.device, use_logits_to_keep=True)
          teacher_model_inputs.pop('labels', None)
-@@ -632,11 +769,14 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -632,11 +1089,14 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
              grpo_batch: GRPOBatch = batch_encoded['grpo_batch']
              device = grpo_batch.completion_mask.device
              n = len(chunk)
@@ -1098,7 +1347,7 @@ index 1463ee659..90a9fb044 100644
              grpo_batch.teacher_per_token_logps = teacher_out.topk_logprobs[..., 0]
              offset += n
  
-@@ -750,6 +890,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -750,6 +1210,7 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
          ga_batch_encoded_inputs: List[Dict[str, Any]] = []
          for batch in gas_chunks:
              teacher_model_inputs = teacher_grpo_batch = None
@@ -1106,7 +1355,7 @@ index 1463ee659..90a9fb044 100644
              with self._template_context(template):
                  for s in batch:
                      encoded_inputs = encode_sample(s, template)
-@@ -757,12 +898,55 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -757,12 +1218,55 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
                      s.encoded = encoded_inputs
                  model_inputs, grpo_batch = collate_to_grpo_micro_batch(
                      batch, template, device=self.accelerator.device, use_logits_to_keep=True)
@@ -1168,7 +1417,7 @@ index 1463ee659..90a9fb044 100644
  
              model_inputs.pop('labels', None)
              batch_encoded_inputs = {'model_inputs': model_inputs, 'grpo_batch': grpo_batch}
-@@ -793,17 +977,47 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -793,17 +1297,47 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
                  grpo_batch.ref_per_token_logps = ref_per_token_logps
                  # OPD-RL: local teacher logp on the sampled tokens (API path filled later).
                  if should_compute_local_teacher_logps(
@@ -1226,7 +1475,7 @@ index 1463ee659..90a9fb044 100644
              ga_batch_encoded_inputs.append(batch_encoded_inputs)
  
          # --- log completion lengths ---
-@@ -1150,10 +1364,11 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
+@@ -1150,10 +1684,11 @@ class GRPOTrainer(RolloutTrainerMixin, SwiftMixin, HFGRPOTrainer):
          # current-forward student logps (per_token_logps, retains grad) and the OPSD teacher logps
          # on the same sampled tokens (detached, remapped to the student frame).
          if self.sdar_loss_coef > 0 and grpo_batch.teacher_per_token_logps is not None:
@@ -1257,103 +1506,6 @@ index f02fb5cdb..f79e4a67d 100644
  
                  # Validate rollout_logprobs completeness: if logprobs are incomplete (missing for some turns),
                  # clear them to disable rollout importance sampling correction (which requires complete logprobs)
-diff --git a/tests/utils/test_action_credit.py b/tests/utils/test_action_credit.py
-new file mode 100644
-index 000000000..58aac82a0
---- /dev/null
-+++ b/tests/utils/test_action_credit.py
-@@ -0,0 +1,91 @@
-+"""Tests for Evidence-Attributed GRPO action-level credit assignment."""
-+
-+import unittest
-+
-+import torch
-+
-+from swift.rl_core.action_credit import (normalize_action_credit_by_group,
-+                                         scatter_turn_credit_to_tokens)
-+
-+
-+class TestNormalizeActionCredit(unittest.TestCase):
-+
-+    def test_group_turn_centering_and_scaling(self):
-+        # One prompt, K=3 trajectories, each with a first query turn gain.
-+        credit = [[1.0], [0.0], [0.5]]
-+        prompt_ids = ['p', 'p', 'p']
-+        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=3, scale='group_turn_center')
-+        # Centered by the slot-0 mean (0.5): [0.5, -0.5, 0.0]
-+        self.assertAlmostEqual(out[0][0], 0.5, places=5)
-+        self.assertAlmostEqual(out[1][0], -0.5, places=5)
-+        self.assertAlmostEqual(out[2][0], 0.0, places=5)
-+
-+    def test_variable_turn_counts_group_per_slot(self):
-+        # Trajectory 0 has 2 query turns, trajectory 1 has 1. Slot 1 has a single owner
-+        # -> no within-group contrast -> zeroed.
-+        credit = [[1.0, 1.0], [0.0]]
-+        prompt_ids = ['p', 'p']
-+        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=2, scale='group_turn_center')
-+        self.assertAlmostEqual(out[0][0], 0.5, places=5)
-+        self.assertAlmostEqual(out[1][0], -0.5, places=5)
-+        # slot 1 only owned by trajectory 0 -> zero
-+        self.assertEqual(out[0][1], 0.0)
-+
-+    def test_separate_prompts_do_not_mix(self):
-+        credit = [[1.0], [1.0]]
-+        prompt_ids = ['a', 'b']
-+        out = normalize_action_credit_by_group(credit, prompt_ids, num_generations=1, scale='group_turn_center')
-+        # Each prompt-slot has a single owner -> zeroed (no contrast).
-+        self.assertEqual(out[0][0], 0.0)
-+        self.assertEqual(out[1][0], 0.0)
-+
-+    def test_scale_none_passthrough(self):
-+        credit = [[0.3, 0.7], None]
-+        out = normalize_action_credit_by_group(credit, ['p', 'p'], num_generations=2, scale='none')
-+        self.assertEqual(out[0], [0.3, 0.7])
-+        self.assertEqual(out[1], [])
-+
-+    def test_group_turn_scaling_unit_std(self):
-+        credit = [[2.0], [0.0]]
-+        out = normalize_action_credit_by_group(credit, ['p', 'p'], num_generations=2, scale='group_turn')
-+        # centered [1,-1]; std (unbiased) = sqrt(2); /(std+1e-4) ~ +/-0.707
-+        self.assertAlmostEqual(out[0][0], 1.0 / (2 ** 0.5 + 1e-4), places=4)
-+        self.assertAlmostEqual(out[1][0], -1.0 / (2 ** 0.5 + 1e-4), places=4)
-+
-+    def test_length_mismatch_raises(self):
-+        with self.assertRaises(ValueError):
-+            normalize_action_credit_by_group([[1.0]], ['p', 'p'], num_generations=1)
-+
-+
-+class TestScatterTurnCredit(unittest.TestCase):
-+
-+    def test_scatter_by_turn_ordinal(self):
-+        # 1 sample, 6 tokens; turns: q0 at [0,1], q1 at [3,4]; token 2,5 outside.
-+        turn_index_map = torch.tensor([[0, 0, -1, 1, 1, -1]])
-+        completion_mask = torch.tensor([[1, 1, 1, 1, 1, 1]])
-+        credit = [[0.5, -0.25]]
-+        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
-+        expected = torch.tensor([[0.5, 0.5, 0.0, -0.25, -0.25, 0.0]])
-+        torch.testing.assert_close(out, expected)
-+
-+    def test_masked_tokens_get_no_credit(self):
-+        turn_index_map = torch.tensor([[0, 0, 1, 1]])
-+        completion_mask = torch.tensor([[1, 0, 1, 1]])  # token1 not a completion token
-+        credit = [[1.0, 2.0]]
-+        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
-+        expected = torch.tensor([[1.0, 0.0, 2.0, 2.0]])
-+        torch.testing.assert_close(out, expected)
-+
-+    def test_empty_credit_is_zero(self):
-+        turn_index_map = torch.tensor([[-1, -1, -1]])
-+        completion_mask = torch.tensor([[1, 1, 1]])
-+        out = scatter_turn_credit_to_tokens([[]], turn_index_map, completion_mask)
-+        torch.testing.assert_close(out, torch.zeros(1, 3))
-+
-+    def test_shape_mismatch_raises(self):
-+        with self.assertRaises(ValueError):
-+            scatter_turn_credit_to_tokens([[1.0]], torch.zeros(1, 3, dtype=torch.long), torch.zeros(1, 4))
-+
-+
-+if __name__ == '__main__':
-+    unittest.main()
 diff --git a/tests/utils/test_multi_teacher.py b/tests/utils/test_multi_teacher.py
 index cfb29dfee..d7d19912f 100644
 --- a/tests/utils/test_multi_teacher.py
@@ -1713,3 +1865,1003 @@ index 4e4c619fa..2fc050879 100644
 +
  if __name__ == '__main__':
      unittest.main()
+diff --git a/swift/rl_core/action_credit.py b/swift/rl_core/action_credit.py
+new file mode 100644
+index 000000000..f037ec6bd
+--- /dev/null
++++ b/swift/rl_core/action_credit.py
+@@ -0,0 +1,492 @@
++# Copyright (c) ModelScope Contributors. All rights reserved.
++"""Action-scoped credit assignment for multi-turn agentic RL (Evidence-Attributed GRPO).
++
++This module implements the *task-agnostic* half of action-level credit assignment. The
++standard GRPO advantage is a single per-sequence scalar broadcast to every response
++token, so a trajectory whose final answer is wrong pushes *all* of its turns down --
++including the query turn that actually retrieved the decisive evidence. That is the
++long-horizon credit-assignment problem: the outcome reward cannot tell which turn helped.
++
++The additive mode adds a second, *per-turn* advantage term that is scattered only onto
++the tokens of the turn that produced it (e.g. each ``<query>`` turn receives its own
++evidence-gain signal). The environment/outcome GRPO advantage is left untouched::
++
++    A_token(t) = A_outcome(seq)                      # existing GRPO broadcast
++               + coef * A_action(turn(t))            # new: only on that turn's tokens
++
++The action-causal mode instead routes independently normalized answer quality to answer
++turns and combines discounted answer quality with local evidence gain on query turns.
++
++The per-turn *raw* signal (e.g. "new gold evidence covered by this query") is produced by
++the task side (the SAPR reward plugin) and passed in as a per-sample vector; this module
++only (1) normalizes it within each prompt group per turn-slot and (2) scatters it to tokens
++via a turn-index map. Keeping the numeric core here (pure tensor / list functions) makes it
++backend-agnostic and unit-testable without a live trainer.
++"""
++
++from typing import Dict, List, Optional, Sequence
++
++import torch
++
++__all__ = [
++    "compose_action_causal_advantages",
++    "compose_causal_return_advantages",
++    "compose_outcome_signed_query_advantages",
++    "compute_causal_query_return_advantages",
++    "gate_action_credit_by_outcome",
++    "normalize_action_credit_by_group",
++    "normalize_sequence_credit_by_group",
++    "scatter_turn_credit_to_tokens",
++]
++
++
++def compose_action_causal_advantages(
++    answer_advantages: torch.Tensor,
++    turn_credit: Sequence[Optional[Sequence[float]]],
++    query_turn_index_map: torch.Tensor,
++    answer_mask: torch.Tensor,
++    completion_mask: torch.Tensor,
++    query_outcome_coef: float,
++    query_credit_coef: float,
++) -> torch.Tensor:
++    """Route independently normalized rewards to the action tokens they supervise.
++
++    Answer turns receive only the answer-quality advantage. Query turns receive a
++    discounted long-horizon answer advantage plus their own per-turn evidence credit.
++    Tokens outside a recognized query/answer turn receive zero advantage.
++    """
++    if query_turn_index_map.shape != completion_mask.shape:
++        raise ValueError(
++            f"query map shape {tuple(query_turn_index_map.shape)} != "
++            f"completion mask shape {tuple(completion_mask.shape)}"
++        )
++    if answer_mask.shape != completion_mask.shape:
++        raise ValueError(
++            f"answer mask shape {tuple(answer_mask.shape)} != "
++            f"completion mask shape {tuple(completion_mask.shape)}"
++        )
++    if (
++        answer_advantages.ndim != 1
++        or answer_advantages.shape[0] != completion_mask.shape[0]
++    ):
++        raise ValueError(
++            f"answer advantages shape {tuple(answer_advantages.shape)} is incompatible "
++            f"with batch {completion_mask.shape[0]}"
++        )
++
++    completion = completion_mask.bool()
++    query_mask = (query_turn_index_map >= 0) & completion
++    answer_mask = answer_mask.bool() & completion
++    if (query_mask & answer_mask).any():
++        raise ValueError("query and answer action masks must be disjoint")
++
++    local_credit = scatter_turn_credit_to_tokens(
++        turn_credit, query_turn_index_map, completion_mask
++    )
++    answer_term = answer_advantages.to(
++        device=completion_mask.device, dtype=torch.float32
++    ).unsqueeze(1)
++    output = torch.zeros_like(completion_mask, dtype=torch.float32)
++    output = torch.where(
++        query_mask,
++        query_outcome_coef * answer_term + query_credit_coef * local_credit,
++        output,
++    )
++    output = torch.where(answer_mask, answer_term, output)
++    return output
++
++
++def compose_outcome_signed_query_advantages(
++    sequence_advantages: torch.Tensor,
++    turn_credit: Sequence[Optional[Sequence[float]]],
++    query_turn_index_map: torch.Tensor,
++    completion_mask: torch.Tensor,
++    credit_coef: float,
++    credit_clip: float,
++) -> torch.Tensor:
++    """Reweight query tokens without changing the sequence-advantage sign.
++
++    The standard GRPO advantage remains unchanged on non-query tokens. Query tokens use
++
++    ``A_query = A_seq + credit_coef * abs(A_seq) * clip(A_gain)``.
++
++    Positive evidence gain therefore strengthens a successful trajectory's query but
++    protects the same query from punishment in an unsuccessful trajectory. Negative gain
++    has the opposite effect. Requiring ``credit_coef * credit_clip < 1`` guarantees that
++    non-zero sequence advantages cannot cross zero.
++    """
++    if query_turn_index_map.shape != completion_mask.shape:
++        raise ValueError(
++            f"query map shape {tuple(query_turn_index_map.shape)} != "
++            f"completion mask shape {tuple(completion_mask.shape)}"
++        )
++    if (
++        sequence_advantages.ndim != 1
++        or sequence_advantages.shape[0] != completion_mask.shape[0]
++    ):
++        raise ValueError(
++            f"sequence advantages shape {tuple(sequence_advantages.shape)} is incompatible "
++            f"with batch {completion_mask.shape[0]}"
++        )
++    if credit_coef < 0.0:
++        raise ValueError(f"credit_coef must be non-negative, got {credit_coef}")
++    if credit_clip <= 0.0:
++        raise ValueError(f"credit_clip must be positive, got {credit_clip}")
++    if credit_coef * credit_clip >= 1.0:
++        raise ValueError(
++            "credit_coef * credit_clip must be < 1 to preserve advantage signs; "
++            f"got {credit_coef} * {credit_clip}"
++        )
++
++    completion = completion_mask.bool()
++    query_mask = (query_turn_index_map >= 0) & completion
++    local_credit = scatter_turn_credit_to_tokens(
++        turn_credit, query_turn_index_map, completion_mask
++    ).clamp(min=-credit_clip, max=credit_clip)
++    base = sequence_advantages.to(
++        device=completion_mask.device, dtype=torch.float32
++    ).unsqueeze(1)
++    output = base.expand_as(completion_mask).to(dtype=torch.float32)
++    query_advantage = base + credit_coef * base.abs() * local_credit
++    output = torch.where(query_mask, query_advantage, output)
++    return output * completion_mask.to(dtype=torch.float32)
++
++
++def compute_causal_query_return_advantages(
++    sequence_rewards: torch.Tensor,
++    sequence_advantages: torch.Tensor,
++    relevance_rewards: torch.Tensor,
++    turn_gains: Sequence[Optional[Sequence[float]]],
++    prompt_ids: Sequence[str],
++    num_generations: int,
++    relevance_weight: float,
++    scale: str = "group_turn",
++    atol: float = 1e-6,
++) -> List[List[float]]:
++    """Build per-query advantages from the evidence reward that remains attainable.
++
++    For query turn ``k``, the raw return keeps every non-relevance component of the
++    original sequence reward and replaces terminal relevance with evidence acquired
++    from ``k`` onward::
++
++        R_query(k) = R_sequence - w_rel * relevance
++                     + w_rel * sum(gain[j] for j >= k)
++
++    This removes evidence obtained before a query from that query's credit while still
++    propagating delayed evidence gains back to preparatory queries. The first query uses
++    the already-computed sequence advantage exactly, preserving standard GRPO at the
++    initial state. Later turns are normalized per prompt and turn slot; slots without
++    enough contrast fall back to the sequence advantage instead of being zeroed.
++    """
++    tensors = (sequence_rewards, sequence_advantages, relevance_rewards)
++    if any(value.ndim != 1 for value in tensors):
++        shapes = ", ".join(str(tuple(value.shape)) for value in tensors)
++        raise ValueError(f"causal-return inputs must be one-dimensional, got {shapes}")
++    n = sequence_rewards.numel()
++    if sequence_advantages.numel() != n or relevance_rewards.numel() != n:
++        raise ValueError(
++            "causal-return tensor length mismatch: "
++            f"rewards={n} advantages={sequence_advantages.numel()} "
++            f"relevance={relevance_rewards.numel()}"
++        )
++    if len(turn_gains) != n or len(prompt_ids) != n:
++        raise ValueError(
++            "causal-return metadata length mismatch: "
++            f"gains={len(turn_gains)} prompt_ids={len(prompt_ids)} samples={n}"
++        )
++    if relevance_weight < 0.0:
++        raise ValueError(
++            f"relevance_weight must be non-negative, got {relevance_weight}"
++        )
++    if scale not in {"group_turn", "group_turn_center"}:
++        raise ValueError(
++            "causal-return advantages require centered turn normalization, "
++            f"got {scale!r}"
++        )
++
++    rewards = sequence_rewards.detach().float().cpu()
++    base_advantages = sequence_advantages.detach().float().cpu()
++    relevance = relevance_rewards.detach().float().cpu()
++    vectors = [
++        [] if gains is None else [float(value) for value in gains]
++        for gains in turn_gains
++    ]
++
++    raw_returns: List[List[float]] = []
++    for index, gains in enumerate(vectors):
++        gain_sum = sum(gains)
++        if abs(gain_sum - float(relevance[index])) > atol:
++            raise ValueError(
++                "per-turn evidence gains must telescope to terminal relevance: "
++                f"sample={index} gains={gain_sum} relevance={float(relevance[index])}"
++            )
++        non_relevance_reward = (
++            float(rewards[index]) - relevance_weight * float(relevance[index])
++        )
++        remaining = 0.0
++        returns = [0.0] * len(gains)
++        for turn_index in range(len(gains) - 1, -1, -1):
++            remaining += gains[turn_index]
++            returns[turn_index] = (
++                non_relevance_reward + relevance_weight * remaining
++            )
++        raw_returns.append(returns)
++
++    normalized = normalize_action_credit_by_group(
++        raw_returns,
++        prompt_ids,
++        num_generations=num_generations,
++        scale=scale,
++    )
++
++    group_to_indices: Dict[str, List[int]] = {}
++    for index, prompt_id in enumerate(prompt_ids):
++        group_to_indices.setdefault(prompt_id, []).append(index)
++
++    # Keep standard GRPO wherever a turn slot has no usable within-group contrast.
++    for indices in group_to_indices.values():
++        max_turns = max((len(vectors[index]) for index in indices), default=0)
++        for turn_index in range(max_turns):
++            members = [
++                index for index in indices if turn_index < len(vectors[index])
++            ]
++            if turn_index == 0:
++                for index in members:
++                    normalized[index][turn_index] = float(base_advantages[index])
++                continue
++            values = torch.tensor(
++                [raw_returns[index][turn_index] for index in members],
++                dtype=torch.float32,
++            )
++            if len(members) <= 1 or torch.isclose(
++                values.std(unbiased=True), torch.tensor(0.0), atol=atol
++            ):
++                for index in members:
++                    normalized[index][turn_index] = float(base_advantages[index])
++
++    return normalized
++
++
++def compose_causal_return_advantages(
++    sequence_advantages: torch.Tensor,
++    query_turn_advantages: Sequence[Optional[Sequence[float]]],
++    query_turn_index_map: torch.Tensor,
++    completion_mask: torch.Tensor,
++) -> torch.Tensor:
++    """Replace only mapped query payloads with their causal return advantages."""
++    if query_turn_index_map.shape != completion_mask.shape:
++        raise ValueError(
++            f"query map shape {tuple(query_turn_index_map.shape)} != "
++            f"completion mask shape {tuple(completion_mask.shape)}"
++        )
++    if (
++        sequence_advantages.ndim != 1
++        or sequence_advantages.shape[0] != completion_mask.shape[0]
++    ):
++        raise ValueError(
++            f"sequence advantages shape {tuple(sequence_advantages.shape)} is incompatible "
++            f"with batch {completion_mask.shape[0]}"
++        )
++
++    completion = completion_mask.bool()
++    query_mask = (query_turn_index_map >= 0) & completion
++    query_values = scatter_turn_credit_to_tokens(
++        query_turn_advantages, query_turn_index_map, completion_mask
++    )
++    base = sequence_advantages.to(
++        device=completion_mask.device, dtype=torch.float32
++    ).unsqueeze(1)
++    output = base.expand_as(completion_mask).to(dtype=torch.float32)
++    output = torch.where(query_mask, query_values, output)
++    return output * completion_mask.to(dtype=torch.float32)
++
++
++def gate_action_credit_by_outcome(
++    credit_by_sample: Sequence[Optional[Sequence[float]]],
++    prompt_ids: Sequence[str],
++    outcome_advantages: Sequence[float],
++    mode: str = "all",
++    atol: float = 1e-8,
++) -> List[List[float]]:
++    """Keep action credit only where the outcome advantage has no group contrast.
++
++    ``zero_outcome`` is a conservative rescue mode: action credit is active only for
++    prompt groups whose sequence-level GRPO advantages are all zero. Non-zero outcome
++    groups remain exactly standard GRPO, avoiding redundant or conflicting updates.
++    """
++    n = len(prompt_ids)
++    if len(credit_by_sample) != n or len(outcome_advantages) != n:
++        raise ValueError(
++            f"action gate length mismatch: credit={len(credit_by_sample)} "
++            f"prompt_ids={n} outcome_advantages={len(outcome_advantages)}"
++        )
++
++    vectors = [
++        [] if vec is None else [float(x) for x in vec] for vec in credit_by_sample
++    ]
++    if mode == "all":
++        return vectors
++    if mode != "zero_outcome":
++        raise ValueError(f"Unsupported action_credit_gate: {mode!r}")
++
++    group_to_indices: Dict[str, List[int]] = {}
++    for idx, pid in enumerate(prompt_ids):
++        group_to_indices.setdefault(pid, []).append(idx)
++
++    active_prompt_ids = {
++        pid
++        for pid, idxs in group_to_indices.items()
++        if all(abs(float(outcome_advantages[i])) <= atol for i in idxs)
++    }
++    return [
++        vec if pid in active_prompt_ids else [0.0] * len(vec)
++        for vec, pid in zip(vectors, prompt_ids)
++    ]
++
++
++def normalize_action_credit_by_group(
++    credit_by_sample: Sequence[Optional[Sequence[float]]],
++    prompt_ids: Sequence[str],
++    num_generations: int,
++    scale: str = "group_turn",
++) -> List[List[float]]:
++    """Normalize the raw per-turn credit vectors within each prompt group.
++
++    Mirrors GRPO's group normalization, but *per turn-slot*: for a given prompt, the
++    ``k``-th query turn across the ``K`` sampled trajectories forms one normalization
++    group. This is the multi-turn analogue of GiGPO's step-grouped micro-advantage and is
++    what lets a single good query stand out from its siblings even when every trajectory in
++    the group ends with the same (wrong) answer -- exactly the zero-variance-outcome case
++    where the plain GRPO advantage vanishes.
++
++    Trajectories have different query counts, so turn-slot ``k`` only groups the
++    trajectories that actually have a ``k``-th query; shorter trajectories simply do not
++    contribute to (or receive) slot ``k``.
++
++    Args:
++        credit_by_sample: length-``N`` sequence; entry ``i`` is that sample's raw per-turn
++            credit vector (one float per credited turn, in turn order) or ``None``/empty.
++        prompt_ids: length-``N`` prompt identifiers defining the groups.
++        num_generations: ``K`` (kept for signature parity / validation; grouping is by
++            ``prompt_id`` so variable group sizes are tolerated).
++        scale: ``'group_turn'`` centers and scales within (group, turn-slot);
++            ``'group_turn_center'`` only centers (subtracts the mean, no std division);
++            ``'none'`` returns the raw values unchanged.
++
++    Returns:
++        length-``N`` list of normalized per-turn vectors (same shape as the input vectors;
++        ``None`` inputs become empty lists).
++    """
++    del (
++        num_generations
++    )  # grouping is by prompt_id; K is not needed but kept for parity.
++    n = len(prompt_ids)
++    if len(credit_by_sample) != n:
++        raise ValueError(
++            f"credit/prompt length mismatch: {len(credit_by_sample)} != {n}"
++        )
++
++    # Materialize to plain lists of floats (defensive copy; tolerate None/empty).
++    vectors: List[List[float]] = []
++    for vec in credit_by_sample:
++        if vec is None:
++            vectors.append([])
++        else:
++            vectors.append([float(x) for x in vec])
++
++    if scale == "none":
++        return vectors
++
++    if scale not in {"group_turn", "group_turn_center"}:
++        raise ValueError(f"Unsupported action_credit_scale: {scale!r}")
++
++    # Group sample indices by prompt id.
++    group_to_indices: Dict[str, List[int]] = {}
++    for idx, pid in enumerate(prompt_ids):
++        group_to_indices.setdefault(pid, []).append(idx)
++
++    out: List[List[float]] = [list(v) for v in vectors]
++    for _pid, idxs in group_to_indices.items():
++        max_turns = max((len(vectors[i]) for i in idxs), default=0)
++        for k in range(max_turns):
++            members = [i for i in idxs if k < len(vectors[i])]
++            if len(members) <= 1:
++                # A single (or zero) trajectory owns turn-slot k: no within-group contrast,
++                # so it yields no differential signal. Zero it out.
++                for i in members:
++                    out[i][k] = 0.0
++                continue
++            vals = torch.tensor([vectors[i][k] for i in members], dtype=torch.float32)
++            centered = vals - vals.mean()
++            if scale == "group_turn":
++                std = vals.std(unbiased=True)
++                centered = centered / (std + 1e-4)
++            for pos, i in enumerate(members):
++                out[i][k] = float(centered[pos])
++    return out
++
++
++def scatter_turn_credit_to_tokens(
++    turn_credit: Sequence[Optional[Sequence[float]]],
++    turn_index_map: torch.Tensor,
++    completion_mask: torch.Tensor,
++) -> torch.Tensor:
++    """Scatter per-turn credit onto the response tokens of each turn.
++
++    Args:
++        turn_credit: length-``B`` sequence of per-turn credit vectors (already normalized).
++            Entry ``i`` is indexed by turn ordinal: ``turn_credit[i][k]`` is the credit for
++            the ``k``-th credited turn of sample ``i``.
++        turn_index_map: ``[B, T]`` long tensor; each response token holds the ordinal ``k``
++            of the credited turn it belongs to, or ``-1`` for tokens outside any credited
++            turn (template tokens, observations, non-credited actions).
++        completion_mask: ``[B, T]`` response-token mask; the returned term is zero outside it.
++
++    Returns:
++        ``[B, T]`` additive per-token credit term (before the coefficient is applied).
++    """
++    if turn_index_map.shape != completion_mask.shape:
++        raise ValueError(
++            f"turn_index_map shape {tuple(turn_index_map.shape)} != "
++            f"completion_mask shape {tuple(completion_mask.shape)}"
++        )
++    if len(turn_credit) != turn_index_map.shape[0]:
++        raise ValueError(
++            f"turn_credit length {len(turn_credit)} != batch {turn_index_map.shape[0]}"
++        )
++
++    out = torch.zeros_like(completion_mask, dtype=torch.float32)
++    comp_bool = completion_mask.bool()
++    for row in range(turn_index_map.shape[0]):
++        vec = turn_credit[row]
++        if not vec:
++            continue
++        idx_row = turn_index_map[row]
++        for k, value in enumerate(vec):
++            if value == 0.0:
++                continue
++            sel = (idx_row == k) & comp_bool[row]
++            if sel.any():
++                out[row, sel] = float(value)
++    return out
++
++
++def normalize_sequence_credit_by_group(
++    values: torch.Tensor, num_generations: int
++) -> torch.Tensor:
++    """Apply standard GRPO group normalization to one reward component."""
++    if values.ndim != 1:
++        raise ValueError(
++            f"values must be one-dimensional, got shape {tuple(values.shape)}"
++        )
++    if num_generations <= 0 or values.numel() % num_generations:
++        raise ValueError(
++            f"values length {values.numel()} is not divisible by num_generations={num_generations}"
++        )
++    grouped = values.view(-1, num_generations)
++    centered = grouped - grouped.mean(dim=1, keepdim=True)
++    if num_generations > 1:
++        std = grouped.std(dim=1, keepdim=True)
++    else:
++        std = torch.zeros_like(grouped)
++    return (centered / (std + 1e-4)).reshape(-1)
+diff --git a/tests/utils/test_action_credit.py b/tests/utils/test_action_credit.py
+new file mode 100644
+index 000000000..49048d24c
+--- /dev/null
++++ b/tests/utils/test_action_credit.py
+@@ -0,0 +1,138 @@
++"""Tests for Evidence-Attributed GRPO action-level credit assignment."""
++
++import unittest
++
++import torch
++
++from swift.rl_core.action_credit import (
++    gate_action_credit_by_outcome,
++    normalize_action_credit_by_group,
++    scatter_turn_credit_to_tokens,
++)
++
++
++class TestGateActionCredit(unittest.TestCase):
++    def test_all_keeps_every_group(self):
++        credit = [[0.5], [-0.5], [0.25], [-0.25]]
++        out = gate_action_credit_by_outcome(
++            credit, ["a", "a", "b", "b"], [1.0, -1.0, 0.0, 0.0], mode="all"
++        )
++        self.assertEqual(out, credit)
++
++    def test_zero_outcome_keeps_only_dead_groups(self):
++        credit = [[0.5], [-0.5], [0.25], [-0.25]]
++        out = gate_action_credit_by_outcome(
++            credit,
++            ["ranked", "ranked", "dead", "dead"],
++            [1.0, -1.0, 0.0, 0.0],
++            mode="zero_outcome",
++        )
++        self.assertEqual(out, [[0.0], [0.0], [0.25], [-0.25]])
++
++    def test_zero_outcome_uses_tolerance(self):
++        out = gate_action_credit_by_outcome(
++            [[1.0], [-1.0]],
++            ["p", "p"],
++            [1e-10, -1e-10],
++            mode="zero_outcome",
++        )
++        self.assertEqual(out, [[1.0], [-1.0]])
++
++    def test_length_mismatch_raises(self):
++        with self.assertRaises(ValueError):
++            gate_action_credit_by_outcome(
++                [[1.0]], ["p"], [0.0, 0.0], mode="zero_outcome"
++            )
++
++
++class TestNormalizeActionCredit(unittest.TestCase):
++    def test_group_turn_centering_and_scaling(self):
++        # One prompt, K=3 trajectories, each with a first query turn gain.
++        credit = [[1.0], [0.0], [0.5]]
++        prompt_ids = ["p", "p", "p"]
++        out = normalize_action_credit_by_group(
++            credit, prompt_ids, num_generations=3, scale="group_turn_center"
++        )
++        # Centered by the slot-0 mean (0.5): [0.5, -0.5, 0.0]
++        self.assertAlmostEqual(out[0][0], 0.5, places=5)
++        self.assertAlmostEqual(out[1][0], -0.5, places=5)
++        self.assertAlmostEqual(out[2][0], 0.0, places=5)
++
++    def test_variable_turn_counts_group_per_slot(self):
++        # Trajectory 0 has 2 query turns, trajectory 1 has 1. Slot 1 has a single owner
++        # -> no within-group contrast -> zeroed.
++        credit = [[1.0, 1.0], [0.0]]
++        prompt_ids = ["p", "p"]
++        out = normalize_action_credit_by_group(
++            credit, prompt_ids, num_generations=2, scale="group_turn_center"
++        )
++        self.assertAlmostEqual(out[0][0], 0.5, places=5)
++        self.assertAlmostEqual(out[1][0], -0.5, places=5)
++        # slot 1 only owned by trajectory 0 -> zero
++        self.assertEqual(out[0][1], 0.0)
++
++    def test_separate_prompts_do_not_mix(self):
++        credit = [[1.0], [1.0]]
++        prompt_ids = ["a", "b"]
++        out = normalize_action_credit_by_group(
++            credit, prompt_ids, num_generations=1, scale="group_turn_center"
++        )
++        # Each prompt-slot has a single owner -> zeroed (no contrast).
++        self.assertEqual(out[0][0], 0.0)
++        self.assertEqual(out[1][0], 0.0)
++
++    def test_scale_none_passthrough(self):
++        credit = [[0.3, 0.7], None]
++        out = normalize_action_credit_by_group(
++            credit, ["p", "p"], num_generations=2, scale="none"
++        )
++        self.assertEqual(out[0], [0.3, 0.7])
++        self.assertEqual(out[1], [])
++
++    def test_group_turn_scaling_unit_std(self):
++        credit = [[2.0], [0.0]]
++        out = normalize_action_credit_by_group(
++            credit, ["p", "p"], num_generations=2, scale="group_turn"
++        )
++        # centered [1,-1]; std (unbiased) = sqrt(2); /(std+1e-4) ~ +/-0.707
++        self.assertAlmostEqual(out[0][0], 1.0 / (2**0.5 + 1e-4), places=4)
++        self.assertAlmostEqual(out[1][0], -1.0 / (2**0.5 + 1e-4), places=4)
++
++    def test_length_mismatch_raises(self):
++        with self.assertRaises(ValueError):
++            normalize_action_credit_by_group([[1.0]], ["p", "p"], num_generations=1)
++
++
++class TestScatterTurnCredit(unittest.TestCase):
++    def test_scatter_by_turn_ordinal(self):
++        # 1 sample, 6 tokens; turns: q0 at [0,1], q1 at [3,4]; token 2,5 outside.
++        turn_index_map = torch.tensor([[0, 0, -1, 1, 1, -1]])
++        completion_mask = torch.tensor([[1, 1, 1, 1, 1, 1]])
++        credit = [[0.5, -0.25]]
++        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
++        expected = torch.tensor([[0.5, 0.5, 0.0, -0.25, -0.25, 0.0]])
++        torch.testing.assert_close(out, expected)
++
++    def test_masked_tokens_get_no_credit(self):
++        turn_index_map = torch.tensor([[0, 0, 1, 1]])
++        completion_mask = torch.tensor([[1, 0, 1, 1]])  # token1 not a completion token
++        credit = [[1.0, 2.0]]
++        out = scatter_turn_credit_to_tokens(credit, turn_index_map, completion_mask)
++        expected = torch.tensor([[1.0, 0.0, 2.0, 2.0]])
++        torch.testing.assert_close(out, expected)
++
++    def test_empty_credit_is_zero(self):
++        turn_index_map = torch.tensor([[-1, -1, -1]])
++        completion_mask = torch.tensor([[1, 1, 1]])
++        out = scatter_turn_credit_to_tokens([[]], turn_index_map, completion_mask)
++        torch.testing.assert_close(out, torch.zeros(1, 3))
++
++    def test_shape_mismatch_raises(self):
++        with self.assertRaises(ValueError):
++            scatter_turn_credit_to_tokens(
++                [[1.0]], torch.zeros(1, 3, dtype=torch.long), torch.zeros(1, 4)
++            )
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/utils/test_action_causal.py b/tests/utils/test_action_causal.py
+new file mode 100644
+index 000000000..c3fe8fedf
+--- /dev/null
++++ b/tests/utils/test_action_causal.py
+@@ -0,0 +1,105 @@
++"""Tests for Action-Causal GRPO advantage routing."""
++
++import unittest
++
++import torch
++
++from swift.rl_core.action_credit import (
++    compose_action_causal_advantages,
++    normalize_sequence_credit_by_group,
++)
++
++
++class TestNormalizeSequenceCredit(unittest.TestCase):
++    def test_matches_group_normalization(self):
++        values = torch.tensor([1.0, 0.0, 0.5, 0.5])
++        out = normalize_sequence_credit_by_group(values, num_generations=2)
++        expected = torch.tensor(
++            [
++                0.5 / (2**0.5 / 2 + 1e-4),
++                -0.5 / (2**0.5 / 2 + 1e-4),
++                0.0,
++                0.0,
++            ]
++        )
++        torch.testing.assert_close(out, expected)
++
++    def test_invalid_group_shape_raises(self):
++        with self.assertRaises(ValueError):
++            normalize_sequence_credit_by_group(torch.ones(3), num_generations=2)
++
++
++class TestComposeActionCausalAdvantages(unittest.TestCase):
++    def test_routes_query_and_answer_signals(self):
++        answer_advantages = torch.tensor([2.0, -2.0])
++        turn_credit = [[1.0, -0.5], [-1.0]]
++        query_turn_index_map = torch.tensor(
++            [
++                [0, 0, -1, 1, -1, -1],
++                [0, -1, -1, -1, -1, -1],
++            ]
++        )
++        answer_mask = torch.tensor(
++            [
++                [0, 0, 0, 0, 1, 1],
++                [0, 0, 1, 1, 1, 0],
++            ]
++        )
++        completion_mask = torch.ones(2, 6)
++
++        out = compose_action_causal_advantages(
++            answer_advantages,
++            turn_credit,
++            query_turn_index_map,
++            answer_mask,
++            completion_mask,
++            query_outcome_coef=0.25,
++            query_credit_coef=0.5,
++        )
++        expected = torch.tensor(
++            [
++                [1.0, 1.0, 0.0, 0.25, 2.0, 2.0],
++                [-1.0, 0.0, -2.0, -2.0, -2.0, 0.0],
++            ]
++        )
++        torch.testing.assert_close(out, expected)
++
++    def test_wrong_answer_does_not_erase_positive_query_credit(self):
++        out = compose_action_causal_advantages(
++            torch.tensor([-1.0]),
++            [[1.0]],
++            torch.tensor([[0, 0, -1]]),
++            torch.tensor([[0, 0, 1]]),
++            torch.ones(1, 3),
++            query_outcome_coef=0.25,
++            query_credit_coef=0.5,
++        )
++        torch.testing.assert_close(out, torch.tensor([[0.25, 0.25, -1.0]]))
++
++    def test_unrouted_and_padding_tokens_are_zero(self):
++        out = compose_action_causal_advantages(
++            torch.tensor([1.0]),
++            [[1.0]],
++            torch.tensor([[0, -1, -1, -1]]),
++            torch.tensor([[0, 1, 0, 1]]),
++            torch.tensor([[1, 1, 1, 0]]),
++            query_outcome_coef=0.0,
++            query_credit_coef=1.0,
++        )
++        torch.testing.assert_close(out, torch.tensor([[1.0, 1.0, 0.0, 0.0]]))
++
++    def test_overlapping_masks_raise(self):
++        with self.assertRaises(ValueError):
++            compose_action_causal_advantages(
++                torch.tensor([1.0]),
++                [[1.0]],
++                torch.tensor([[0]]),
++                torch.tensor([[1]]),
++                torch.tensor([[1]]),
++                query_outcome_coef=0.25,
++                query_credit_coef=0.5,
++            )
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/utils/test_signed_query_reweight.py b/tests/utils/test_signed_query_reweight.py
+new file mode 100644
+index 000000000..963713de1
+--- /dev/null
++++ b/tests/utils/test_signed_query_reweight.py
+@@ -0,0 +1,81 @@
++"""Tests for outcome-signed query advantage reweighting."""
++
++import unittest
++
++import torch
++
++from swift.rl_core.action_credit import compose_outcome_signed_query_advantages
++
++
++class TestOutcomeSignedQueryAdvantages(unittest.TestCase):
++    def test_reweights_positive_and_negative_outcomes_symmetrically(self):
++        out = compose_outcome_signed_query_advantages(
++            sequence_advantages=torch.tensor([2.0, -2.0]),
++            turn_credit=[[1.0, -1.0], [1.0, -1.0]],
++            query_turn_index_map=torch.tensor(
++                [
++                    [0, 0, 1, -1],
++                    [0, 1, 1, -1],
++                ]
++            ),
++            completion_mask=torch.ones(2, 4),
++            credit_coef=0.25,
++            credit_clip=2.0,
++        )
++        torch.testing.assert_close(
++            out,
++            torch.tensor(
++                [
++                    [2.5, 2.5, 1.5, 2.0],
++                    [-1.5, -2.5, -2.5, -2.0],
++                ]
++            ),
++        )
++
++    def test_zero_advantage_stays_zero(self):
++        out = compose_outcome_signed_query_advantages(
++            sequence_advantages=torch.tensor([0.0]),
++            turn_credit=[[2.0]],
++            query_turn_index_map=torch.tensor([[0, 0]]),
++            completion_mask=torch.ones(1, 2),
++            credit_coef=0.25,
++            credit_clip=2.0,
++        )
++        torch.testing.assert_close(out, torch.zeros(1, 2))
++
++    def test_clips_credit_and_preserves_non_query_tokens(self):
++        out = compose_outcome_signed_query_advantages(
++            sequence_advantages=torch.tensor([2.0]),
++            turn_credit=[[9.0]],
++            query_turn_index_map=torch.tensor([[0, -1, -1]]),
++            completion_mask=torch.tensor([[1, 1, 0]]),
++            credit_coef=0.25,
++            credit_clip=2.0,
++        )
++        torch.testing.assert_close(out, torch.tensor([[3.0, 2.0, 0.0]]))
++
++    def test_sign_preserving_constraint_is_enforced(self):
++        with self.assertRaises(ValueError):
++            compose_outcome_signed_query_advantages(
++                sequence_advantages=torch.tensor([1.0]),
++                turn_credit=[[-2.0]],
++                query_turn_index_map=torch.tensor([[0]]),
++                completion_mask=torch.ones(1, 1),
++                credit_coef=0.5,
++                credit_clip=2.0,
++            )
++
++    def test_invalid_shape_raises(self):
++        with self.assertRaises(ValueError):
++            compose_outcome_signed_query_advantages(
++                sequence_advantages=torch.tensor([1.0, -1.0]),
++                turn_credit=[[1.0]],
++                query_turn_index_map=torch.tensor([[0]]),
++                completion_mask=torch.ones(1, 1),
++                credit_coef=0.25,
++                credit_clip=2.0,
++            )
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/utils/test_causal_return.py b/tests/utils/test_causal_return.py
+new file mode 100644
+index 000000000..80693ad68
+--- /dev/null
++++ b/tests/utils/test_causal_return.py
+@@ -0,0 +1,154 @@
++"""Tests for causal return-to-go query advantage assignment."""
++
++import unittest
++
++import torch
++
++from swift.rl_core.action_credit import (
++    compose_causal_return_advantages,
++    compute_causal_query_return_advantages,
++    normalize_action_credit_by_group,
++    normalize_sequence_credit_by_group,
++)
++from swift.rl_core.data import OnPolicySample
++from swift.rlhf_trainers.gkd_helpers import build_query_turn_index_map
++
++
++class TestCausalQueryReturnAdvantages(unittest.TestCase):
++
++    def test_first_query_matches_sequence_and_later_query_uses_remaining_evidence(self):
++        rewards = torch.tensor([1.25, 0.15, 0.55])
++        relevance = torch.tensor([1.0, 0.5, 0.0])
++        base = normalize_sequence_credit_by_group(rewards, num_generations=3)
++        gains = [[0.5, 0.5], [0.0, 0.5], [0.0, 0.0]]
++
++        out = compute_causal_query_return_advantages(
++            sequence_rewards=rewards,
++            sequence_advantages=base,
++            relevance_rewards=relevance,
++            turn_gains=gains,
++            prompt_ids=['p', 'p', 'p'],
++            num_generations=3,
++            relevance_weight=0.2,
++        )
++
++        for index in range(3):
++            self.assertAlmostEqual(out[index][0], float(base[index]), places=6)
++        expected_late = normalize_action_credit_by_group(
++            [[1.15], [0.15], [0.55]],
++            ['p', 'p', 'p'],
++            num_generations=3,
++            scale='group_turn',
++        )
++        for index in range(3):
++            self.assertAlmostEqual(out[index][1], expected_late[index][0], places=6)
++
++    def test_single_owner_late_turn_falls_back_to_sequence_advantage(self):
++        out = compute_causal_query_return_advantages(
++            sequence_rewards=torch.tensor([1.2, 0.0]),
++            sequence_advantages=torch.tensor([0.7, -0.7]),
++            relevance_rewards=torch.tensor([1.0, 0.0]),
++            turn_gains=[[0.5, 0.5], []],
++            prompt_ids=['p', 'p'],
++            num_generations=2,
++            relevance_weight=0.2,
++        )
++        self.assertAlmostEqual(out[0][1], 0.7, places=6)
++
++    def test_gain_must_telescope_to_terminal_relevance(self):
++        with self.assertRaisesRegex(ValueError, 'telescope'):
++            compute_causal_query_return_advantages(
++                sequence_rewards=torch.tensor([1.0]),
++                sequence_advantages=torch.tensor([0.0]),
++                relevance_rewards=torch.tensor([1.0]),
++                turn_gains=[[0.5]],
++                prompt_ids=['p'],
++                num_generations=1,
++                relevance_weight=0.2,
++            )
++
++    def test_composition_changes_only_mapped_query_tokens(self):
++        out = compose_causal_return_advantages(
++            sequence_advantages=torch.tensor([1.0, -1.0]),
++            query_turn_advantages=[[1.0, -0.5], [-1.0, 0.25]],
++            query_turn_index_map=torch.tensor([
++                [-1, 0, 0, -1, 1, -1],
++                [-1, 0, -1, 1, 1, -1],
++            ]),
++            completion_mask=torch.tensor([
++                [1, 1, 1, 1, 1, 0],
++                [1, 1, 1, 1, 1, 0],
++            ]),
++        )
++        torch.testing.assert_close(out, torch.tensor([
++            [1.0, 1.0, 1.0, 1.0, -0.5, 0.0],
++            [-1.0, -1.0, -1.0, 0.25, 0.25, 0.0],
++        ]))
++
++
++class _OffsetTokenizer:
++    pieces = {
++        1: 'reasoning ',
++        2: '<',
++        3: 'query',
++        4: '>',
++        5: 'bridge entity',
++        6: '</',
++        9: ' trailing',
++        20: '<answer>a</answer>',
++    }
++
++    def decode(self, token_ids, skip_special_tokens=False):
++        del skip_special_tokens
++        return ''.join(self.pieces[token_id] for token_id in token_ids)
++
++    def __call__(self, text, add_special_tokens=False, return_offsets_mapping=False):
++        del add_special_tokens
++        ids = []
++        offsets = []
++        cursor = 0
++        while cursor < len(text):
++            for token_id, piece in sorted(self.pieces.items(), key=lambda item: -len(item[1])):
++                if text.startswith(piece, cursor):
++                    ids.append(token_id)
++                    offsets.append((cursor, cursor + len(piece)))
++                    cursor += len(piece)
++                    break
++            else:
++                raise AssertionError(f'no token piece at {cursor}: {text[cursor:]}')
++        result = {'input_ids': ids}
++        if return_offsets_mapping:
++            result['offset_mapping'] = offsets
++        return result
++
++
++class TestQueryPayloadTurnIndexMap(unittest.TestCase):
++
++    def test_payload_only_excludes_reasoning_and_trailing_text(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 2, 3, 4, 5, 6, 3, 4, 9], [20]],
++            response_loss_mask=[[1] * 9, [1]],
++        )
++        completion_mask = torch.ones(1, 10)
++        out = build_query_turn_index_map(
++            [sample], completion_mask, _OffsetTokenizer(), payload_only=True)
++        torch.testing.assert_close(
++            out,
++            torch.tensor([[-1, 0, 0, 0, 0, 0, 0, 0, -1, -1]]),
++        )
++
++    def test_payload_extends_to_turn_end_when_stop_removes_closing_tag(self):
++        sample = OnPolicySample(
++            messages=[],
++            response_token_ids=[[1, 2, 3, 4, 5]],
++            response_loss_mask=[[1] * 5],
++        )
++        completion_mask = torch.ones(1, 5)
++        out = build_query_turn_index_map(
++            [sample], completion_mask, _OffsetTokenizer(), payload_only=True)
++        torch.testing.assert_close(out, torch.tensor([[-1, 0, 0, 0, 0]]))
++
++
++if __name__ == '__main__':
++    unittest.main()

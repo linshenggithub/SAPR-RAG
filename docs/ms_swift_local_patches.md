@@ -32,17 +32,17 @@ patches/ms-swift/sapr-rag-ms-swift-full-1dbd1bf64.patch
 | commit 标题 | `fix(template): keep MiMo dependencies optional (#9886)` |
 | commit 日期 | `2026-08-11T16:08:41+08:00` |
 | ms-swift 版本 | `4.5.0.dev0` |
-| 完整补丁 SHA256 | `ba857e2ba1528747f25b7562e5b4b11ccaf3fc8ed47c7c13f36ed094f99d411a` |
+| 完整补丁 SHA256 | `710ec851f05ce05a5d684c784bfde083e310b91ac88fa8072a104a58c35dc7dd` |
 
 补丁统计：
 
 ```text
-13 files changed
-1267 insertions
-58 deletions
+16 files changed
+2390 insertions
+60 deletions
 ```
 
-补丁包含的 13 个文件：
+补丁包含的 16 个文件：
 
 ```text
 swift/dataset/preprocessor/core.py
@@ -56,6 +56,9 @@ swift/rlhf_trainers/gkd_helpers.py
 swift/rlhf_trainers/grpo_trainer.py
 swift/rollout/multi_turn.py
 tests/utils/test_action_credit.py        # 新增：动作级信用单元测试
+tests/utils/test_action_causal.py        # 新增：完整动作因果优势单元测试
+tests/utils/test_signed_query_reweight.py # 新增：符号保持 Query 重加权单元测试
+tests/utils/test_causal_return.py       # 新增：因果 return-to-go 与精确 Query 标签段测试
 tests/utils/test_multi_teacher.py
 tests/utils/test_teacher_advantage.py
 ```
@@ -103,7 +106,7 @@ git -C ../ms-swift apply \
 预期 SHA256：
 
 ```text
-ba857e2ba1528747f25b7562e5b4b11ccaf3fc8ed47c7c13f36ed094f99d411a
+710ec851f05ce05a5d684c784bfde083e310b91ac88fa8072a104a58c35dc7dd
 ```
 
 应用后确认：
@@ -366,11 +369,16 @@ teacher_action_coef_mask
 | `action_credit_coef` | `0.0` | 逐轮证据增益优势的系数 |
 | `action_credit_scale` | `group_turn` | `group_turn/group_turn_center/none`，逐 turn-slot 组归一化方式 |
 | `action_credit_infos_key` | `query_evidence_gain` | rollout_infos 中承载逐轮原始向量的 key |
+| `action_credit_gate` | `all` | `all/zero_outcome`；后者只救援 sequence advantage 整组为零的 prompt |
+| `advantage_mode` | `sequence` | `sequence/action_causal/signed_query_reweight/causal_return`；最后一项启用 E21 剩余 evidence return 路由 |
+| `action_query_outcome_coef` | `0.25` | action-causal 模式下 Query 保留的长程 Answer F1 advantage 系数 |
+| `action_credit_clip` | `2.0` | signed-query 模式下逐轮信用裁剪上限；要求 `action_credit_coef * action_credit_clip < 1` |
 
 默认值保持旧路径：
 
 ```text
-无 gate
+sequence advantage 模式
++ 无 gate
 + 保留 GRPO advantage
 + teacher 作用全 completion
 + 分动作系数关闭
@@ -624,8 +632,12 @@ A_token(t) = A_outcome(seq)            # 现有 GRPO 广播
            + coef * A_action(turn(t))  # 新增：只加到该轮 token
 ```
 
-两个函数：
+核心函数：
 
+- `gate_action_credit_by_outcome(credit_by_sample, prompt_ids, outcome_advantages, mode)`
+  在 `mode='zero_outcome'` 时，仅保留 sequence-level GRPO advantage 整组为零的
+  prompt 的动作信用；标准 GRPO 已能排序的组全部置零，避免动作信号与 outcome
+  advantage 重复或冲突。默认 `mode='all'` 保持 E17 行为。
 - `normalize_action_credit_by_group(credit_by_sample, prompt_ids, num_generations, scale)`
   按 prompt 分组，再**逐 turn-slot** 归一化：某 prompt 下第 `k` 个 query 轮跨 `K` 条
   rollout 组成一个归一化组（GiGPO step-grouped micro-advantage 的多轮类比）。轨迹 query
@@ -636,15 +648,37 @@ A_token(t) = A_outcome(seq)            # 现有 GRPO 广播
   按 `turn_index_map[b,t]` 里存的 query-turn 序号，把 `turn_credit[b][k]` 铺到
   `(idx==k) & completion_mask` 的 token 上，返回 `[B,T]` 附加项（未乘系数）。
 
+- `normalize_sequence_credit_by_group(values, num_generations)`
+  对单个序列 reward 分量按 prompt 的 rollout 组执行标准 GRPO 归一化。E19 用它
+  从 `SaprF1ORM` 单独构造 Answer advantage，避免 relevance/format 混入 Answer。
+- `compose_action_causal_advantages(answer_advantages, turn_credit, query_turn_index_map,
+  answer_mask, completion_mask, query_outcome_coef, query_credit_coef)`
+  将独立分量按动作 token 路由：Query 接收 `alpha*A_F1 + lambda*A_query_gain(k)`，
+  Answer 接收 `A_F1`，其他 completion token、observation 和 padding 为 0；Query 与
+  Answer mask 重叠时 fail-fast。
+- `compose_outcome_signed_query_advantages(sequence_advantages, turn_credit,
+  query_turn_index_map, completion_mask, credit_coef, credit_clip)`
+  完整保留标准 GRPO advantage，只在 Query token 上增加
+  `lambda*abs(A_seq)*clip(A_query_gain)`。强制 `lambda*clip<1`，从数值上保证
+  非零 advantage 不会翻转符号。
+- `compute_causal_query_return_advantages(...)`
+  从 B 的原始复合 reward 中移除 terminal relevance，再加入第 k 轮之后仍可取得的
+  evidence gain 总和并按 prompt/turn-slot 归一化。第一轮以及无有效局部对比的槽位
+  回退到标准 sequence advantage；逐轮 gain 与 terminal relevance 不一致时 fail-fast。
+- `compose_causal_return_advantages(...)`
+  只在精确 Query 标签段写入上述 turn advantage，其他 completion token 保持标准 GRPO。
+
 原始逐轮信号（“本轮新覆盖 gold evidence 数 / gold 总数”）由**任务侧** SAPR reward plugin
 产出（见下方数据通道），本文件只负责归一化与 token scatter。
 
 ### 5.8 补充：`build_query_turn_index_map`（gkd_helpers.py）
 
 `gkd_helpers.py` 除动作 mask 外，新增 `build_query_turn_index_map(samples,
-completion_mask, tokenizer, input_ids=None)`，返回 `[B,T]` long 张量：每个 response token
-存它所属 **query 轮的序号**（0-based，仅数 `<query>` 轮），非 query 轮/模板/observation 为
-`-1`。它**完全复用** `build_teacher_action_mask` 的多轮 token-子序列对齐与
+completion_mask, tokenizer, input_ids=None, payload_only=False)`，返回 `[B,T]` long
+张量：每个 response token 存它所属 **query 轮的序号**（0-based，仅数 `<query>` 轮），
+非 query 轮/模板/observation 为 `-1`。E21 设置 `payload_only=True`，基于原始 token 的逐 token 解码字符区间
+的 offset mapping 只标记 `<query>...</query>` 标签段，排除同一 assistant turn 中的
+前置推理文本。它**完全复用** `build_teacher_action_mask` 的多轮 token-子序列对齐与
 `classify_action`（answer > query > evidence 优先级）逻辑，保证与动作 mask 同一套对齐语
 义。序号 `k` 与任务侧逐轮向量下标一一对应（第 `k` 个 query 轮 ↔ 向量第 `k` 项）。
 
@@ -652,19 +686,39 @@ completion_mask, tokenizer, input_ids=None)`，返回 `[B,T]` long 张量：每�
 
 全部逻辑严格 gated 在 `self.action_credit_mode != 'off'`，默认关闭时零开销、bit-identical：
 
-- `__init__`：读取 4 个 `action_credit_*` 参数并做前置校验——`mode!=off` 时要求
+- `__init__`：读取 5 个 `action_credit_*` 参数并做前置校验——`mode!=off` 时要求
   `coef!=0`、要求 `opd_use_grpo_advantage=true`（本项是 advantage 的加项）、不兼容
   `advantage_reweight=rlsd`。
 - `_compute_action_turn_credit(samples)`：从 `rollout_infos[action_credit_infos_key]` 读
   本地逐轮原始向量 → `gather_object` 跨进程汇总 → `normalize_action_credit_by_group` 按
-  prompt 组逐 turn-slot 归一化 → `get_even_process_data` 切回本地。
+  prompt 组逐 turn-slot 归一化 → 按 `action_credit_gate` 使用全局 outcome advantage
+  门控 → `get_even_process_data` 切回本地。监控 `action_credit_gate_group_ratio`。
 - `_postprocess_batch`：`mode!=off` 时把归一化后的逐轮向量写入
   `samples[i].action_turn_credit`（随 SP all-gather 存活到 mini-batch 循环）。
 - mini-batch 循环：`build_query_turn_index_map` + `scatter_turn_credit_to_tokens` 得到
   per-token 附加项，`grpo_batch.advantages += action_credit_coef * credit_term`；并记录
   `action_credit_token_ratio`、`action_credit_abs_mean` 两个监控指标。
 
-`GRPOSample`（data.py，分组 I）相应新增字段 `action_turn_credit: Optional[List[float]]`。
+**完整 Action-Causal 模式**：`advantage_mode=action_causal` 时，trainer 额外从
+`SaprF1ORM` 计算并保存 `answer_advantage`，构造 Query turn map 与 Answer mask 后调用
+`compose_action_causal_advantages()`。旧 additive 分支只在 `advantage_mode=sequence`
+时执行，防止同一信号重复叠加。该模式要求 `action_credit_mode=query_evidence`、
+`action_credit_gate=all`、GRPO group scaling，并明确禁止 teacher、RLSD、SDAR 和
+dynamic sampling 的未验证组合。
+
+新增监控：`action_answer_zero_std`、`action_answer_advantage_abs_mean`、
+`action_credit_nonzero_group_ratio`、`action_query_token_ratio`、
+`action_answer_token_ratio`、`action_unrouted_token_ratio`、
+`action_query_advantage_abs_mean`、`action_answer_token_advantage_abs_mean`。
+
+`GRPOSample`（data.py，分组 I）相应新增 `action_turn_credit: Optional[List[float]]`、
+`answer_advantage: Optional[torch.Tensor]` 和
+`query_turn_advantage: Optional[List[float]]`。
+
+**Causal Return-to-Go 模式**：`advantage_mode=causal_return` 时，trainer 读取现有
+`SaprRelevanceORM` 与逐轮 `query_evidence_gain`，验证二者 telescoping 一致后重构每轮
+Query return。第一轮 Query、无方差后续槽位、Answer 和所有非 Query token 均回退标准
+GRPO；只有后续精确 Query 标签段允许改变。该模式不使用 `action_credit_coef`。
 
 **数据通道**：reward ORM 收到的 `rollout_infos` 与 sample 上的是同一对象引用，且 reward
 计算发生在 advantage 装配**之前**，因此 SAPR plugin 可把逐轮向量以**副作用**写入
@@ -672,6 +726,7 @@ completion_mask, tokenizer, input_ids=None)`，返回 `[B,T]` long 张量：每�
 
 ### 5.13 `tests/utils/test_action_credit.py`（新增文件）
 
+- `TestGateActionCredit`：默认全开、只保留 zero-outcome 组、浮点容差、长度不匹配报错。
 - `TestNormalizeActionCredit`：center/scale、变长 turn、跨 prompt 不混、`scale=none`、单
   位 std、长度不匹配报错、单成员 slot 置零。
 - `TestScatterTurnCredit`：按 ordinal scatter、masked token 无 credit、空 credit 为 0、
@@ -685,6 +740,23 @@ answer/evidence 排除、遵守 loss_mask、input_ids-frame 对齐）。
 > `rollout_infos`，reward 本身恒返回 0.0；训练入口 `run_grpo_opsd.sh` 通过
 > `ACTION_CREDIT_MODE=query_evidence` 打开并把 `--action_credit_*` 透传给 `swift rlhf`。
 > E17 launcher 为 `run_canonical_sft_action_credit_s1000.sh`（B 的单变量增量）。
+
+### 5.14 `tests/utils/test_action_causal.py`（新增文件）
+
+覆盖单 reward component 的 GRPO 组归一化、Query/Answer token 路由、Answer 错误时
+正 query gain 的保留、padding/未路由 token 清零，以及 Query/Answer mask 重叠
+fail-fast。与其他动作信用测试共同覆盖数值核心与 trainer 路由。
+
+### 5.15 `tests/utils/test_signed_query_reweight.py`（新增文件）
+
+覆盖正负 outcome 的对称重加权、零 advantage 保持、局部 credit 裁剪、非 Query
+token 完全保持标准 GRPO，以及 `credit_coef*credit_clip<1` 的符号保持约束。
+
+### 5.16 `tests/utils/test_causal_return.py`（新增文件）
+
+覆盖逐轮 gain 的 telescoping 校验、第一轮 Query 与 B 完全一致、延迟 evidence 的
+return-to-go、单成员槽位回退、仅 Query 标签段路由，以及非 Query/padding 保持标准优势。
+同时覆盖 vLLM stop 移除 `</query>` 时将标签段延伸到当前 turn 末尾。
 
 ## 6. 数据契约
 
@@ -767,6 +839,9 @@ ENABLE_REWARD=false
 | 纯分动作 OPSD | 无 | 有 | `opd_use_grpo_advantage=false` |
 | failed-only 外部 OPD | 有或无 | 外部 teacher | `teacher_sequence_gate=failed_em/failed_f1` |
 | Evidence-Attributed GRPO | 有 | 可无 | `action_credit_mode=query_evidence` + `action_credit_coef>0` |
+| Hybrid Action-Causal GRPO | 有 | 无 | `advantage_mode=action_causal` + 独立 F1/query credit 路由 |
+| Outcome-Signed Query Reweighting | 有 | 无 | `advantage_mode=signed_query_reweight` + 有界、符号保持的 Query 梯度重加权 |
+| Causal Return-to-Go GRPO | 有 | 无 | `advantage_mode=causal_return` + 剩余 evidence return + 精确 Query 标签段 |
 
 ## 8. 验证流程
 
@@ -780,6 +855,7 @@ python -m py_compile \
   swift/infer_engine/grpo_vllm_engine.py \
   swift/pipelines/infer/rollout.py \
   swift/rl_core/advantage.py \
+  swift/rl_core/action_credit.py \
   swift/rl_core/data.py \
   swift/rlhf_trainers/args_mixin.py \
   swift/rlhf_trainers/gkd_helpers.py \
@@ -792,7 +868,11 @@ python -m py_compile \
 ```bash
 PYTHONPATH=. python -m pytest -q \
   tests/utils/test_teacher_advantage.py \
-  tests/utils/test_multi_teacher.py
+  tests/utils/test_multi_teacher.py \
+  tests/utils/test_action_credit.py \
+  tests/utils/test_action_causal.py \
+  tests/utils/test_signed_query_reweight.py \
+  tests/utils/test_causal_return.py
 ```
 
 ### 8.3 普通 GRPO smoke
@@ -827,15 +907,48 @@ opd_use_grpo_advantage=false
 
 同时 `teacher_kl_scoped_*` 非零且 loss/grad norm 有限。
 
-### 8.6 当前快照的实际验证记录
+### 8.6 Hybrid Action-Causal GRPO smoke
 
-2026-09-06 对完整补丁执行了以下检查：
+确认：
+
+- `advantage_mode=action_causal`；
+- `action_answer_advantage_abs_mean` 与 `action_query_advantage_abs_mean` 有限且非零；
+- `action_credit_nonzero_group_ratio` 显著高于 0；
+- Query/Answer mask 不重叠，`action_unrouted_token_ratio` 仅对应模板边界；
+- teacher/RLSD/SDAR 均关闭；
+- `advantage_mode=sequence` 的历史路径回归测试通过。
+
+### 8.7 Outcome-Signed Query Reweighting smoke
+
+确认：
+
+- `advantage_mode=signed_query_reweight`；
+- `action_credit_nonzero_group_ratio` 显著高于 0；
+- `action_credit_clipped_ratio` 有限且不过高；
+- `action_query_reweight_delta_abs_mean` 有限且非零；
+- `action_query_sign_flip_ratio` 恒为 0；
+- 非 Query token 的 advantage 与标准 GRPO 完全一致。
+
+### 8.8 Causal Return-to-Go GRPO smoke
+
+确认：
+
+- `advantage_mode=causal_return`；
+- `causal_return_first_query_delta_max` 恒为 0；
+- `causal_return_query_payload_ratio` 明显小于旧 Query-turn mask 比例；
+- `causal_return_delta_abs_mean` 有限且只统计后续 Query；
+- gain 总和与 terminal relevance 不一致时训练立即报错；
+- Answer、reasoning 与非 Query token 的 advantage 与标准 GRPO 完全一致。
+
+### 8.9 当前快照的实际验证记录
+
+2026-09-09 首次验证、2026-09-17 提交前复验完整补丁：
 
 ```text
 干净基线 worktree 前向 git apply：通过
 反向 git apply 校验：通过
-9 个修改源码文件 py_compile：通过
-test_teacher_advantage + test_multi_teacher：46 tests passed
+10 个修改源码文件 py_compile：通过
+六个定向测试模块：81 tests passed
 ```
 
 当前默认 Python 未安装 pytest，因此实际使用：
@@ -843,13 +956,17 @@ test_teacher_advantage + test_multi_teacher：46 tests passed
 ```bash
 PYTHONPATH=. python -m unittest \
   tests.utils.test_teacher_advantage \
-  tests.utils.test_multi_teacher
+  tests.utils.test_multi_teacher \
+  tests.utils.test_action_credit \
+  tests.utils.test_action_causal \
+  tests.utils.test_signed_query_reweight \
+  tests.utils.test_causal_return
 ```
 
 输出：
 
 ```text
-Ran 46 tests
+Ran 81 tests
 OK
 ```
 
@@ -862,7 +979,12 @@ OK
 - E13：failed-EM external-teacher OPD；
 - E16：canonical SFT + GRPO + 分动作 OPSD；
 - B：canonical SFT + GRPO-only；
-- D：canonical SFT + 纯分动作 OPSD。
+- D：canonical SFT + 纯分动作 OPSD；
+- E17：Evidence-Attributed GRPO additive prototype；
+- E18：Zero-Outcome Rescue GRPO；
+- E19：Hybrid Action-Causal GRPO（250-step pilot 正向、1000-step 全量失败）；
+- E20：Outcome-Signed Query Reweighting（250-step pilot 失败）；
+- E21：Causal Return-to-Go GRPO（实现和离线验证完成，待 pilot）；
 
 对应配置和结果以：
 

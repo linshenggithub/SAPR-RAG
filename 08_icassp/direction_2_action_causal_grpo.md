@@ -198,6 +198,31 @@ lambda = 0.2
 
 G1 是最干净的算法对照，G2 是更可能获得最终指标收益的正式候选。
 
+### 3.4.1 实现状态澄清（2026-09-08）
+
+已完成的 E17 是 **additive prototype**，不是上面定义的完整 G2：
+
+```text
+E17: A_token = A_total_sequence + 0.2 * A_query_gain
+```
+
+其中 `A_total_sequence` 仍由 F1 + relevance + format 合成后广播给全部生成 token；
+Answer F1 没有只路由到 Answer span，relevance 也同时存在于 sequence reward 和局部
+query credit 中。因此 E17 全量无增益只能证伪“低权重全局附加”版本，不能证伪
+G1/G2 的动作分解本身。
+
+E18 pilot 先做一个更保守的小改动：只在 `A_total_sequence` 整组为 0 的 prompt 上
+启用 query credit（`action_credit_gate=zero_outcome`, coef=0.5），验证局部信号能否
+只填补 GRPO 死区而不干扰已有排序。若仍无增益，再实现严格 G1/G2 的 Answer/Query
+分量独立归一化与 token 路由。
+
+E18 的在线监控表明该门控过于保守：虽然约 18% 的 prompt 组被选中，但 125 个
+generation 中只有 3 个产生非零动作项（2.4%），乘 0.5 后的全程平均绝对幅度仅
+0.00314。因此 E19 直接实现上述完整 G2：Answer 使用独立归一化的 F1 advantage；
+Query 使用 `alpha * A_F1 + lambda * A_query_gain`；其他 token 不接收任务
+advantage。首个 pilot 取 `alpha=0.5, lambda=0.5`，在降低错误广播的同时保留一半
+长程答案责任。
+
 ### 3.5 分组与归一化
 
 不同动作 reward 的量纲不同，不能先相加再统一归一化。建议：
@@ -284,7 +309,10 @@ advantage_mode=action_causal     # 新方法
 | G0 | B：标准 GRPO | 序列 reward 广播 | 现有强基线 |
 | G1 | Strict Action-Causal | Query=局部增量，Answer=F1 | 验证纯动作信用分配 |
 | G2 | Hybrid Action-Causal | Query=长程 F1+局部增量 | 正式候选 |
-| G3 | G2 + query cost | 仅无新增/重复 Query 扣费 | 可选消融 |
+| G3 | Outcome-Signed Query Reweighting | 保留标准 GRPO，只按局部进展调整 Query 梯度幅度且不翻转符号 | E19 失败后的候选；E20 pilot 已否定 |
+| G4 | Causal Return-to-Go GRPO | 将 terminal relevance 按剩余 evidence return 重分配到后续 Query 标签段 | E21 pilot 已否定 |
+| G5 | DAPO Dynamic Sampling control | 不改 advantage；过滤并重采样零方差 prompt 组 | E22 pilot 已完成，未形成稳定增益 |
+| G6 | Dr.GRPO length normalization control | 不改 advantage；固定长度分母，提高长轨迹相对权重 | E23 pilot 已否定 |
 
 所有实验固定：
 
@@ -323,9 +351,126 @@ advantage_mode=action_causal     # 新方法
 - 平均轮数；
 - 输出长度和 grad norm。
 
+**E19 pilot 结果（2026-09-08）**：`alpha=0.5, lambda=0.5` 完成 250 step。
+局部信用在 43.36% 的 prompt 组中非零，Query/Answer token advantage
+绝对值均值分别为 0.3090/0.5025，机制信号有效。
+
+固定 `hash1000, seed=20260908` 上，E19-250 相对同阶段 G0/B-250：
+
+| 数据集 | ΔEM | ΔF1 | ΔCover-EM |
+|---|---:|---:|---:|
+| HotpotQA | +0.70pt | +0.30pt | +0.70pt |
+| 2Wiki | +1.20pt | +1.25pt | +1.10pt |
+| MuSiQue | +0.50pt | -0.09pt | +0.50pt |
+| 宏平均 | +0.80pt | +0.49pt | +0.77pt |
+
+单数据集 paired bootstrap 的 95% 差值区间仍跨 0，因此这里只判定为
+“通过 pilot、进入正式训练”，不将其作为最终显著性结论。
+
 #### G-D：1000-step 正式实验
 
 只允许一个通过 pilot 门槛的配置进入正式训练，避免大规模参数搜索污染结论。
+当前唯一进入正式训练的配置是 G2 `alpha=0.5, lambda=0.5`，入口为
+`03_sapr_rag/scripts/grpo/run_canonical_sft_action_causal_s1000.sh`。
+正式 run `action_causal_g2_a0.5_l0.5_s1000_20260908` 已于 2026-09-08 06:35 启动，
+12:27 完成。checkpoint-1000 全量相对 B 的宏平均 EM/F1 分别下降
+0.58/0.45pt，三数据集 EM/F1 均未提升，因此 G2 被否定。
+
+#### G-E：Outcome-Signed Query Reweighting
+
+E19 的核心问题是局部 gain 可以在最终错误轨迹上形成独立正优势，同时完整 G2
+还删除了 B 中 relevance/format 对 Answer token 的约束。G3 改为：
+
+```text
+Query_k: A_seq + lambda * abs(A_seq) * clip(A_query_gain(k), -c, c)
+其他:    A_seq
+```
+
+其中 `lambda=0.25, c=2.0`，并强制 `lambda*c<1`。因此：
+
+- 标准 GRPO 的复合 reward、Answer 与非 Query token 全部保持不变；
+- 成功轨迹中高 gain Query 被加强，低 gain Query 被减弱；
+- 失败轨迹中高 gain Query 少受惩罚，低 gain Query 多受惩罚；
+- 非零优势绝不跨 0，不会把失败轨迹中的局部动作变成正监督；
+- sequence advantage 为 0 时保持 0，不声称解决 E18 已证伪的 zero-outcome 死区。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_signed_query_reweight_pilot.sh`。
+
+E20 的 checkpoint-250 在固定 hash1000 上相对 B-250 的宏平均 EM/F1/Cover-EM
+分别为 −0.10/−0.34/−0.20pt。局部项覆盖约 69.6% completion token、平均改变量
+0.0418 且无符号翻转，但 HotpotQA/2Wiki 检索覆盖几乎不变。失败原因不是局部项
+太弱，而是即时 gain 与 B 的 terminal relevance 重复，并且只奖励直接命中，无法
+给准备 bridge entity、后续才取得证据的 Query 分配长期信用。
+
+#### G-F：Causal Return-to-Go GRPO
+
+E21 不增加 reward，而是重分配 B 中已有的 relevance 分量。令
+`gain_j = Phi(E_j)-Phi(E_{j-1})`，第 k 个 Query 的原始 return 为：
+
+```text
+R_query(k) = R_sequence - 0.2 * relevance_final
+             + 0.2 * sum(gain_j, j >= k)
+A_query(k) = GroupNorm(R_query(k))
+```
+
+设计约束：
+
+- `sum(gain_j)` 必须与 `relevance_final` 一致，否则 fail-fast；
+- Query 1 直接复用标准 `A_sequence`，与 B 逐值一致；
+- 后续 turn-slot 无组内对比时回退 `A_sequence`；
+- 只替换 `<query>...</query>` 标签段，Query 前 reasoning、Answer 与其他 token
+  继续使用 `A_sequence`；
+- 不引入额外系数，reward 权重仍为 F1 1.0 / relevance 0.2 / format 0.05。
+
+该方法同时修复两个问题：标准 GRPO 会把历史已经取得的 evidence 继续奖励给后续
+Query，而 E17/E20 的即时 gain 又无法奖励为下一跳创造条件的准备性 Query。E21 使用
+future return，使 Query 只承担其执行时刻之后的可达收益。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_causal_return_pilot.sh`。
+
+E21 完成 250 step，固定 hash1000 sweep 选择 checkpoint-250。相对 B-250，
+HotpotQA EM/F1 为 +0.30/+0.04pt，2Wiki 为 +0.60/−0.08pt，MuSiQue 为
+−0.90/−0.89pt；宏平均 EM/F1/Cover-EM 分别为 +0.00/−0.31/−0.17pt。
+方法在较短链数据上有局部 EM 增益，但明显伤害 MuSiQue 长链任务，因此未通过
+pilot，不进入 1000-step。
+
+#### G-G：DAPO Dynamic Sampling control
+
+E22 不再修改 Query/Answer token 的优势。它完整保留 B 的复合 sequence advantage，
+只丢弃组内复合 reward 标准差为 0 的 prompt group，并最多重采样 3 轮。
+这可以验证 E17–E21 的失败究竟来自局部信用设计，还是 B 中 10%–50% 无有效梯度的
+rollout 组降低了样本效率。
+
+E22 是 DAPO 风格强优化基线，不作为新的信用分配方法。入口：
+`03_sapr_rag/scripts/grpo/run_canonical_sft_dapo_dynamic_pilot.sh`。
+
+E22 完成 250 step 后，固定 hash1000 sweep 选择 checkpoint-250。相对 B-250，
+宏平均 EM/F1/Cover-EM 分别为 +0.20/+0.03/+0.20pt；HotpotQA 有小幅改善，
+2Wiki F1 基本持平，MuSiQue EM/F1 均下降。动态采样确实将零方差组比例降至 0，
+但额外 rollout 成本约使训练从 20.7 s/it 增至 33.0 s/it，且没有稳定 F1 增益，
+因此不进入 1000-step。
+
+#### G-H：Dr.GRPO length normalization control
+
+E23 保留 B 的 reward、sequence advantage 与所有采样设置，只把 loss 从逐轨迹长度
+平均改为 Dr.GRPO 固定长度归一化：
+
+```text
+B:   L = mean_i(sum_t L_i,t / T_i)
+E23: L = sum_i,t L_i,t / (batch_size * max_completion_length)
+```
+
+B 的实际保存配置已确认 `loss_type=grpo`。其训练 completion 平均长度为 338.80
+token，而 `max_completion_length=4096`；标准 GRPO 让短、长轨迹的总权重相同，
+可能削弱 MuSiQue 等长链样本中多个动作的累计监督。E23 用固定分母消除该逐样本
+长度归一化偏置，不引入新的 reward 或动作级启发式信用。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_dr_grpo_pilot.sh`。250-step run
+`dr_grpo_lengthnorm_r3_s250_20260911` 与 checkpoint-125/250 固定
+`hash1000, seed=20260908` 评测均已完成。checkpoint-250 最优，但宏平均
+EM/F1/Cover-EM 相对 B-250 分别下降 0.23/0.32/0.37pt；HotpotQA 仅 EM/Cover
+小幅提高，2Wiki 与 MuSiQue 全面下降。提高长轨迹相对权重没有改善 MuSiQue，
+因此 E23 不进入 1000-step。
 
 ## 7. 评测指标与成功门槛
 

@@ -82,7 +82,13 @@
 | E16 | Canonical SFT→GRPO+分动作 OPSD | E14 canonical SFT ckpt4150；三源 train 277,839 条；LoRA | 复现 E12：GRPO reward + Query 0.01 / Answer 0.03 分动作 teacher，只替换 SFT 起点 | ckpt1000 三数据集全量完成；HotpotQA .4636/.5816/.5025；2Wiki .5154/.5659/.5307；MuSiQue .1837/.2786/.2089；相对 E14 全面提升（2Wiki 约 +11pt）；OPSD 独立贡献待 B/D 对照 | A | 下文“E16 Canonical SFT→分动作 OPSD” |
 | B（E16 对照） | Canonical SFT→GRPO-only（关 teacher） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭全部 teacher（纯 GRPO reward） | ckpt1000 三数据集全量完成；HotpotQA .4629/.5837/.5026；2Wiki .5161/.5654/.5314；MuSiQue .1808/.2794/.2056 | A | 下文“B/D 对照与 OPSD 归因” |
 | D（E16 对照） | Canonical SFT→纯分动作 OPSD（无 RL reward） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭 GRPO reward 与组内 advantage，仅保留 Query/Answer teacher log-ratio | ckpt1000 三数据集全量完成；HotpotQA .4462/.5703/.5030；2Wiki .4948/.5548/.5270；MuSiQue .1758/.2717/.2085 | A | 下文“B/D 对照与 OPSD 归因” |
-| E17（G2 / 方向2） | Canonical SFT→GRPO + Evidence-Attributed（动作级证据信用） | E14 canonical SFT ckpt4150；与 B 同的三源 noteacher 数据/采样/步数；LoRA | 在 B（GRPO-only）之上唯一新增：逐轮“本轮新增 gold evidence 覆盖率”经组内逐 turn-slot 归一化后，作为附加 advantage 只加到对应 `<query>` turn 的 token（`action_credit_mode=query_evidence`, coef=0.2）；teacher 全关 | **ckpt-750（sweep 选优）三数据集全量完成，相对 B 无增益**：HotpotQA .4552/.5766/.4957（vs B −0.77/−0.71pt）；2Wiki .5153/.5668/.5316（vs B −0.08/+0.14pt，持平）；MuSiQue .1804/.2768/.2040（vs B −0.04/−0.26pt，持平）。coef=0.2 动作级证据信用在强 SFT+有效 GRPO 起点上未带来独立增益（与 OPSD 的 C−B≈0 同模式）。 | A | 下文“E17 Evidence-Attributed GRPO（方向2）” |
+| E17（方向2 additive prototype） | Canonical SFT→GRPO + Evidence-Attributed（动作级证据信用） | E14 canonical SFT ckpt4150；与 B 同的三源 noteacher 数据/采样/步数；LoRA | 在 B（GRPO-only）之上唯一新增：逐轮“本轮新增 gold evidence 覆盖率”经组内逐 turn-slot 归一化后，作为附加 advantage 只加到对应 `<query>` turn 的 token（`action_credit_mode=query_evidence`, coef=0.2）；仍广播总 sequence reward，因此不是完整 G2；teacher 全关 | **ckpt-750（sweep 选优）三数据集全量完成，相对 B 无增益**：HotpotQA .4552/.5766/.4957（vs B −0.77/−0.71pt）；2Wiki .5153/.5668/.5316（vs B −0.08/+0.14pt，持平）；MuSiQue .1804/.2768/.2040（vs B −0.04/−0.26pt，持平）。coef=0.2 动作级证据信用在强 SFT+有效 GRPO 起点上未带来独立增益（与 OPSD 的 C−B≈0 同模式）。 | A | 下文“E17 Evidence-Attributed GRPO（方向2）” |
+| E18 pilot | Zero-Outcome Rescue GRPO | 与 B/E17 同起点、三源 noteacher 数据和训练配置；250-step pilot | 仅在 sequence GRPO advantage 整组为 0 时启用 query evidence credit；非零方差组完全保持标准 GRPO；`action_credit_gate=zero_outcome`, coef=0.5 | **机制级早停失败**：250 step 完成；gate 平均命中 18.24% 的组，但 125 个 generation 中仅 3 个动作项非零（2.4%），有效幅度均值仅 0.00314；不进入评测。 | A | 下文“E18 Zero-Outcome Rescue GRPO pilot” |
+| E19 | Hybrid Action-Causal GRPO（完整 G2） | 与 B/E17 同起点、三源 noteacher 数据和训练配置；1000 step | F1 与逐轮 evidence gain 独立组内归一化并按动作 token 路由；teacher 全关 | **全量失败**：最佳 ckpt1000；HotpotQA .4558/.5801、2Wiki .5084/.5604、MuSiQue .1783/.2744（EM/F1），三集均低于 B；宏平均 EM/F1 分别 −0.58/−0.45pt。 | A | 下文“E19 Hybrid Action-Causal GRPO pilot” |
+| E20 pilot | Outcome-Signed Query Reweighting（G3） | 与 B 同起点、reward、数据和训练配置；250-step pilot | 完整保留标准 GRPO advantage；仅 Query turn 使用 `A_seq + 0.25*abs(A_seq)*clip(A_gain,-2,2)`，严格保持 advantage 符号 | **未通过 pilot**：ckpt250 最优；hash1000 宏平均 EM/F1/Cover 为 .3710/.4601/.3990，相对 B-250 分别 −0.10/−0.34/−0.20pt；不进入 1000-step。 | A | 下文“E20 Outcome-Signed Query Reweighting pilot” |
+| E21 pilot | Causal Return-to-Go GRPO | 与 B 同起点、reward、数据和训练配置；250-step pilot | 不新增 reward；对第 k 个精确 Query 标签段，将 terminal relevance 替换为该时刻之后仍可获得的 evidence return；第一轮 Query、Answer、推理文本及其他 token 与 B 一致 | **未通过 pilot**：ckpt250 最优；hash1000 宏平均 EM/F1/Cover 为 .3720/.4603/.3993，相对 B-250 分别 +0.00/−0.31/−0.17pt；不进入 1000-step。 | A | 下文“E21 Causal Return-to-Go GRPO pilot” |
+| E22 pilot | DAPO Dynamic Sampling control | 与 B 同起点、reward、优势函数、数据和训练配置；250-step pilot | 保持标准 sequence GRPO；仅过滤复合 reward 组内标准差为 0 的 prompt，并最多重采样 3 轮 | **未通过 pilot**：ckpt250 最优；hash1000 宏平均 EM/F1/Cover 为 .3740/.4637/.4030，相对 B-250 分别 +0.20/+0.03/+0.20pt；MuSiQue EM/F1 均下降，F1 增益可忽略，不进入 1000-step。 | A | 下文“E22 DAPO Dynamic Sampling pilot” |
+| E23 pilot | Dr.GRPO fixed-length normalization | 与 B 同起点、reward、sequence advantage、数据和采样；250-step pilot | 唯一算法变化为 `loss_type: grpo -> dr_grpo`，将逐轨迹长度平均改为固定 `batch_size * max_completion_length` 分母，使长轨迹获得更高相对权重 | **未通过 pilot**：ckpt250 最优；hash1000 宏平均 EM/F1/Cover 为 .3697/.4602/.3973，相对 B-250 分别 −0.23/−0.32/−0.37pt；不进入 1000-step。 | A | 下文“E23 Dr.GRPO length normalization pilot” |
 
 ### 外部天花板诊断（DeepSeek，非同口径参考）
 
@@ -583,6 +589,279 @@ SFT+GRPO）在该配置下**未达成**。
 - E17 日志：`03_sapr_rag/scripts/grpo/logs/action_credit_canonical_sft_3src_s1000_coef0.2_20260906/`
 - sweep 评测：`data/eval_results/E17_action_credit_sweep_20260907/`
 - 全量评测：`data/eval_results/E17_action_credit_full_ckpt750_20260907/full/checkpoint-750/`
+
+### E18 Zero-Outcome Rescue GRPO pilot
+
+**研究动机**：E17 的动作信用作为全局附加项，与已有 outcome advantage 重叠，并且
+幅度过小。基于完整训练产物 `completions.jsonl`（80,080 样本 / 10,010 prompt 组）
+做离线诊断：
+
+| 诊断项 | 结果 |
+|---|---:|
+| 标准 GRPO advantage 平均绝对值 | 0.5748 |
+| E17 有效动作项均值（0.2 × 0.1931） | 0.0386（仅为基础项 6.72%） |
+| 生成批次动作信用完全为 0 | 35.0% |
+| 总 reward 整组零方差 | 23.8% |
+| 含“F1=0 但 relevance>0”样本的 prompt 组 | 44.1% |
+| F1 与 relevance 样本级相关系数 | 0.369 |
+
+**改进**：新增 `action_credit_gate=zero_outcome`。只有同一 prompt 的所有
+sequence-level GRPO advantage 均为 0 时，才保留逐 turn query evidence credit；
+标准 GRPO 已能产生排序的组全部把动作项置零。这样动作项只填补 GRPO 的死区，不干扰
+其已有排序。pilot 将 coef 提到 0.5，使救援信号达到中等尺度。
+
+严格保持不变：E14 起点、三源 noteacher 数据、F1/relevance/format reward、5 卡训练、
+双 rollout、num_generations=8、steps_per_generation=8。pilot 训练 250 step，
+checkpoint-125/250。
+
+- 启动脚本：`03_sapr_rag/scripts/grpo/run_canonical_sft_zero_outcome_credit_pilot.sh`
+- 输出：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/zero_outcome_credit_pilot_coef0.5_s250_20260908/`
+- 状态：250 step 已完成，checkpoint-125/250 均完整保存。125 个 generation 中
+  gate 平均命中 18.24% 的 prompt 组，但只有 3 个 generation 的动作项非零
+  （2.4%）；`0.5 * action_credit_abs_mean` 的全程均值仅 0.00314。该门控同时筛掉了
+  几乎全部有组内差异的 query gain，按过程指标早停，不进入评测。
+
+### E19 Hybrid Action-Causal GRPO pilot
+
+**改进**：实现完整 G2，而不是在总 sequence advantage 上继续叠加小项。Answer F1
+与逐轮 query evidence gain 分别归一化，再按动作 token 路由：
+
+```text
+Query_k: 0.5 * A_F1 + 0.5 * A_query_gain(k)
+Answer:  1.0 * A_F1
+其他:    0
+```
+
+该改动只替换 advantage 构造；rollout、GRPO loss、采样、数据、学习率和训练布局均与
+B/E17 保持一致。默认 `advantage_mode=sequence` 保持历史实验行为，E19 显式使用
+`advantage_mode=action_causal`。
+
+- 启动脚本：`03_sapr_rag/scripts/grpo/run_canonical_sft_action_causal_pilot.sh`
+- 输出：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/action_causal_g2_a0.5_l0.5_s250_20260908/`
+- 状态：250 step 已正常完成，checkpoint-125/250 均完整保存。125 个 generation
+  的过程统计如下：`action_credit_nonzero_group_ratio=0.4336`，
+  `action_credit_abs_mean=0.1887`，Query/Answer token advantage 绝对值均值分别为
+  `0.3090/0.5025`，未路由 token 仅 `1.66%`。因此局部信号没有重现 E18 的稀疏塌缩。
+
+固定 `hash1000, seed=20260908` 的 pilot 结果：
+
+| 数据集 | B-250 EM/F1/Cover | E19-125 EM/F1/Cover | E19-250 EM/F1/Cover | E19-250 − B-250 |
+|---|---:|---:|---:|---:|
+| HotpotQA | .4420/.5704/.4810 | .4530/.5718/.4900 | .4490/.5734/.4880 | +.0070/+.0030/+.0070 |
+| 2Wiki | .5000/.5506/.5190 | .5060/.5544/.5230 | .5120/.5631/.5300 | +.0120/+.0125/+.0110 |
+| MuSiQue | .1740/.2693/.2030 | .1710/.2596/.1980 | .1790/.2684/.2080 | +.0050/−.0009/+.0050 |
+| 宏平均 | .3720/.4634/.4010 | .3767/.4619/.4037 | .3800/.4683/.4087 | +.0080/+.0049/+.0077 |
+
+配对 bootstrap（每个数据集 20,000 次）显示单数据集 95% 区间仍跨 0：
+HotpotQA F1 差值区间 `[-.0118, .0176]`，2Wiki `[-.0042, .0291]`，
+MuSiQue `[-.0155, .0136]`。因此 pilot 只作为进入正式训练的筛选证据，不能单独宣称
+显著提升。
+
+行为审计显示该增益并非来自更短轨迹。相对 B-250，E19-250 的平均 Query 数、
+重复 Query 率与 max-turn rate 均略高，回答率略低：
+
+| 数据集 | B/E19 平均 Query 数 | B/E19 重复率 | B/E19 max-turn rate | B/E19 回答率 |
+|---|---:|---:|---:|---:|
+| HotpotQA | 2.254/2.277 | .120/.129 | .042/.053 | .971/.963 |
+| 2Wiki | 2.715/2.716 | .205/.209 | .071/.072 | .974/.967 |
+| MuSiQue | 3.044/3.050 | .208/.225 | .161/.171 | .913/.896 |
+
+因此当前证据只支持“动作路由改善部分答案决策”，尚不支持“搜索策略更高效”。若
+正式训练放大该退化，下一项改进应在 G2 上加入轻量 zero-gain/repeat query cost，
+而不是继续增大 evidence credit。
+
+- B-250 对照：`data/eval_results/B_grpo_hash1000_ckpt250_20260908/`
+- E17-250：`data/eval_results/E17_action_credit_hash1000_ckpt250_20260908/`
+- E19-125：`data/eval_results/E19_action_causal_hash1000_ckpt125_20260908/`
+- E19-250：`data/eval_results/E19_action_causal_hash1000_ckpt250_20260908/`
+- 正式 1000-step 启动脚本：
+  `03_sapr_rag/scripts/grpo/run_canonical_sft_action_causal_s1000.sh`
+- 正式 run：`action_causal_g2_a0.5_l0.5_s1000_20260908`，2026-09-08 06:35 启动；
+  12:27 完成 1000 step；hash1000 sweep 选择 checkpoint-1000。
+
+全量结果相对 B：
+
+| 数据集 | B EM/F1/Cover | E19 EM/F1/Cover | E19 − B |
+|---|---:|---:|---:|
+| HotpotQA | .4629/.5837/.5026 | .4558/.5801/.4991 | −.0071/−.0036/−.0035 |
+| 2Wiki | .5161/.5654/.5314 | .5084/.5604/.5279 | −.0077/−.0050/−.0035 |
+| MuSiQue | .1808/.2794/.2056 | .1783/.2744/.2085 | −.0025/−.0050/+.0029 |
+| 宏平均 | .3866/.4762/.4132 | .3808/.4716/.4118 | −.0058/−.0045/−.0014 |
+
+结论：E19 的 250-step hash pilot 增益没有扩展到 1000-step 全量结果。完整替换
+sequence advantage 同时删除 relevance/format 对 Answer 的约束，并允许错误轨迹中的
+正局部 credit 强化 Query，改动过强；E19 终止。
+
+### E20 Outcome-Signed Query Reweighting pilot
+
+E20 保留 B 的复合 sequence advantage，不再替换 reward 或将局部信号直接相加：
+
+```text
+Query_k: A_seq + lambda * abs(A_seq) * clip(A_query_gain(k), -c, c)
+其他:    A_seq
+lambda=0.25, c=2.0, lambda*c<1
+```
+
+正 evidence gain 会加强成功轨迹中的 Query、减轻失败轨迹对该 Query 的惩罚；负
+gain 则相反。`lambda*c<1` 保证非零 advantage 不跨过 0，因此局部 credit 只能
+重分配 Query 梯度强度，不能把坏轨迹改成正监督。与 E17/E19 相比，它保持 B 的
+F1/relevance/format 复合 reward、Answer 和非 Query token 完全不变。
+
+- 模式：`advantage_mode=signed_query_reweight`
+- 启动脚本：`03_sapr_rag/scripts/grpo/run_canonical_sft_signed_query_reweight_pilot.sh`
+- 监控：`action_query_reweight_delta_abs_mean`、`action_credit_clipped_ratio`、
+  `action_query_sign_flip_ratio`（必须恒为 0）
+- 训练与评测：250 step 已完成，checkpoint-250 最优。固定
+  `hash1000, seed=20260908` 结果如下：
+
+| 数据集 | B-250 EM/F1/Cover | E20-250 EM/F1/Cover | E20 − B |
+|---|---:|---:|---:|
+| HotpotQA | .4420/.5704/.4810 | .4450/.5711/.4850 | +.0030/+.0007/+.0040 |
+| 2Wiki | .5000/.5506/.5190 | .5000/.5443/.5150 | +.0000/−.0063/−.0040 |
+| MuSiQue | .1740/.2693/.2030 | .1680/.2648/.1970 | −.0060/−.0045/−.0060 |
+| 宏平均 | .3720/.4634/.4010 | .3710/.4601/.3990 | −.0010/−.0034/−.0020 |
+
+机制审计：125 个 generation 中 Query turn 覆盖 69.62% 的 completion token，
+`action_query_reweight_delta_abs_mean=0.0418`，非零局部信用组占 43.68%，且
+`action_query_sign_flip_ratio=0`。说明失败不是信号未生效，而是即时 evidence gain
+与 B 已有 terminal relevance 高度重复。HotpotQA/2Wiki 的平均 gold evidence 覆盖率
+分别仅从 45.6%→45.7%、39.4%→39.4%，没有改善检索能力。E20 不进入 1000-step。
+
+### E21 Causal Return-to-Go GRPO pilot
+
+E21 不再添加或放大新的 evidence reward，而是对 B 已有 relevance 分量做时间因果
+重分配。第 k 个 Query 使用：
+
+```text
+R_query(k) = R_sequence - 0.2 * relevance_final
+             + 0.2 * sum(evidence_gain[j], j >= k)
+A_query(k) = GroupNorm(R_query(k))
+```
+
+其中 Query 1 强制复用标准 `A_sequence`，无方差或只有单一样本的后续 turn-slot 也
+回退到 `A_sequence`。因此 E21 具有以下不变量：
+
+- 不新增 reward，逐轮 gain 仍严格 telescoping 到 terminal relevance；
+- Query 只获得当前时刻之后的 evidence 收益，不再继承此前已经取得的 evidence；
+- 前置 bridge Query 可通过后续 evidence gain 获得 return-to-go 信用；
+- 仅 `<query>...</query>` 标签段使用新 advantage，Query 前的推理文本保持 B；
+- Answer、非 Query token、rollout、数据、采样和优化器均保持 B。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_causal_return_pilot.sh`。监控包括
+`causal_return_query_payload_ratio`、`causal_return_late_query_ratio`、
+`causal_return_delta_abs_mean`、`causal_return_sign_flip_ratio` 和
+`causal_return_first_query_delta_max`；最后一项必须恒为 0。
+
+**运行记录**：首次启动在 step 0 暴露 tokenizer decode→encode 不能保证原 BPE
+边界完全回环，触发 Query payload mask fail-fast；launcher 自动清理全部进程。随后改为
+直接依据原始 token id 的逐 token 解码字符区间定位标签段，81 项测试和干净补丁重放
+通过。v2 于 2026-09-10 17:43:29 启动，随后在 step 6 发现 vLLM stop 会从原始
+可训练 token ids 中移除 `</query>`；mask 改为在缺失闭标签时延伸到当前 turn 末尾，
+并新增回归测试。v3 于 18:09:35 启动，rollout1/2 分别于 18:18:34/18:27:31
+ready，已稳定越过 step 12。首批 `causal_return_query_payload_ratio≈0.15`、
+`causal_return_first_query_delta_max=0`；后续 Query 的符号翻转率最高约 3.3%，属于
+return-to-go 重新排序的预期行为。训练完成后自动评测 checkpoint-125/250 的固定
+`hash1000, seed=20260908`。
+
+v3 于 2026-09-10 19:56:16 完成 250 step，自动 hash1000 sweep 于 21:09:11
+完成并选择 checkpoint-250：
+
+| 数据集 | B-250 EM/F1/Cover | E21-250 EM/F1/Cover | E21 − B |
+|---|---:|---:|---:|
+| HotpotQA | .4420/.5704/.4810 | .4450/.5708/.4870 | +.0030/+.0004/+.0060 |
+| 2Wiki | .5000/.5506/.5190 | .5060/.5498/.5220 | +.0060/−.0008/+.0030 |
+| MuSiQue | .1740/.2693/.2030 | .1650/.2604/.1890 | −.0090/−.0089/−.0140 |
+| 宏平均 | .3720/.4634/.4010 | .3720/.4603/.3993 | +.0000/−.0031/−.0017 |
+
+checkpoint-125 的宏平均 EM/F1/Cover 为 `.3690/.4574/.3970`，同样低于 B。
+E21 在 HotpotQA 和 2Wiki 的 EM 上有小幅改善，但 MuSiQue EM/F1 分别下降
+0.90/0.89pt，抵消了收益。该方法未通过 pilot，不进入 1000-step。
+
+### E22 DAPO Dynamic Sampling pilot
+
+E17–E21 均直接改变了动作 token 的优势，未取得稳定增益。E22 回到标准 B 的
+sequence GRPO，只处理每个 generation batch 中没有学习信号的零方差组：
+
+```text
+if std({R_i}_{i=1..G}) == 0:
+    discard this prompt group and sample a fresh on-policy group
+else:
+    keep the original group and standard GRPO advantage
+```
+
+配置固定为 `dynamic_sample=true, max_resample_times=3, overlong_filter=false`。
+reward 仍为 F1 1.0 / relevance 0.2 / format 0.05，teacher、动作信用与额外
+reward 全部关闭。该实验用于回答“B 的增益是否受 10%–50% 零方差 rollout 组拖累”，
+属于 DAPO 强优化对照，不作为独立论文贡献。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_dapo_dynamic_pilot.sh`。
+仍只训练 250 step，并以固定 `hash1000, seed=20260908` 对 checkpoint-125/250
+进行评测；未通过 pilot 不进入 1000-step。
+
+**运行记录**：8×H20 worker 的默认 FAISS GPU 包不包含 H20 kernel，首次启动
+触发 CUDA error 209；切换到 `sapr_faiss_gpu_cuda129_py311` 并使用其
+`libstdc++.so.6` 后，GPU0 检索服务于 01:15 ready。E22 于 01:16:21 启动，
+rollout1/2 分别于 01:30:04/01:40:04 ready。训练已越过 step 4；首两个
+generation 的 `frac_reward_zero_std` 均为 0，generation step 约 58–68 秒，
+无 NaN/OOM/RuntimeError。训练于 04:00:47 完成，自动 hash1000 sweep 于
+05:12:34 完成并选择 checkpoint-250：
+
+| 数据集 | B-250 EM/F1/Cover | E22-250 EM/F1/Cover | E22 − B |
+|---|---:|---:|---:|
+| HotpotQA | .4420/.5704/.4810 | .4480/.5728/.4890 | +.0060/+.0024/+.0080 |
+| 2Wiki | .5000/.5506/.5190 | .5040/.5504/.5210 | +.0040/−.0002/+.0020 |
+| MuSiQue | .1740/.2693/.2030 | .1700/.2679/.1990 | −.0040/−.0014/−.0040 |
+| 宏平均 | .3720/.4634/.4010 | .3740/.4637/.4030 | +.0020/+.0003/+.0020 |
+
+checkpoint-125 宏平均 EM/F1/Cover 为 `.3697/.4577/.3987`，低于 B。动态采样
+将训练中的零方差组稳定降到 0，但 checkpoint-250 的宏平均 F1 仅提升 0.03pt，
+且 MuSiQue 退化，因此证明“消除零方差空转”本身不足以带来稳定端到端增益。
+E22 不进入 1000-step。
+
+### E23 Dr.GRPO length normalization pilot
+
+**实验 ID**：E23
+**日期**：2026-09-11
+**状态**：250-step 训练与 checkpoint-125/250 固定 hash1000 评测均已完成；
+checkpoint-250 最优，未通过 pilot。
+
+E17–E21 的 Query 局部信用未形成稳定增益，E22 又证明零方差组不是主要瓶颈。
+E23 因而检验另一项与 Agentic RAG 长轨迹直接相关的偏置：B 使用标准
+`loss_type=grpo`，会先对每条轨迹的 token loss 按自身长度取平均，再对轨迹取平均，
+使短轨迹和长轨迹在 loss 中总权重相同。对需要更多检索轮的 MuSiQue，这可能稀释
+长链轨迹中多个有效动作的联合学习信号。
+
+E23 只把 loss 归一化改为 Dr.GRPO：
+
+```text
+B:   L = mean_i(sum_t L_i,t / T_i)
+E23: L = sum_i,t L_i,t / (batch_size * 4096)
+```
+
+reward、sequence advantage、数据、学习率、采样参数、Evidence Agent 和最大轮数均
+保持 B 不变；teacher、动作信用、动态采样与 overlong filter 全部关闭。B 的权威
+`args.json` 已确认 `loss_type=grpo`。B 训练日志中完成长度均值为 338.80 token，
+batch mean 的 P10/中位数/P90 分别为 292.25/339.85/384.84，因此该改动会明显提高
+长轨迹相对短轨迹的梯度权重。由于多轮总 completion 偶尔可超过单轮配置上限 4096，
+这里把 Dr.GRPO 视为固定尺度的长度重权实验，而不声称 4096 是严格的总轨迹上界。
+
+入口：`03_sapr_rag/scripts/grpo/run_canonical_sft_dr_grpo_pilot.sh`。训练 run 为
+`dr_grpo_lengthnorm_r3_s250_20260911`；评测输出为
+`data/eval_results/E23_dr_grpo_hash1000_20260911/`。
+
+训练于 11:56 完成，耗时 1h26m；自动 sweep 于 13:07 完成：
+
+| 数据集 | B-250 EM/F1/Cover | E23-250 EM/F1/Cover | E23 − B |
+|---|---:|---:|---:|
+| HotpotQA | .4420/.5704/.4810 | .4460/.5685/.4850 | +.0040/−.0019/+.0040 |
+| 2Wiki | .5000/.5506/.5190 | .4960/.5454/.5140 | −.0040/−.0052/−.0050 |
+| MuSiQue | .1740/.2693/.2030 | .1670/.2668/.1930 | −.0070/−.0025/−.0100 |
+| 宏平均 | .3720/.4634/.4010 | .3697/.4602/.3973 | −.0023/−.0032/−.0037 |
+
+checkpoint-125 的宏平均 EM/F1/Cover 为 `.3660/.4583/.3963`，同样低于 B。
+Dr.GRPO 仅使 HotpotQA EM/Cover 小幅提高，却同时降低三套数据集的 F1，并明显伤害
+MuSiQue 的 EM/Cover。因此“提高长轨迹相对权重”没有修复长链任务，E23 不进入
+1000-step。
 
 ### External-teacher selective OPD
 

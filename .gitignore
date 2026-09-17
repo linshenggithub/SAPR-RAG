@@ -29,6 +29,7 @@ docs/worker_gpu_zombie_context_note_*.md
 03_sapr_rag/scripts/grpo/smoke_*.sh
 03_sapr_rag/scripts/grpo/_*.sh
 03_sapr_rag/scripts/grpo/*_worker.sh
+!03_sapr_rag/scripts/grpo/launch_action_scoped_opsd_worker.sh
 03_sapr_rag/scripts/grpo/precheck_worker*.sh
 03_sapr_rag/scripts/grpo/launch_opsd_worker*.sh
 03_sapr_rag/scripts/grpo/launch_opsd_on_worker.sh

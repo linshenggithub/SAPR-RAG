@@ -72,6 +72,14 @@ ACTION_CREDIT_MODE="${ACTION_CREDIT_MODE:-off}"
 ACTION_CREDIT_COEF="${ACTION_CREDIT_COEF:-0.0}"
 ACTION_CREDIT_SCALE="${ACTION_CREDIT_SCALE:-group_turn}"
 ACTION_CREDIT_INFOS_KEY="${ACTION_CREDIT_INFOS_KEY:-query_evidence_gain}"
+ACTION_CREDIT_GATE="${ACTION_CREDIT_GATE:-all}"
+ADVANTAGE_MODE="${ADVANTAGE_MODE:-sequence}"
+ACTION_QUERY_OUTCOME_COEF="${ACTION_QUERY_OUTCOME_COEF:-0.25}"
+ACTION_CREDIT_CLIP="${ACTION_CREDIT_CLIP:-2.0}"
+DYNAMIC_SAMPLE="${DYNAMIC_SAMPLE:-false}"
+MAX_RESAMPLE_TIMES="${MAX_RESAMPLE_TIMES:-3}"
+OVERLONG_FILTER="${OVERLONG_FILTER:-false}"
+LOSS_TYPE="${LOSS_TYPE:-grpo}"
 DRY_RUN="${DRY_RUN:-false}"
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-6}"
@@ -105,10 +113,39 @@ case "$OPD_USE_GRPO_ADVANTAGE" in
     true|false) ;;
     *) echo "[run_grpo_opsd] ERROR: OPD_USE_GRPO_ADVANTAGE must be true or false, got: $OPD_USE_GRPO_ADVANTAGE" >&2; exit 2 ;;
 esac
+case "$DYNAMIC_SAMPLE" in
+    true|false) ;;
+    *) echo "[run_grpo_opsd] ERROR: DYNAMIC_SAMPLE must be true or false, got: $DYNAMIC_SAMPLE" >&2; exit 2 ;;
+esac
+case "$OVERLONG_FILTER" in
+    true|false) ;;
+    *) echo "[run_grpo_opsd] ERROR: OVERLONG_FILTER must be true or false, got: $OVERLONG_FILTER" >&2; exit 2 ;;
+esac
+if ! [[ "$MAX_RESAMPLE_TIMES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[run_grpo_opsd] ERROR: MAX_RESAMPLE_TIMES must be a positive integer, got: $MAX_RESAMPLE_TIMES" >&2
+    exit 2
+fi
+case "$LOSS_TYPE" in
+    grpo|bnpo|dr_grpo|dapo|cispo|sapo|real|fipo) ;;
+    *) echo "[run_grpo_opsd] ERROR: unsupported LOSS_TYPE=$LOSS_TYPE" >&2; exit 2 ;;
+esac
 case "$ACTION_CREDIT_MODE" in
     off|query_evidence) ;;
     *) echo "[run_grpo_opsd] ERROR: ACTION_CREDIT_MODE must be off or query_evidence, got: $ACTION_CREDIT_MODE" >&2; exit 2 ;;
 esac
+case "$ACTION_CREDIT_GATE" in
+    all|zero_outcome) ;;
+    *) echo "[run_grpo_opsd] ERROR: ACTION_CREDIT_GATE must be all or zero_outcome, got: $ACTION_CREDIT_GATE" >&2; exit 2 ;;
+esac
+case "$ADVANTAGE_MODE" in
+    sequence|action_causal|signed_query_reweight|causal_return) ;;
+    *) echo "[run_grpo_opsd] ERROR: unsupported ADVANTAGE_MODE=$ADVANTAGE_MODE" >&2; exit 2 ;;
+esac
+if [ "$ADVANTAGE_MODE" != "sequence" ] \
+        && { [ "$ACTION_CREDIT_MODE" != "query_evidence" ] || [ "$ACTION_CREDIT_GATE" != "all" ]; }; then
+    echo "[run_grpo_opsd] ERROR: $ADVANTAGE_MODE requires ACTION_CREDIT_MODE=query_evidence and ACTION_CREDIT_GATE=all" >&2
+    exit 2
+fi
 if [ "$ACTION_CREDIT_MODE" != "off" ] && [ "$ENABLE_REWARD" = "false" ]; then
     echo "[run_grpo_opsd] ERROR: ACTION_CREDIT_MODE requires ENABLE_REWARD=true (additive on GRPO advantage)" >&2; exit 2
 fi
@@ -210,6 +247,8 @@ echo "[run_grpo_opsd] layout=train:${DEVICE_LABEL}${TRAIN_DEVICES}"
 echo "[run_grpo_opsd] vllm_server=${VLLM_HOST}:${VLLM_PORT} group_port=${VLLM_GROUP_PORT}"
 echo "[run_grpo_opsd] opsd=$ENABLE_OPSD teacher_fields=$DATASET_TEACHER_FIELDS action_scope=$TEACHER_ACTION_SCOPE"
 echo "[run_grpo_opsd] teacher_coefs=global:$TEACHER_KL_COEF query:$TEACHER_QUERY_KL_COEF evidence:$TEACHER_EVIDENCE_KL_COEF answer:$TEACHER_ANSWER_KL_COEF"
+echo "[run_grpo_opsd] advantage_mode=$ADVANTAGE_MODE query_outcome_coef=$ACTION_QUERY_OUTCOME_COEF credit_clip=$ACTION_CREDIT_CLIP"
+echo "[run_grpo_opsd] loss_type=$LOSS_TYPE dynamic_sample=$DYNAMIC_SAMPLE max_resample_times=$MAX_RESAMPLE_TIMES overlong_filter=$OVERLONG_FILTER"
 
 REWARD_FUNCS=(sapr_f1 sapr_relevance sapr_format)
 REWARD_WEIGHTS=(1.0 0.2 0.05)
@@ -244,6 +283,10 @@ CMD=(
     --action_credit_coef "$ACTION_CREDIT_COEF"
     --action_credit_scale "$ACTION_CREDIT_SCALE"
     --action_credit_infos_key "$ACTION_CREDIT_INFOS_KEY"
+    --action_credit_gate "$ACTION_CREDIT_GATE"
+    --advantage_mode "$ADVANTAGE_MODE"
+    --action_query_outcome_coef "$ACTION_QUERY_OUTCOME_COEF"
+    --action_credit_clip "$ACTION_CREDIT_CLIP"
     --use_vllm true
     --vllm_mode server
     --vllm_server_host "${VLLM_HOST_ARR[@]}"
@@ -260,6 +303,10 @@ CMD=(
     --gradient_accumulation_steps "$GRADIENT_ACCUMULATION_STEPS"
     --steps_per_generation "$STEPS_PER_GENERATION"
     --num_generations "$NUM_GENERATIONS"
+    --loss_type "$LOSS_TYPE"
+    --dynamic_sample "$DYNAMIC_SAMPLE"
+    --max_resample_times "$MAX_RESAMPLE_TIMES"
+    --overlong_filter "$OVERLONG_FILTER"
     --learning_rate 1e-6
     --temperature 1.0
     --gradient_checkpointing_kwargs '{"use_reentrant": false}'

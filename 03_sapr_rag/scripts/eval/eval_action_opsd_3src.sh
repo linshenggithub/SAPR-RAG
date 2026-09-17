@@ -13,6 +13,8 @@ RUN_ROOT="${RUN_ROOT:-$PROJ_ROOT/03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_act
 CHECKPOINT_STEPS="${CHECKPOINT_STEPS:-500,1000,1500,2000,2500,3000}"
 CHECKPOINT_STEP="${CHECKPOINT_STEP:-}"
 N_SUBSET="${N_SUBSET:-200}"
+SUBSET_SELECTION="${SUBSET_SELECTION:-head}"
+SUBSET_SEED="${SUBSET_SEED:-42}"
 ROLLOUT_GPU="${ROLLOUT_GPU:-7}"
 ROLLOUT_PORT="${ROLLOUT_PORT:-8031}"
 RETRIEVAL_URL="${RETRIEVAL_URL:-http://127.0.0.1:8100}"
@@ -163,14 +165,51 @@ eval_one() {
 prepare_subsets() {
   local dataset
   local input
+  local output
   local subset_dir="$OUT_ROOT/selection_inputs"
 
   mkdir -p "$subset_dir"
   for dataset in "${DATASETS[@]}"; do
     input="$PROJ_ROOT/data/eval/$dataset/dev.jsonl"
     require_file "$input"
-    head -n "$N_SUBSET" "$input" >"$subset_dir/${dataset}_first${N_SUBSET}.jsonl"
+    output="$subset_dir/$(subset_filename "$dataset")"
+    if [[ "$SUBSET_SELECTION" == "head" ]]; then
+      head -n "$N_SUBSET" "$input" >"$output"
+    elif [[ "$SUBSET_SELECTION" == "hash" ]]; then
+      python - "$input" "$output" "$N_SUBSET" "$SUBSET_SEED" <<'PY'
+import hashlib
+import json
+import sys
+
+input_path, output_path, n_text, seed = sys.argv[1:]
+n = int(n_text)
+ranked = []
+with open(input_path) as src:
+    for line_no, line in enumerate(src):
+        row = json.loads(line)
+        item_id = str(row.get("id", line_no))
+        digest = hashlib.sha256(f"{seed}\0{item_id}".encode()).digest()
+        ranked.append((digest, line))
+if len(ranked) < n:
+    raise SystemExit(f"subset size {n} exceeds dataset size {len(ranked)}")
+ranked.sort(key=lambda item: item[0])
+with open(output_path, "w") as dst:
+    dst.writelines(line for _, line in ranked[:n])
+PY
+    else
+      echo "ERROR: SUBSET_SELECTION must be head or hash, got: $SUBSET_SELECTION" >&2
+      exit 2
+    fi
   done
+}
+
+subset_filename() {
+  local dataset="$1"
+  if [[ "$SUBSET_SELECTION" == "head" ]]; then
+    printf '%s_first%s.jsonl\n' "$dataset" "$N_SUBSET"
+  else
+    printf '%s_hash%s_seed%s.jsonl\n' "$dataset" "$N_SUBSET" "$SUBSET_SEED"
+  fi
 }
 
 write_sweep_summary() {
@@ -227,7 +266,7 @@ run_sweep() {
   for step in "${steps[@]}"; do
     start_rollout "$step"
     for dataset in "${DATASETS[@]}"; do
-      input="$OUT_ROOT/selection_inputs/${dataset}_first${N_SUBSET}.jsonl"
+      input="$OUT_ROOT/selection_inputs/$(subset_filename "$dataset")"
       eval_one "$step" "$dataset" "$input" selection
     done
     cleanup_rollout
@@ -282,6 +321,8 @@ CONFIG_FILE="$OUT_ROOT/config_${MODE}.txt"
   echo "checkpoint_steps=$CHECKPOINT_STEPS"
   echo "checkpoint_step=$CHECKPOINT_STEP"
   echo "n_subset=$N_SUBSET"
+  echo "subset_selection=$SUBSET_SELECTION"
+  echo "subset_seed=$SUBSET_SEED"
   echo "rollout_gpu=$ROLLOUT_GPU"
   echo "rollout_port=$ROLLOUT_PORT"
   echo "retrieval_url=$RETRIEVAL_URL"

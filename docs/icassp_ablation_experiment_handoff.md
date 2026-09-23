@@ -1,6 +1,8 @@
 # SAPR-RAG ICASSP 消融实验补做清单与执行交接
 
-日期：2026-09-22。状态：**待补训、待补推理；本文不包含新增实验结果**。
+日期：2026-09-22。状态：**推理预算消融已完成；纯 OPSD Query/Answer 消融待补训**。
+已完成的 GRPO-additive 诊断见
+[`icassp_ablation_experiment_report.md`](icassp_ablation_experiment_report.md)。
 
 目标读者：能够访问 SAPR-RAG、配套 ms-swift checkout、模型、数据、检索服务和 GPU 的执行 AI。
 本文的目的，是在投稿截止前用最少但可归因的实验验证当前完整目标：
@@ -20,12 +22,29 @@ A_{i,t}=\hat A_i+\beta_qm_{i,t}^{q}d_{i,t}^{q}
 
 ## 0. 先给结论：缺什么、不缺什么
 
+### 0.0 2026-09-23 非目标诊断记录
+
+- 已完成的 Query-only 与 Answer-only 均**保留 GRPO outcome advantage**，属于
+  “GRPO 上叠加单个 OPSD 动作项”的加法诊断，不是本文要求的纯 OPSD 动作消融；
+- checkpoint-250/500/750/1000 全部保存；
+- Outcome-only、Query-only、Answer-only 使用统一 S5-K3 强制回答协议重新完成三数据集
+  全量评测，共 67,194 条新增结果；
+- 加上已有 Full 结果，四组均为 22,398 题且 question ID 严格对齐；
+- 回答率 100%，格式失败、服务失败和逐行错误均为 0；
+- 10,000 次分层 paired bootstrap 的五组比较全部不显著；
+- 宏 F1：Outcome-only 0.4794、Query-only 0.4770、Answer-only 0.4791、
+  Full 0.4785；
+- 结论：在 GRPO 基础上叠加 Query/Answer OPSD 会轻微改变检索行为，但没有在强
+  Outcome-only 基线上带来可验证的端到端质量收益；
+- 以上结果只能作为 GRPO-additive 诊断，不能冒充
+  `SFT + Query-only OPSD` / `SFT + Answer-only OPSD` 消融。
+
 ### 0.1 必须新增训练的两组
 
-只缺两个与完整方法严格匹配的分支消融：
+只缺两个与 OPSD-only 基线严格匹配的动作分支消融：
 
-1. **Query-only**：保留 GRPO，开启 Query OPSD，关闭 Answer OPSD。
-2. **Answer-only**：保留 GRPO，关闭 Query OPSD，开启 Answer OPSD。
+1. **SFT + Query-only OPSD**：关闭 GRPO，只开启 Query OPSD。
+2. **SFT + Answer-only OPSD**：关闭 GRPO，只开启 Answer OPSD。
 
 旧 E09/E10 的 Answer-only OPSD 从 SFT+DPO 起点训练，数据、步数与当前 canonical
 SFT 主线不匹配，**不能**冒充这里的 Answer-only 对照。
@@ -82,27 +101,28 @@ Outcome-only。新增 Query/Answer 消融的任务是解释信号作用，不是
 
 | Method | Outcome advantage | Query OPSD | Answer OPSD |
 |---|---:|---:|---:|
-| Outcome-only | ✓ | × | × |
-| + Query OPSD | ✓ | ✓ | × |
-| + Answer OPSD | ✓ | × | ✓ |
-| SAPR-RAG | ✓ | ✓ | ✓ |
+| SFT | × | × | × |
+| SFT + Query-only OPSD | × | ✓ | × |
+| SFT + Answer-only OPSD | × | × | ✓ |
+| SFT + OPSD-only | × | ✓ | ✓ |
 
-这一表直接验证公式里的两个新增动作项，是截止前最高优先级的新增训练。
+这一表在不混入 outcome advantage 的前提下，直接验证两个 OPSD 动作项，是当前
+最高优先级的新增训练。
 
 ## 2. P0：Query-only 与 Answer-only 匹配训练
 
 ### 2.1 唯一允许改变的配置
 
-两组都从 E14 canonical SFT `checkpoint-4150` 起步，使用与 E16 相同的
-三源 `hotpotqa_2wiki_musique_train_multi_opsd.jsonl`、reward、rollout、Evidence
-Agent、模型、LoRA、batch、采样数、长度、学习率、reference、检索器和 1000 steps。
+两组都从 E14 canonical SFT `checkpoint-4150` 起步，使用与 D（OPSD-only）相同的
+三源 `hotpotqa_2wiki_musique_train_multi_opsd.jsonl`、rollout、Evidence Agent、
+模型、LoRA、batch、采样数、长度、学习率、reference、检索器和 1000 steps。
 
 共同开关：
 
 ```text
 ENABLE_OPSD=true
-ENABLE_REWARD=true
-OPD_USE_GRPO_ADVANTAGE=true
+ENABLE_REWARD=false
+OPD_USE_GRPO_ADVANTAGE=false
 TEACHER_ACTION_SCOPE=multi
 TEACHER_EVIDENCE_KL_COEF=0.0
 ENABLE_TRUNCATION_REWARD=false
@@ -116,29 +136,29 @@ ADVANTAGE_MODE=sequence
 |---|---:|---:|
 | Query-only | `0.01` | `0.0` |
 | Answer-only | `0.0` | `0.03` |
-| E16 Full（已有） | `0.01` | `0.03` |
+| D OPSD-only（已有） | `0.01` | `0.03` |
 
-不要使用 E09/E10 的旧 Answer-only wrapper，不要改成纯 OPSD，不要同时开启
-E17–E23 的动作信用、return-to-go、动态采样或长度归一化。
+不要使用 E09/E10 的旧 Answer-only wrapper，不要保留 GRPO reward/advantage，也不要
+同时开启 E17–E23 的动作信用、return-to-go、动态采样或长度归一化。
 
 ### 2.2 建议新增入口
 
-从 `run_canonical_sft_multi_opsd_s1000.sh` 复制并逐项审计，建议新增：
+从 `run_canonical_sft_pure_opsd_s1000.sh` 复制并逐项审计，建议新增：
 
 ```text
-03_sapr_rag/scripts/grpo/run_canonical_sft_query_opsd_s1000.sh
-03_sapr_rag/scripts/grpo/run_canonical_sft_answer_opsd_s1000.sh
+03_sapr_rag/scripts/grpo/run_canonical_sft_pure_query_opsd_s1000.sh
+03_sapr_rag/scripts/grpo/run_canonical_sft_pure_answer_opsd_s1000.sh
 ```
 
 脚本名符合仓库规范。除了两个动作系数、`RUN_NAME`、端口和经用户确认的 GPU 分配，
-与 E16 不应有其他实验差异。复制后用机器可读方式比较展开配置，并把 diff 写入
+与 D 不应有其他实验差异。复制后用机器可读方式比较展开配置，并把 diff 写入
 `experiment_note.md`。
 
 建议 run name：
 
 ```text
-query_opsd_canonical_sft_q001_a000_3src_s1000_YYYYMMDD
-answer_opsd_canonical_sft_q000_a003_3src_s1000_YYYYMMDD
+pure_query_opsd_canonical_sft_q001_a000_3src_s1000_YYYYMMDD
+pure_answer_opsd_canonical_sft_q000_a003_3src_s1000_YYYYMMDD
 ```
 
 不得照抄历史固定的 GPU2–7 或端口。执行前查看 GPU/进程/端口归属并取得用户对资源、
@@ -154,7 +174,7 @@ steps、生成数或最大长度。
 - E14 adapter 和两份训练 JSONL 是否存在、大小及哈希；
 - 检索 `/health` 的语料/索引/BGE/FAISS 字段；
 - 可用 GPU、显存、端口、磁盘和预计 wall time；
-- 展开后的 Query-only／Answer-only／E16 配置差异。
+- 展开后的 Query-only／Answer-only／D 配置差异。
 
 已有完整 ms-swift 补丁基于
 `1dbd1bf64a46bd6bb710d9ace05d529ff071cd1f`；按迁移手册核验，不在有本地改动的
@@ -173,10 +193,10 @@ steps、生成数或最大长度。
 
 ### 2.4 checkpoint 与停止规则
 
-保存 250/500/750/1000，但核心消融固定比较 **checkpoint-1000**，与 B/D/C 一致。
+保存 250/500/750/1000，但核心消融固定比较 **checkpoint-1000**，与 SFT/D 一致。
 不得为每个方法分别挑最好 checkpoint 后放进同一消融表。
 
-若因截止时间只跑到 250，应明确标为 pilot，并与 B/C/D 的 250-step 匹配 checkpoint
+若因截止时间只跑到 250，应明确标为 pilot，并与 D 的 250-step 匹配 checkpoint
 比较，不能把 250-step 新方法与 1000-step 完整结果并表。资源不足时报告并请求用户
 选择，不自动改变方案。
 
@@ -202,7 +222,7 @@ adapter、数据路径和当前权威评测口径。不要用选择集挑 checkp
 
 至少输出：EM、F1、Cover-EM、回答率、平均决策轮数、平均逻辑检索数、重复 Query
 率、max-turn rate、格式失败率、服务失败率。对每个问题保存 id，使用
-`paired_bootstrap.py` 与 Outcome-only 及 Full 做配对差值和 95% CI；若脚本只默认比较
+`paired_bootstrap.py` 与 SFT 及 OPSD-only 做配对差值和 95% CI；若脚本只默认比较
 SFT+DPO，先参数化 reference 文件，不能把错误 reference 的输出放入论文。
 
 ### 3.2 现有四组是否需要重推理
@@ -306,7 +326,7 @@ config、输出目录和 metrics manifest。先用一条样本验证 `/health`/�
 checkpoint ∈ {250, 500, 750, 1000}
 ```
 
-至少画 Outcome-only、OPSD-only、Full；Query-only/Answer-only 完成后可加入附录。
+至少画 SFT、Query-only、Answer-only、OPSD-only；GRPO 相关组放在独立总目标表。
 先读取现有 eval 目录和 metrics，不重复推理已有 checkpoint。缺失的 checkpoint 在同一
 固定 validation 子集上补评，不允许每条方法用不同题集。横轴可以是 steps；只有可靠
 记录了 GPU hours 才画 GPU hours，不能从别的机器估算后当实测。
@@ -343,7 +363,7 @@ checkpoint ∈ {250, 500, 750, 1000}
 
 严格按以下顺序：
 
-1. 只读核验已有 E14/B/D/C 产物和协议。
+1. 只读核验已有 E14/D 产物和协议；B/C 只用于另一张总目标表。
 2. 实现两个新 wrapper 和评测脚本参数化，完成测试/dry-run。
 3. 用户确认 GPU 预算后，跑 Query-only／Answer-only smoke。
 4. 完成两组 1000-step 匹配训练；资源不允许则停止并报告。
@@ -400,18 +420,17 @@ docs/icassp_ablation_experiment_report.md
 - 关键比较提供 paired bootstrap 95% CI；
 - 负结果、服务失败和不显著差异没有被隐藏。
 
-特别是，现有 `C-B≈0` 时不能写“AS-OPSD 显著增强 outcome optimization”。若新增
-实验仍如此，准确表述应是：完整目标优于 SFT 和纯 OPSD，同时与强 outcome-only
-基线相当；Query/Answer 分支的行为差异按真实结果报告。只有 Full 稳健超过匹配
-Outcome-only，才能主张 OPSD 在 GRPO 之上带来独立收益。
+纯 OPSD 动作表只回答 Query 与 Answer teacher 各自的作用，不能混入 GRPO advantage。
+现有 GRPO-additive 诊断应单独报告，不能替代该表。
 
 ## 11. 给服务器端 AI 的直接启动指令
 
 > 阅读 AGENTS.md、docs/experiment_tracker.md、docs/ms_swift_local_patches.md、
 > docs/retrieval_service_gpu_runbook.md 和本文。先核验 E14/B/D/C 的 checkpoint、配置、
 > metrics 与统一评测协议，不重复训练已有四组。新增且只新增两个最高优先级匹配训练：
-> Query-only（q=0.01, ans=0）和 Answer-only（q=0, ans=0.03），保留 E16 的 GRPO
-> advantage/reward及全部其他配置，固定训练1000 step并评checkpoint-1000。先完成
+> SFT + Query-only OPSD（q=0.01, ans=0）和 SFT + Answer-only OPSD
+>（q=0, ans=0.03），以 D 的 pure-OPSD 配置为唯一基准，关闭 reward 与 GRPO
+> advantage，其余配置固定，训练1000 step并评checkpoint-1000。先完成
 > dry-run、1–2步smoke、动作mask/token对齐和LoRA同步检查，取得用户GPU预算确认后
 > 才运行正式训练。随后统一评HotpotQA、2Wiki、MuSiQue并统计EM/F1/Cover、检索数、
 > 重复率、max-turn率和回答率。参数化评测脚本中硬编码的Top-k=3和max_turns=6，完成

@@ -20,7 +20,15 @@ ROLLOUT_PORT="${ROLLOUT_PORT:-8031}"
 RETRIEVAL_URL="${RETRIEVAL_URL:-http://127.0.0.1:8100}"
 BATCH_SIZE="${BATCH_SIZE:-64}"
 MAX_TOKENS="${MAX_TOKENS:-512}"
+TOP_K="${TOP_K:-3}"
+MAX_SEARCHES="${MAX_SEARCHES:-5}"
+MAX_TURNS="${MAX_TURNS:-6}"
+FORCE_FINAL_ANSWER="${FORCE_FINAL_ANSWER:-false}"
+RUN_BOOTSTRAP="${RUN_BOOTSTRAP:-true}"
 BOOTSTRAP_SAMPLES="${BOOTSTRAP_SAMPLES:-20000}"
+REQUEST_RETRIES="${REQUEST_RETRIES:-2}"
+RETRY_BACKOFF="${RETRY_BACKOFF:-5}"
+RESUME="${RESUME:-false}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUT_ROOT="${OUT_ROOT:-$PROJ_ROOT/data/eval_results/action_opsd_3src_${MODE}_${RUN_TAG}}"
 DRY_RUN="${DRY_RUN:-false}"
@@ -38,6 +46,41 @@ declare -A REASONRAG_F1=(
   [musique]="0.321"
 )
 ROLL_PID=""
+
+[[ "$TOP_K" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: TOP_K must be a positive integer, got: $TOP_K" >&2
+  exit 2
+}
+[[ "$MAX_SEARCHES" =~ ^[0-9]+$ ]] && (( MAX_SEARCHES <= 7 )) || {
+  echo "ERROR: MAX_SEARCHES must be an integer in [0,7], got: $MAX_SEARCHES" >&2
+  exit 2
+}
+[[ "$MAX_TURNS" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: MAX_TURNS must be a positive integer, got: $MAX_TURNS" >&2
+  exit 2
+}
+[[ "$FORCE_FINAL_ANSWER" == "true" || "$FORCE_FINAL_ANSWER" == "false" ]] || {
+  echo "ERROR: FORCE_FINAL_ANSWER must be true or false, got: $FORCE_FINAL_ANSWER" >&2
+  exit 2
+}
+[[ "$RUN_BOOTSTRAP" == "true" || "$RUN_BOOTSTRAP" == "false" ]] || {
+  echo "ERROR: RUN_BOOTSTRAP must be true or false, got: $RUN_BOOTSTRAP" >&2
+  exit 2
+}
+[[ "$RESUME" == "true" || "$RESUME" == "false" ]] || {
+  echo "ERROR: RESUME must be true or false, got: $RESUME" >&2
+  exit 2
+}
+[[ "$REQUEST_RETRIES" =~ ^[0-9]+$ ]] || {
+  echo "ERROR: REQUEST_RETRIES must be a non-negative integer" >&2
+  exit 2
+}
+
+if [[ "$FORCE_FINAL_ANSWER" == "true" ]]; then
+  MULTI_TURN_SCHEDULER="sapr_rag_forced_answer_scheduler"
+else
+  MULTI_TURN_SCHEDULER="sapr_rag_scheduler"
+fi
 
 cleanup_rollout() {
   if [[ -z "${ROLL_PID:-}" ]] || ! kill -0 "$ROLL_PID" 2>/dev/null; then
@@ -90,10 +133,12 @@ start_rollout() {
     ROLLOUT_DEVICES="$ROLLOUT_GPU" \
     PORT="$ROLLOUT_PORT" \
     SAPR_RETRIEVAL_URL="$RETRIEVAL_URL" \
-    SAPR_TOP_K=3 \
+    SAPR_TOP_K="$TOP_K" \
+    SAPR_MAX_SEARCHES="$MAX_SEARCHES" \
     SAPR_ENABLE_EVIDENCE_AGENT=true \
     SAPR_EVIDENCE_MAX_TOKENS=128 \
-    MULTI_TURN_SCHEDULER=sapr_rag_scheduler \
+    MULTI_TURN_SCHEDULER="$MULTI_TURN_SCHEDULER" \
+    MAX_TURNS="$MAX_TURNS" \
     INIT_ADAPTER=none \
     ADAPTER_PATH="$ckpt" \
     VLLM_MAX_MODEL_LEN=8192 \
@@ -135,18 +180,25 @@ eval_one() {
   local expected
   local rows
   local unique_ids
+  local -a resume_args=()
 
   mkdir -p "$out_dir/logs"
   expected="$(wc -l < "$input")"
   echo "[eval] stage=$stage checkpoint=$step dataset=$dataset rows=$expected"
+  if [[ "$RESUME" == "true" ]]; then
+    resume_args+=(--resume)
+  fi
 
   python "$SCRIPT_DIR/run_direct_rollout_eval.py" \
     --input_jsonl "$input" \
     --output_jsonl "$raw" \
     --rollout_url "http://127.0.0.1:${ROLLOUT_PORT}" \
     --batch_size "$BATCH_SIZE" \
-    --max_turns 6 \
+    --max_turns "$MAX_TURNS" \
     --max_tokens "$MAX_TOKENS" \
+    --request_retries "$REQUEST_RETRIES" \
+    --retry_backoff "$RETRY_BACKOFF" \
+    "${resume_args[@]}" \
     2>&1 | tee "$out_dir/logs/eval.log"
 
   rows="$(wc -l < "$raw")"
@@ -293,21 +345,23 @@ run_full() {
     require_file "$input"
     eval_one "$step" "$dataset" "$input" full
 
-    candidate="$OUT_ROOT/full/checkpoint-${step}/$dataset/results.jsonl"
-    bootstrap_output="$OUT_ROOT/full/checkpoint-${step}/$dataset/paired_bootstrap_vs_sft_dpo.json"
-    require_file "${BASELINES[$dataset]}"
-    reasonrag_args=(--reasonrag_f1 "${REASONRAG_F1[$dataset]}")
-    if [[ "$dataset" == "hotpotqa" ]]; then
-      reasonrag_args+=(--reasonrag_em 0.384)
+    if [[ "$RUN_BOOTSTRAP" == "true" ]]; then
+      candidate="$OUT_ROOT/full/checkpoint-${step}/$dataset/results.jsonl"
+      bootstrap_output="$OUT_ROOT/full/checkpoint-${step}/$dataset/paired_bootstrap_vs_sft_dpo.json"
+      require_file "${BASELINES[$dataset]}"
+      reasonrag_args=(--reasonrag_f1 "${REASONRAG_F1[$dataset]}")
+      if [[ "$dataset" == "hotpotqa" ]]; then
+        reasonrag_args+=(--reasonrag_em 0.384)
+      fi
+      python "$SCRIPT_DIR/paired_bootstrap.py" \
+        --candidate "$candidate" \
+        --baseline "${BASELINES[$dataset]}" \
+        --output "$bootstrap_output" \
+        --samples "$BOOTSTRAP_SAMPLES" \
+        --seed 20260812 \
+        "${reasonrag_args[@]}" \
+        2>&1 | tee "$OUT_ROOT/full/checkpoint-${step}/$dataset/logs/bootstrap.log"
     fi
-    python "$SCRIPT_DIR/paired_bootstrap.py" \
-      --candidate "$candidate" \
-      --baseline "${BASELINES[$dataset]}" \
-      --output "$bootstrap_output" \
-      --samples "$BOOTSTRAP_SAMPLES" \
-      --seed 20260812 \
-      "${reasonrag_args[@]}" \
-      2>&1 | tee "$OUT_ROOT/full/checkpoint-${step}/$dataset/logs/bootstrap.log"
   done
   cleanup_rollout
   echo "$step" >"$OUT_ROOT/full_checkpoint_step.txt"
@@ -326,10 +380,18 @@ CONFIG_FILE="$OUT_ROOT/config_${MODE}.txt"
   echo "rollout_gpu=$ROLLOUT_GPU"
   echo "rollout_port=$ROLLOUT_PORT"
   echo "retrieval_url=$RETRIEVAL_URL"
+  echo "top_k=$TOP_K"
+  echo "max_searches=$MAX_SEARCHES"
+  echo "max_turns=$MAX_TURNS"
+  echo "force_final_answer=$FORCE_FINAL_ANSWER"
+  echo "multi_turn_scheduler=$MULTI_TURN_SCHEDULER"
+  echo "run_bootstrap=$RUN_BOOTSTRAP"
   echo "bootstrap_samples=$BOOTSTRAP_SAMPLES"
+  echo "request_retries=$REQUEST_RETRIES"
+  echo "retry_backoff=$RETRY_BACKOFF"
+  echo "resume=$RESUME"
   echo "datasets=$DATASETS_CSV"
   echo "evidence_agent=true"
-  echo "top_k=3"
   echo "started_at=$(date -Is)"
 } >"$CONFIG_FILE"
 

@@ -78,13 +78,28 @@ def evaluate(results):
     n = len(results)
     n_answered = 0
     n_max_turns = 0
+    n_forced_answer = 0
+    n_forced_answer_valid = 0
+    n_search_budget_hit = 0
+    n_format_failures = 0
+    n_service_failures = 0
     em_sum = 0.0
     cover_em_sum = 0.0
     f1_sum = 0.0
+    forced_em_sum = 0.0
+    forced_f1_sum = 0.0
     turns_sum = 0
+    logical_searches_sum = 0
+    actual_retrieval_rpcs_sum = 0
+    reasoner_tokens_sum = 0
+    evidence_tokens_sum = 0
+    forced_answer_tokens_sum = 0
+    duplicate_query_count = 0
+    total_query_count = 0
     empty_ev_count = 0
     total_ev = 0
     latency_sum = 0.0
+    latencies = []
 
     for r in results:
         pred = r.get("answer")
@@ -95,35 +110,100 @@ def evaluate(results):
         # answer 行为指标
         if r.get("error") == "max_turns_exceeded":
             n_max_turns += 1
+        behavior = r.get("behavior") or {}
+        forced_answer = bool(behavior.get("forced_answer", False))
+        if forced_answer:
+            n_forced_answer += 1
+            n_forced_answer_valid += int(bool(behavior.get("forced_answer_valid", False)))
+        if behavior.get("force_reason") == "search_budget":
+            n_search_budget_hit += 1
+        if r.get("error") == "forced_answer_format_failure":
+            n_format_failures += 1
+        retrieval_errors = int(behavior.get("retrieval_error_count", 0))
+        n_service_failures += int(retrieval_errors > 0)
         if pred is not None:
             n_answered += 1
-            em_sum += em_score(pred, gold)
-            cover_em_sum += cover_em_score(pred, gold)
-            f1_sum += f1_score(pred, gold)
+            em = em_score(pred, gold)
+            cover_em = cover_em_score(pred, gold)
+            f1 = f1_score(pred, gold)
+            em_sum += em
+            cover_em_sum += cover_em
+            f1_sum += f1
+            if forced_answer:
+                forced_em_sum += em
+                forced_f1_sum += f1
 
         # turns / evidence 行为指标
         history = r.get("history", [])
-        turns_sum += len(history)
+        turns_sum += int(behavior.get("num_turns", len(history)))
+        logical_searches_sum += int(behavior.get("logical_search_count", len(history)))
+        actual_retrieval_rpcs_sum += int(behavior.get(
+            "actual_retrieval_rpc_count",
+            behavior.get("actual_search_count", len(history)),
+        ))
+        reasoner_tokens_sum += int(behavior.get("reasoner_token_count", 0))
+        evidence_tokens_sum += int(behavior.get("evidence_token_count", 0))
+        forced_answer_tokens_sum += int(behavior.get("forced_answer_token_count", 0))
+        duplicate_query_count += int(behavior.get(
+            "exact_duplicate_count",
+            behavior.get("repeat_count_from_text", 0),
+        ))
+        total_query_count += int(behavior.get("num_queries", len(history)))
         for h in history:
             total_ev += 1
             if (h.get("evidence") or "").strip().lower() in ("none", ""):
                 empty_ev_count += 1
 
-        latency_sum += r.get("latency_s", 0.0)
+        latency = float(r.get("latency_s", 0.0))
+        latency_sum += latency
+        latencies.append(latency)
+
+    sorted_latencies = sorted(latencies)
+
+    def percentile(values, q):
+        if not values:
+            return 0.0
+        index = min(len(values) - 1, max(0, round((len(values) - 1) * q)))
+        return values[index]
 
     return {
         "n_total": n,
         "n_answered": n_answered,
         "n_max_turns_exceeded": n_max_turns,
+        "n_forced_answer": n_forced_answer,
+        "n_forced_answer_valid": n_forced_answer_valid,
+        "n_search_budget_hit": n_search_budget_hit,
+        "n_format_failures": n_format_failures,
+        "n_service_failures": n_service_failures,
         # 答案质量（分母 = 全部题，不是 n_answered，因为 None 计 0 分）
         "em": round(em_sum / n, 4) if n else 0.0,
         "cover_em": round(cover_em_sum / n, 4) if n else 0.0,
         "f1": round(f1_sum / n, 4) if n else 0.0,
         # 行为指标
+        "answer_rate": round(n_answered / n, 4) if n else 0.0,
+        "forced_answer_rate": round(n_forced_answer / n, 4) if n else 0.0,
+        "forced_answer_valid_rate": (
+            round(n_forced_answer_valid / n_forced_answer, 4) if n_forced_answer else 0.0
+        ),
+        "forced_answer_em": round(forced_em_sum / n_forced_answer, 4) if n_forced_answer else 0.0,
+        "forced_answer_f1": round(forced_f1_sum / n_forced_answer, 4) if n_forced_answer else 0.0,
+        "search_budget_hit_rate": round(n_search_budget_hit / n, 4) if n else 0.0,
         "avg_turns": round(turns_sum / n, 3) if n else 0.0,
+        "avg_logical_searches": round(logical_searches_sum / n, 3) if n else 0.0,
+        "avg_actual_retrieval_rpcs": round(actual_retrieval_rpcs_sum / n, 3) if n else 0.0,
+        "avg_reasoner_tokens": round(reasoner_tokens_sum / n, 3) if n else 0.0,
+        "avg_evidence_tokens": round(evidence_tokens_sum / n, 3) if n else 0.0,
+        "avg_forced_answer_tokens": round(forced_answer_tokens_sum / n, 3) if n else 0.0,
+        "repeat_query_rate": (
+            round(duplicate_query_count / total_query_count, 4) if total_query_count else 0.0
+        ),
+        "format_failure_rate": round(n_format_failures / n, 4) if n else 0.0,
+        "service_failure_rate": round(n_service_failures / n, 4) if n else 0.0,
         "max_turns_rate": round(n_max_turns / n, 4) if n else 0.0,
         "empty_evidence_rate": round(empty_ev_count / total_ev, 4) if total_ev else 0.0,
         "avg_latency_s": round(latency_sum / n, 2) if n else 0.0,
+        "latency_p50_s": round(percentile(sorted_latencies, 0.50), 3),
+        "latency_p95_s": round(percentile(sorted_latencies, 0.95), 3),
     }
 
 

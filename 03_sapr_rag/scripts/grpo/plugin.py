@@ -449,6 +449,240 @@ multi_turns["sapr_rag_canonical_scheduler"] = SaprCanonicalScheduler
 
 
 # ═══════════════════════════════════════════════════════════════════
+# §2.5 仅评测：显式检索预算 + 预算耗尽后强制回答
+# ═══════════════════════════════════════════════════════════════════
+FORCED_FINAL_ANSWER_SYSTEM = (
+    "You are a question-answering assistant in final-answer mode. Retrieval is no "
+    "longer available. Use the original question and all evidence accumulated in "
+    "the conversation to give the best concise answer, even when the evidence is "
+    "incomplete. Never request more information and never issue a retrieval query. "
+    "Continue the prefilled answer and stop immediately after the answer."
+)
+FORCED_FINAL_ANSWER_INSTRUCTION = (
+    "The retrieval budget is exhausted. Based on the original question and all "
+    "evidence accumulated so far, provide the best final answer now. Do not issue "
+    "another retrieval query. End with <answer>answer</answer>."
+)
+FORCED_FINAL_ANSWER_PREFILL = "So the answer is <answer>"
+FORCED_FINAL_ANSWER_PROTOCOL = "answer_only_system_prefill_v2"
+
+
+class SaprForcedAnswerScheduler(SaprRagScheduler):
+    """Eval-only scheduler with an explicit logical-search budget.
+
+    The legacy scheduler stops after ``max_turns`` and can leave a trajectory
+    without an answer. This scheduler instead allows at most
+    ``SAPR_MAX_SEARCHES`` logical query actions and then runs one answer-only
+    generation from the evidence accumulated so far.
+
+    The existing ``sapr_rag_scheduler`` remains unchanged. Select this class
+    explicitly with ``--multi_turn_scheduler sapr_rag_forced_answer_scheduler``.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_searches = int(os.environ.get("SAPR_MAX_SEARCHES", "5"))
+        if self.max_searches < 0:
+            raise ValueError(f"SAPR_MAX_SEARCHES must be >= 0, got {self.max_searches}")
+
+    @staticmethod
+    def _build_forced_answer_messages(messages):
+        result = deepcopy(messages)
+        if result and result[0].get("role") == "system":
+            result[0]["content"] = FORCED_FINAL_ANSWER_SYSTEM
+        else:
+            result.insert(0, {"role": "system", "content": FORCED_FINAL_ANSWER_SYSTEM})
+        if result and result[-1].get("role") == "user":
+            content = str(result[-1].get("content") or "").rstrip()
+            result[-1]["content"] = f"{content}\n{FORCED_FINAL_ANSWER_INSTRUCTION}"
+        else:
+            result.append({"role": "user", "content": FORCED_FINAL_ANSWER_INSTRUCTION})
+        result.append({"role": "assistant", "content": FORCED_FINAL_ANSWER_PREFILL})
+        return result
+
+    async def _generate_evidence(self, infer_request, request_config, uuid, turn, query, docs, **kwargs):
+        if not self.use_evidence_agent:
+            return None, None, self._format_document_observation(docs), 0
+
+        evidence_request = deepcopy(infer_request)
+        evidence_request.uuid = f"{uuid}:evidence:{turn}"
+        evidence_request.messages = self._build_evidence_messages(query, docs)
+        evidence_config = deepcopy(request_config)
+        evidence_config.max_tokens = self.evidence_max_tokens
+        evidence_config.temperature = 0.0
+        evidence_config.top_p = 1.0
+        evidence_config.stop = ["</evidence>"]
+        evidence_response = await self.infer_engine.infer_async(evidence_request, evidence_config, **kwargs)
+        evidence_text = evidence_response.choices[0].message.content or "<evidence>None</evidence>"
+        evidence_text = ensure_protocol_close(evidence_text, "evidence")
+        evidence_match = RE_EVIDENCE.search(evidence_text)
+        evidence = evidence_match.group(1).strip() if evidence_match else "None"
+        evidence_token_count = len(evidence_response.choices[0].token_ids or [])
+        return evidence, evidence_text, self._format_evidence_observation(evidence), evidence_token_count
+
+    async def _generate_forced_answer(self, infer_request, request_config, messages, uuid, **kwargs):
+        answer_request = deepcopy(infer_request)
+        answer_request.uuid = f"{uuid}:forced-answer"
+        answer_request.messages = self._build_forced_answer_messages(messages)
+        answer_config = deepcopy(request_config)
+        answer_config.max_tokens = min(answer_config.max_tokens or 128, 128)
+        answer_config.temperature = 0.0
+        answer_config.top_p = 1.0
+        answer_config.stop = ["</answer>"]
+        response = await self.infer_engine.infer_async(answer_request, answer_config, **kwargs)
+        choice = response.choices[0]
+        text = ensure_protocol_close(
+            FORCED_FINAL_ANSWER_PREFILL + (choice.message.content or ""), "answer")
+        choice.message.content = text
+        final_messages = deepcopy(answer_request.messages)
+        final_messages[-1]["content"] = text
+        answer_match = RE_ANSWER.search(text)
+        return response, final_messages, bool(answer_match and answer_match.group(1).strip())
+
+    async def run(self, infer_request, request_config, **kwargs):
+        uuid = infer_request.uuid or "default"
+        messages = deepcopy(infer_request.messages)
+        if messages and messages[-1].get("role") == "assistant" and not messages[-1].get("content"):
+            messages.pop()
+
+        steps = []
+        seen_queries = set()
+        logical_search_count = 0
+        actual_retrieval_rpc_count = 0
+        decision_turns = 0
+        forced_answer = False
+        forced_answer_valid = False
+        forced_answer_token_count = 0
+        reasoner_token_count = 0
+        evidence_token_count = 0
+        force_reason = None
+        response = None
+        response_token_ids = []
+        response_loss_mask = []
+
+        while True:
+            if logical_search_count >= self.max_searches:
+                forced_answer = True
+                force_reason = force_reason or "search_budget"
+                response, messages, forced_answer_valid = await self._generate_forced_answer(
+                    infer_request, request_config, messages, uuid, **kwargs)
+                token_ids = list(response.choices[0].token_ids or [])
+                if token_ids:
+                    response_token_ids.append(token_ids)
+                    response_loss_mask.append([1] * len(token_ids))
+                forced_answer_token_count += len(token_ids)
+                decision_turns += 1
+                finish_reason = (
+                    "forced_answer_after_search_budget"
+                    if forced_answer_valid else "forced_answer_format_failure"
+                )
+                break
+
+            reasoning_request = deepcopy(infer_request)
+            reasoning_request.uuid = f"{uuid}:reason:{decision_turns + 1}"
+            reasoning_request.messages = deepcopy(messages)
+            reasoning_config = deepcopy(request_config)
+            reasoning_config.stop = ["</query>", "</answer>"]
+            response = await self.infer_engine.infer_async(reasoning_request, reasoning_config, **kwargs)
+            choice = response.choices[0]
+            text = ensure_protocol_close(choice.message.content or "", "query")
+            text = ensure_protocol_close(text, "answer")
+            choice.message.content = text
+            messages = reasoning_request.messages + [{"role": "assistant", "content": text}]
+            token_ids = list(choice.token_ids or [])
+            if token_ids:
+                response_token_ids.append(token_ids)
+                response_loss_mask.append([1] * len(token_ids))
+            reasoner_token_count += len(token_ids)
+            decision_turns += 1
+
+            if RE_ANSWER.search(text):
+                finish_reason = "model_answer"
+                break
+
+            query_match = RE_QUERY.search(text)
+            if not query_match:
+                forced_answer = True
+                force_reason = "invalid_reasoner_format"
+                response, messages, forced_answer_valid = await self._generate_forced_answer(
+                    infer_request, request_config, messages, uuid, **kwargs)
+                token_ids = list(response.choices[0].token_ids or [])
+                if token_ids:
+                    response_token_ids.append(token_ids)
+                    response_loss_mask.append([1] * len(token_ids))
+                forced_answer_token_count += len(token_ids)
+                decision_turns += 1
+                finish_reason = (
+                    "forced_answer_after_format_failure"
+                    if forced_answer_valid else "forced_answer_format_failure"
+                )
+                break
+
+            query = query_match.group(1).strip()
+            normalized_query = normalize_query(query)
+            logical_search_count += 1
+            exact_duplicate = bool(normalized_query and normalized_query in seen_queries)
+            retrieval_error = None
+
+            if exact_duplicate:
+                docs = []
+                search_executed = False
+            else:
+                seen_queries.add(normalized_query)
+                actual_retrieval_rpc_count += 1
+                search_executed = True
+                try:
+                    docs = self.client.search(query, top_k=self.top_k)
+                except Exception as exc:
+                    docs = []
+                    retrieval_error = f"{type(exc).__name__}: {exc}"
+
+            evidence, evidence_text, observation, evidence_tokens = await self._generate_evidence(
+                infer_request, request_config, uuid, decision_turns, query, docs, **kwargs)
+            evidence_token_count += evidence_tokens
+            messages.append({"role": "user", "content": observation})
+            step = {
+                "turn": decision_turns,
+                "query": query,
+                "normalized_query": normalized_query,
+                "docs": docs,
+                "exact_duplicate": exact_duplicate,
+                "search_executed": search_executed,
+            }
+            if evidence is not None:
+                step["evidence"] = evidence
+                step["evidence_raw"] = evidence_text
+            if retrieval_error is not None:
+                step["retrieval_error"] = retrieval_error
+            steps.append(step)
+
+        return RolloutOutput(
+            response=response,
+            messages=messages,
+            response_token_ids=response_token_ids,
+            response_loss_mask=response_loss_mask,
+            rollout_infos={
+                "retrieved_steps": steps,
+                "uuid": uuid,
+                "num_turns": decision_turns,
+                "logical_search_count": logical_search_count,
+                "actual_retrieval_rpc_count": actual_retrieval_rpc_count,
+                "max_searches": self.max_searches,
+                "top_k": self.top_k,
+                "forced_answer": forced_answer,
+                "forced_answer_valid": forced_answer_valid,
+                "forced_answer_protocol": FORCED_FINAL_ANSWER_PROTOCOL,
+                "reasoner_token_count": reasoner_token_count,
+                "evidence_token_count": evidence_token_count,
+                "forced_answer_token_count": forced_answer_token_count,
+                "force_reason": force_reason,
+                "finish_reason": finish_reason,
+            },
+        )
+
+
+multi_turns["sapr_rag_forced_answer_scheduler"] = SaprForcedAnswerScheduler
+# ═══════════════════════════════════════════════════════════════════
 # §3 Reward 函数（三个 ORM）
 # ═══════════════════════════════════════════════════════════════════
 def _as_list(x):

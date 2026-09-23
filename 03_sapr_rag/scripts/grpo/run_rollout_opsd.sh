@@ -46,6 +46,7 @@ VLLM_GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.85}"
 VLLM_ENABLE_LORA="${VLLM_ENABLE_LORA:-true}"
 ROLLOUT_DTYPE="${ROLLOUT_DTYPE:-bfloat16}"
 MULTI_TURN_SCHEDULER="${MULTI_TURN_SCHEDULER:-sapr_rag_scheduler}"
+MAX_TURNS="${MAX_TURNS:-6}"
 DRY_RUN="${DRY_RUN:-false}"
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
@@ -100,7 +101,7 @@ CMD=(
     --vllm_use_async_engine true
     "${SCHEDULER_ARGS[@]}"
     --external_plugins "$PLUGIN"
-    --max_turns 6
+    --max_turns "$MAX_TURNS"
     --torch_dtype "$ROLLOUT_DTYPE"
     --vllm_max_model_len "$VLLM_MAX_MODEL_LEN"
     --vllm_gpu_memory_utilization "$VLLM_GPU_MEM_UTIL"

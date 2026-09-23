@@ -32,6 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_turns", type=int, default=6)
     parser.add_argument("--max_tokens", type=int, default=512)
     parser.add_argument("--timeout", type=float, default=600.0)
+    parser.add_argument("--request_retries", type=int, default=2)
+    parser.add_argument("--retry_backoff", type=float, default=5.0)
     parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
@@ -83,7 +85,11 @@ def behavior_from_infos(info: dict[str, Any], max_turns: int = 6) -> dict[str, A
         for step in steps
         if step.get("exact_duplicate") and not step.get("search_executed", True)
     )
-    actual_search_count = sum(1 for step in steps if step.get("search_executed", True))
+    actual_search_count = int(info.get(
+        "actual_retrieval_rpc_count",
+        sum(1 for step in steps if step.get("search_executed", True)),
+    ))
+    logical_search_count = int(info.get("logical_search_count", len(steps)))
     repeat_count_from_text = len(queries) - len(set(queries))
     recorded_turns = info.get("num_turns")
     num_turns = int(recorded_turns or len(steps) or 0)
@@ -91,15 +97,30 @@ def behavior_from_infos(info: dict[str, Any], max_turns: int = 6) -> dict[str, A
         exhausted = len(steps) >= max(0, max_turns - 1)
     else:
         exhausted = num_turns >= max_turns
+    finish_reason = info.get("finish_reason")
+    if not finish_reason:
+        finish_reason = "max_turns_exceeded" if exhausted else "stopped"
     return {
         "num_turns": num_turns,
         "num_queries": len(steps),
+        "logical_search_count": logical_search_count,
         "actual_search_count": actual_search_count,
+        "actual_retrieval_rpc_count": actual_search_count,
         "exact_duplicate_count": exact_duplicate_count,
         "intercepted_repeat_count": intercepted_repeat_count,
         "repeat_count_from_text": repeat_count_from_text,
         "has_exact_duplicate": exact_duplicate_count > 0 or repeat_count_from_text > 0,
-        "finish_reason": "max_turns_exceeded" if exhausted else "stopped",
+        "max_searches": info.get("max_searches"),
+        "top_k": info.get("top_k"),
+        "forced_answer": bool(info.get("forced_answer", False)),
+        "forced_answer_valid": bool(info.get("forced_answer_valid", False)),
+        "forced_answer_protocol": info.get("forced_answer_protocol"),
+        "reasoner_token_count": int(info.get("reasoner_token_count", 0)),
+        "evidence_token_count": int(info.get("evidence_token_count", 0)),
+        "forced_answer_token_count": int(info.get("forced_answer_token_count", 0)),
+        "force_reason": info.get("force_reason"),
+        "retrieval_error_count": sum(1 for step in steps if step.get("retrieval_error")),
+        "finish_reason": finish_reason,
     }
 
 
@@ -136,6 +157,8 @@ def request_batch(
     batch: list[tuple[int, dict[str, Any]]],
     max_tokens: int,
     timeout: float,
+    request_retries: int,
+    retry_backoff: float,
 ) -> list[dict[str, Any]]:
     payload = {
         "infer_requests": [
@@ -156,20 +179,33 @@ def request_batch(
         },
         "use_tqdm": False,
     }
-    response = session.post(
-        f"{rollout_url.rstrip('/')}/infer/",
-        json=payload,
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    outputs = response.json()
-    if not isinstance(outputs, list) or len(outputs) != len(batch):
-        raise RuntimeError(
-            f"rollout returned {type(outputs).__name__} with "
-            f"{len(outputs) if isinstance(outputs, list) else 'unknown'} rows; "
-            f"expected {len(batch)}"
-        )
-    return outputs
+    for attempt in range(request_retries + 1):
+        try:
+            response = session.post(
+                f"{rollout_url.rstrip('/')}/infer/",
+                json=payload,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            outputs = response.json()
+            if not isinstance(outputs, list) or len(outputs) != len(batch):
+                raise RuntimeError(
+                    f"rollout returned {type(outputs).__name__} with "
+                    f"{len(outputs) if isinstance(outputs, list) else 'unknown'} rows; "
+                    f"expected {len(batch)}"
+                )
+            return outputs
+        except Exception:
+            if attempt >= request_retries:
+                raise
+            delay = retry_backoff * (2 ** attempt)
+            print(
+                f"[direct_rollout] request failed; retry "
+                f"{attempt + 1}/{request_retries} in {delay:.1f}s",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def main() -> int:
@@ -196,17 +232,15 @@ def main() -> int:
         for start in range(0, len(pending), args.batch_size):
             batch = pending[start:start + args.batch_size]
             batch_started = time.time()
-            try:
-                outputs = request_batch(
-                    session,
-                    args.rollout_url,
-                    batch,
-                    args.max_tokens,
-                    args.timeout,
-                )
-            except Exception as exc:
-                error = f"{type(exc).__name__}: {exc}"
-                outputs = [{"error": error} for _ in batch]
+            outputs = request_batch(
+                session,
+                args.rollout_url,
+                batch,
+                args.max_tokens,
+                args.timeout,
+                args.request_retries,
+                args.retry_backoff,
+            )
 
             batch_seconds = time.time() - batch_started
             for (index, row), item in zip(batch, outputs):
@@ -215,8 +249,11 @@ def main() -> int:
                 error = item.get("error")
                 behavior = behavior_from_infos(info, max_turns=args.max_turns)
                 answer = None if error else parse_answer(text)
-                if not error and answer is None and behavior["finish_reason"] == "max_turns_exceeded":
-                    error = "max_turns_exceeded"
+                if not error and answer is None:
+                    if behavior["finish_reason"] == "max_turns_exceeded":
+                        error = "max_turns_exceeded"
+                    elif behavior["forced_answer"]:
+                        error = "forced_answer_format_failure"
                 record = {
                     "id": row.get("id", index),
                     "question": row["question"],

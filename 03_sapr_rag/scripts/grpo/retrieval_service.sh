@@ -28,8 +28,11 @@ RETRIEVAL_GPU="${RETRIEVAL_GPU:-0}"
 RETRIEVAL_DEVICES="${RETRIEVAL_DEVICES:-$RETRIEVAL_GPU}"
 PORT="${RETRIEVAL_PORT:-8100}"
 HOST="${HOST:-127.0.0.1}"
-SVC_LOG="$LOG_DIR/retrieval_service.log"
-PID_FILE="$LOG_DIR/retrieval_service.pid"
+SERVICE_TAG="${RETRIEVAL_SERVICE_TAG:-}"
+SERVICE_SUFFIX="${SERVICE_TAG:+_$SERVICE_TAG}"
+SVC_LOG="$LOG_DIR/retrieval_service${SERVICE_SUFFIX}.log"
+PID_FILE="$LOG_DIR/retrieval_service${SERVICE_SUFFIX}.pid"
+DAEMON_LOG="$LOG_DIR/retrieval_daemon_flexible${SERVICE_SUFFIX}.log"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-1200}"   # 最长等 20 分钟 ready
 
 ACTION="${1:-status}"
@@ -59,6 +62,7 @@ do_start() {
     echo "[svc] launching retrieval daemon on GPU$RETRIEVAL_DEVICES port=$PORT (detached) ..."
     nohup setsid env GPU="$RETRIEVAL_GPU" RETRIEVAL_DEVICES="$RETRIEVAL_DEVICES" \
         DEVICE_BACKEND=cuda PORT="$PORT" HOST="$HOST" \
+        RETRIEVAL_DAEMON_LOG="$DAEMON_LOG" \
         bash "$SCRIPT_DIR/run_retrieval_daemon_flexible.sh" \
         >"$SVC_LOG" 2>&1 < /dev/null &
     disown

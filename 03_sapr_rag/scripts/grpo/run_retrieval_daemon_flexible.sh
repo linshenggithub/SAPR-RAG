@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="${SAPR_RAG_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
+DAEMON_LOG="${RETRIEVAL_DAEMON_LOG:-$LOG_DIR/retrieval_daemon_flexible.log}"
 
 DEVICE_BACKEND="${DEVICE_BACKEND:-cuda}"
 if [ "$DEVICE_BACKEND" = "npu" ] && [ -n "${ASCEND_VISIBLE_DEVICES:-}" ]; then
@@ -98,7 +99,7 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 if [ -n "$VISIBLE_DEVICES_ENV" ]; then
-    env "$VISIBLE_DEVICES_ENV=$RETRIEVAL_DEVICES" "${CMD[@]}" 2>&1 | tee "$LOG_DIR/retrieval_daemon_flexible.log"
+    env "$VISIBLE_DEVICES_ENV=$RETRIEVAL_DEVICES" "${CMD[@]}" 2>&1 | tee "$DAEMON_LOG"
 else
-    "${CMD[@]}" 2>&1 | tee "$LOG_DIR/retrieval_daemon_flexible.log"
+    "${CMD[@]}" 2>&1 | tee "$DAEMON_LOG"
 fi

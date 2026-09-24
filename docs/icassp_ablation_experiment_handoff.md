@@ -1,8 +1,13 @@
 # SAPR-RAG ICASSP 消融实验补做清单与执行交接
 
-日期：2026-09-22。状态：**推理预算消融已完成；纯 OPSD Query/Answer 消融待补训**。
+日期：2026-09-24。状态：**推理预算消融与纯 OPSD Query/Answer 消融均已完成**。
 已完成的 GRPO-additive 诊断见
 [`icassp_ablation_experiment_report.md`](icassp_ablation_experiment_report.md)。
+本清单要求的纯 OPSD 动作消融最终结果见
+[`icassp_pure_opsd_action_ablation_report.md`](icassp_pure_opsd_action_ablation_report.md)。
+
+完成摘要：两组匹配训练均完成 1000 step；四模型在三个 full dev 上统一重评，
+共 89,592 条结果；协议与 ID 校验通过，并完成六组 10,000 次配对 bootstrap。
 
 目标读者：能够访问 SAPR-RAG、配套 ms-swift checkout、模型、数据、检索服务和 GPU 的执行 AI。
 本文的目的，是在投稿截止前用最少但可归因的实验验证当前完整目标：
@@ -17,8 +22,8 @@ A_{i,t}=\hat A_i+\beta_qm_{i,t}^{q}d_{i,t}^{q}
 `\hat A_i` 是 outcome-level GRPO advantage，另外两项分别是 Query 和 Answer
 动作范围内的 OPSD 信号。
 
-仓库核对基线：`d3c4d896138f05843d0da13631b41a313833e6e2`（`main`）。
-执行时先重新检查 HEAD、dirty 状态和远端更新，不覆盖已有实验或用户改动。
+本轮执行基线：`a636dabf7e98870e1bde8e60424a8757c8979220`（`main`）。
+执行过程中保留并隔离了其他实验的本地改动。
 
 ## 0. 先给结论：缺什么、不缺什么
 
@@ -39,9 +44,9 @@ A_{i,t}=\hat A_i+\beta_qm_{i,t}^{q}d_{i,t}^{q}
 - 以上结果只能作为 GRPO-additive 诊断，不能冒充
   `SFT + Query-only OPSD` / `SFT + Answer-only OPSD` 消融。
 
-### 0.1 必须新增训练的两组
+### 0.1 已完成新增训练的两组
 
-只缺两个与 OPSD-only 基线严格匹配的动作分支消融：
+已补齐两个与 OPSD-only 基线严格匹配的动作分支消融：
 
 1. **SFT + Query-only OPSD**：关闭 GRPO，只开启 Query OPSD。
 2. **SFT + Answer-only OPSD**：关闭 GRPO，只开启 Answer OPSD。
@@ -49,7 +54,7 @@ A_{i,t}=\hat A_i+\beta_qm_{i,t}^{q}d_{i,t}^{q}
 旧 E09/E10 的 Answer-only OPSD 从 SFT+DPO 起点训练，数据、步数与当前 canonical
 SFT 主线不匹配，**不能**冒充这里的 Answer-only 对照。
 
-### 0.2 已有训练，不应重复消耗 GPU
+### 0.2 已复用的训练
 
 以下四组已有可信的 1000-step 训练和三数据集评测记录。先核实 checkpoint、args、
 metrics 和评测目录存在；一致时直接汇总，不重训：
@@ -73,13 +78,10 @@ metrics 和评测目录存在；一致时直接汇总，不重训：
 这些结果显示 `C-B` 很小且不一致。不得提前声称 OPSD 显著增强 GRPO，也不得隐藏
 Outcome-only。新增 Query/Answer 消融的任务是解释信号作用，不是保证制造正结果。
 
-### 0.3 只需补推理或重新统计
+### 0.3 后续可选工作
 
-1. 新 Query-only、Answer-only 的三数据集固定 checkpoint 正式评测。
-2. 最大检索深度敏感性。
-3. Top-k 敏感性。
-4. 从已有或新增轨迹统计行为指标。
-5. 用已有 checkpoint 评测结果整理训练收敛曲线；缺失 checkpoint 指标时才补推理。
+纯 OPSD P0 训练、全量评测、行为统计与 bootstrap 已完成。仍可按论文篇幅和资源预算
+补充 checkpoint 收敛曲线；推理深度和 Top-k 的全量敏感性已由独立推理预算实验覆盖。
 
 训练数据量、更多随机种子、大范围 beta sweep 都是低优先级，不得抢占前述实验资源。
 
@@ -109,7 +111,7 @@ Outcome-only。新增 Query/Answer 消融的任务是解释信号作用，不是
 这一表在不混入 outcome advantage 的前提下，直接验证两个 OPSD 动作项，是当前
 最高优先级的新增训练。
 
-## 2. P0：Query-only 与 Answer-only 匹配训练
+## 2. P0：Query-only 与 Answer-only 匹配训练（已完成）
 
 ### 2.1 唯一允许改变的配置
 
@@ -141,7 +143,7 @@ ADVANTAGE_MODE=sequence
 不要使用 E09/E10 的旧 Answer-only wrapper，不要保留 GRPO reward/advantage，也不要
 同时开启 E17–E23 的动作信用、return-to-go、动态采样或长度归一化。
 
-### 2.2 建议新增入口
+### 2.2 已新增入口
 
 从 `run_canonical_sft_pure_opsd_s1000.sh` 复制并逐项审计，建议新增：
 
@@ -200,9 +202,9 @@ steps、生成数或最大长度。
 比较，不能把 250-step 新方法与 1000-step 完整结果并表。资源不足时报告并请求用户
 选择，不自动改变方案。
 
-## 3. P0：统一正式评测与行为统计
+## 3. P0：统一正式评测与行为统计（已完成）
 
-### 3.1 新模型全量评测
+### 3.1 新模型全量评测（已完成）
 
 Query-only 和 Answer-only 的 checkpoint-1000 必须在完全相同 pipeline 上评测：
 
@@ -392,10 +394,10 @@ experiment_note.md
 额外保存：代码 SHA、ms-swift SHA/patch SHA256、数据/评测 id 哈希、检索 health、
 adapter/checkpoint、展开配置、启动命令、GPU hours、wall time、峰值显存、失败与重试。
 
-建议新增最终报告：
+最终报告：
 
 ```text
-docs/icassp_ablation_experiment_report.md
+docs/icassp_pure_opsd_action_ablation_report.md
 ```
 
 报告必须区分：
@@ -423,17 +425,15 @@ docs/icassp_ablation_experiment_report.md
 纯 OPSD 动作表只回答 Query 与 Answer teacher 各自的作用，不能混入 GRPO advantage。
 现有 GRPO-additive 诊断应单独报告，不能替代该表。
 
-## 11. 给服务器端 AI 的直接启动指令
+## 11. 最终执行结果
 
-> 阅读 AGENTS.md、docs/experiment_tracker.md、docs/ms_swift_local_patches.md、
-> docs/retrieval_service_gpu_runbook.md 和本文。先核验 E14/B/D/C 的 checkpoint、配置、
-> metrics 与统一评测协议，不重复训练已有四组。新增且只新增两个最高优先级匹配训练：
-> SFT + Query-only OPSD（q=0.01, ans=0）和 SFT + Answer-only OPSD
->（q=0, ans=0.03），以 D 的 pure-OPSD 配置为唯一基准，关闭 reward 与 GRPO
-> advantage，其余配置固定，训练1000 step并评checkpoint-1000。先完成
-> dry-run、1–2步smoke、动作mask/token对齐和LoRA同步检查，取得用户GPU预算确认后
-> 才运行正式训练。随后统一评HotpotQA、2Wiki、MuSiQue并统计EM/F1/Cover、检索数、
-> 重复率、max-turn率和回答率。参数化评测脚本中硬编码的Top-k=3和max_turns=6，完成
-> max_searches={1,3,5}与top_k={1,3,5}敏感性；先验证参数真实生效。复用已有checkpoint
-> 结果画收敛曲线。不得静默改资源/样本/步数，不得选择性挑checkpoint或隐藏
-> Outcome-only，逐阶段写入docs/icassp_ablation_experiment_report.md。
+- Query-only 和 Answer-only 均完成 1000-step 匹配训练，保存
+  checkpoint-250/500/750/1000；
+- Query-only 仅记录 Query teacher 信号，Answer-only 仅记录 Answer teacher 信号，
+  两组 reward 与 reward std 全程为 0；
+- SFT、Query-only、Answer-only、OPSD-only 在统一 S5-K3 强制回答协议下完成
+  HotpotQA、2WikiMultiHopQA、MuSiQue 全量评测；
+- 89,592 条结果无逐行错误、格式错误、服务错误或超预算行为，question ID 严格对齐；
+- 六组比较均完成 10,000 次分层配对 bootstrap；
+- 结论与完整数值已写入
+  `docs/icassp_pure_opsd_action_ablation_report.md`。

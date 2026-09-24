@@ -2,9 +2,9 @@
 
 **首次建立**：2026-05-30
 
-**最后更新**：2026-09-06
+**最后更新**：2026-09-24
 
-**当前主线**：Canonical SFT 起点上的分动作 OPSD 与匹配 GRPO 对照
+**当前主线**：Canonical SFT 起点上的纯 OPSD Query／Answer 动作归因已完成
 
 **用途**：统一记录实验动机、实现方法、控制变量、结果、可信度和产物位置，供复现、论文写作与后续交接使用。
 
@@ -56,6 +56,14 @@
    与 OPSD 同为"信号被 GRPO outcome advantage 淹没"的模式。sweep 子集曾显示领先但
    属子集乐观偏差，全量证伪。下一步需决策：加大 coef / 改尖锐信号设计 / 或接受
    强 SFT 上改 GRPO 增益空间有限的结论。
+9. E24/E25 已完成严格关闭 GRPO 的 Query-only／Answer-only 纯 OPSD 动作消融，
+   并与 E14 SFT、D 双分支纯 OPSD 在统一 S5-K3 强制回答协议下重评。Query-only
+   相对 SFT 的宏 EM/F1 显著下降 1.79/0.90pt，但 Cover-EM 显著提高 2.41pt；
+   Answer-only 的宏 EM/F1 与 SFT 无显著差异，Cover-EM 显著提高 1.47pt。
+10. D 双分支纯 OPSD 相对 Answer-only 的宏 EM/F1/Cover-EM 均不显著，说明当前
+    纯 OPSD 的主要有效成分来自 Answer 分支，Query 分支只增加搜索和证据覆盖，
+    没有形成稳定的答案质量互补收益。完整结果见
+    `docs/icassp_pure_opsd_action_ablation_report.md`。
 
 ### 实验总表
 
@@ -82,6 +90,8 @@
 | E16 | Canonical SFT→GRPO+分动作 OPSD | E14 canonical SFT ckpt4150；三源 train 277,839 条；LoRA | 复现 E12：GRPO reward + Query 0.01 / Answer 0.03 分动作 teacher，只替换 SFT 起点 | ckpt1000 三数据集全量完成；HotpotQA .4636/.5816/.5025；2Wiki .5154/.5659/.5307；MuSiQue .1837/.2786/.2089；相对 E14 全面提升（2Wiki 约 +11pt）；OPSD 独立贡献待 B/D 对照 | A | 下文“E16 Canonical SFT→分动作 OPSD” |
 | B（E16 对照） | Canonical SFT→GRPO-only（关 teacher） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭全部 teacher（纯 GRPO reward） | ckpt1000 三数据集全量完成；HotpotQA .4629/.5837/.5026；2Wiki .5161/.5654/.5314；MuSiQue .1808/.2794/.2056 | A | 下文“B/D 对照与 OPSD 归因” |
 | D（E16 对照） | Canonical SFT→纯分动作 OPSD（无 RL reward） | E14 canonical SFT ckpt4150；与 E16 同数据/采样/步数；LoRA | 与 E16 唯一差异：关闭 GRPO reward 与组内 advantage，仅保留 Query/Answer teacher log-ratio | ckpt1000 三数据集全量完成；HotpotQA .4462/.5703/.5030；2Wiki .4948/.5548/.5270；MuSiQue .1758/.2717/.2085 | A | 下文“B/D 对照与 OPSD 归因” |
+| E24 | Canonical SFT→Query-only 纯 OPSD | E14 canonical SFT ckpt4150；与 D 同数据/采样/步数；LoRA | 关闭 GRPO，只保留 Query OPSD βq=0.01 | 统一强制回答口径：HotpotQA .4375/.5681/.5149；2Wiki .4649/.5405/.5418；MuSiQue .1684/.2669/.2151；宏 EM/F1 显著低于 SFT，Cover 显著提高 | A | `docs/icassp_pure_opsd_action_ablation_report.md` |
+| E25 | Canonical SFT→Answer-only 纯 OPSD | E14 canonical SFT ckpt4150；与 D 同数据/采样/步数；LoRA | 关闭 GRPO，只保留 Answer OPSD βans=0.03 | 统一强制回答口径：HotpotQA .4427/.5712/.5051；2Wiki .4929/.5561/.5293；MuSiQue .1742/.2816/.2094；宏 F1 与 SFT 持平、Cover 显著提高，且与 D 无显著差异 | A | `docs/icassp_pure_opsd_action_ablation_report.md` |
 | E17（方向2 additive prototype） | Canonical SFT→GRPO + Evidence-Attributed（动作级证据信用） | E14 canonical SFT ckpt4150；与 B 同的三源 noteacher 数据/采样/步数；LoRA | 在 B（GRPO-only）之上唯一新增：逐轮“本轮新增 gold evidence 覆盖率”经组内逐 turn-slot 归一化后，作为附加 advantage 只加到对应 `<query>` turn 的 token（`action_credit_mode=query_evidence`, coef=0.2）；仍广播总 sequence reward，因此不是完整 G2；teacher 全关 | **ckpt-750（sweep 选优）三数据集全量完成，相对 B 无增益**：HotpotQA .4552/.5766/.4957（vs B −0.77/−0.71pt）；2Wiki .5153/.5668/.5316（vs B −0.08/+0.14pt，持平）；MuSiQue .1804/.2768/.2040（vs B −0.04/−0.26pt，持平）。coef=0.2 动作级证据信用在强 SFT+有效 GRPO 起点上未带来独立增益（与 OPSD 的 C−B≈0 同模式）。 | A | 下文“E17 Evidence-Attributed GRPO（方向2）” |
 | E18 pilot | Zero-Outcome Rescue GRPO | 与 B/E17 同起点、三源 noteacher 数据和训练配置；250-step pilot | 仅在 sequence GRPO advantage 整组为 0 时启用 query evidence credit；非零方差组完全保持标准 GRPO；`action_credit_gate=zero_outcome`, coef=0.5 | **机制级早停失败**：250 step 完成；gate 平均命中 18.24% 的组，但 125 个 generation 中仅 3 个动作项非零（2.4%），有效幅度均值仅 0.00314；不进入评测。 | A | 下文“E18 Zero-Outcome Rescue GRPO pilot” |
 | E19 | Hybrid Action-Causal GRPO（完整 G2） | 与 B/E17 同起点、三源 noteacher 数据和训练配置；1000 step | F1 与逐轮 evidence gain 独立组内归一化并按动作 token 路由；teacher 全关 | **全量失败**：最佳 ckpt1000；HotpotQA .4558/.5801、2Wiki .5084/.5604、MuSiQue .1783/.2744（EM/F1），三集均低于 B；宏平均 EM/F1 分别 −0.58/−0.45pt。 | A | 下文“E19 Hybrid Action-Causal GRPO pilot” |
@@ -490,6 +500,53 @@ B/C/D 共用训练集 `hotpotqa_2wiki_musique_train_multi_opsd.jsonl`（277,839 
 - D 启动：`03_sapr_rag/scripts/grpo/run_canonical_sft_pure_opsd_s1000.sh`
 - D 训练：`03_sapr_rag/saves/qwen2_5_7b/lora/grpo_opsd_action_scoped/pure_opsd_canonical_sft_q001_a003_3src_s1000_20260906/`
 - D 评测：`data/eval_results/D_pure_opsd_ckpt1000_3src_20260906/`
+
+### E24/E25 纯 OPSD Query／Answer 动作消融
+
+**实验 ID**：E24（Query-only）、E25（Answer-only）
+**日期**：2026-09-23 至 2026-09-24
+**状态**：两组 1000-step 训练和四模型三数据集全量统一重评完成。
+
+研究问题：在完全关闭 GRPO reward 与 outcome advantage 后，分别隔离 Query 和
+Answer OPSD，验证两个动作级信号的独立贡献。两组均从 E14 `checkpoint-4150`
+开始，使用与 D 相同的 277,839 条三源训练数据和其余超参数；唯一差异为
+E24 仅 `beta_query=0.01`，E25 仅 `beta_answer=0.03`。
+
+训练验收：E24/E25 均完成 1000 step 并保存 250/500/750/1000；reward 与
+reward std 全程为 0。E24 仅有 Query scoped KL 记录，E25 仅有 Answer scoped
+KL 记录，另一动作分支记录数为 0，无 NaN、OOM 或训练中断。
+
+统一 S5-K3、预算耗尽强制回答口径下的 full-dev 结果（EM/F1/Cover-EM）：
+
+| 方法 | HotpotQA | 2Wiki | MuSiQue | 三数据集宏平均 |
+|---|---|---|---|---|
+| E14 SFT | .4527/.5747/.4906 | .5061/.5576/.5200 | .1659/.2701/.1891 | .3749/.4675/.3999 |
+| E24 Query-only | .4375/.5681/.5149 | .4649/.5405/.5418 | .1684/.2669/.2151 | .3569/.4585/.4239 |
+| E25 Answer-only | .4427/.5712/.5051 | .4929/.5561/.5293 | .1742/.2816/.2094 | .3699/.4696/.4146 |
+| D OPSD-only | .4455/.5721/.5036 | .4986/.5611/.5344 | .1676/.2762/.2069 | .3706/.4698/.4150 |
+
+10,000 次分层配对 bootstrap 的宏平均结论：
+
+| 对比 | EM 差值（双侧 p） | F1 差值（双侧 p） | Cover 差值（双侧 p） |
+|---|---:|---:|---:|
+| E24 − E14 | -1.79pt (0.0002) | -0.90pt (0.0024) | +2.41pt (0.0002) |
+| E25 − E14 | -0.50pt (0.0762) | +0.22pt (0.4134) | +1.47pt (0.0002) |
+| D − E14 | -0.43pt (0.1146) | +0.24pt (0.3886) | +1.50pt (0.0002) |
+| D − E25 | +0.06pt (0.6965) | +0.02pt (0.9237) | +0.03pt (0.8335) |
+
+行为上，E24 将宏平均逻辑检索数从 2.661 提高到 2.733、强制回答率从
+11.21% 提高到 14.88%、重复 Query 率从 11.39% 提高到 12.84%，表现为
+“更多搜索和覆盖，但检索效率及答案准确率下降”。E25 将逻辑检索数降至
+2.426、强制回答率降至 7.19%、重复 Query 率降至 9.87%，其行为与 D 接近。
+
+结论：Query-only 的 Cover-EM 增益不能转化为 EM/F1；Answer-only 保持宏 F1 并
+显著提高 Cover-EM。D 与 E25 三项宏指标均无显著差异，说明 Answer 分支主导当前
+纯 OPSD 的有效行为变化，Query 分支没有稳定互补贡献。旧 E14/D 评测未启用强制
+回答，不能与此处数值直接混表。
+
+完整逐数据集结果、95% CI、行为指标和复现哈希见：
+`docs/icassp_pure_opsd_action_ablation_report.md`。机器可读产物位于
+`data/eval_results/icassp_pure_opsd_action_ablation_20260924/`。
 
 ### E17 Evidence-Attributed GRPO（方向2）
 
